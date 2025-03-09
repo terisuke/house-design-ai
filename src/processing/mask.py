@@ -8,9 +8,19 @@ import io
 from typing import Optional, Tuple, Dict, Any, Union
 from PIL import Image
 import logging
+import yaml
 
 # ロギング設定
 logger = logging.getLogger(__name__)
+
+# data.yamlからクラス名を取得
+with open('config/data.yaml', 'r') as f:
+    data_config = yaml.safe_load(f)
+    class_names = data_config['names']
+
+# クラス名からIDを取得
+HOUSE_CLASS_ID = class_names.index('House') if 'House' in class_names else None
+ROAD_CLASS_ID = class_names.index('Road') if 'Road' in class_names else None
 
 
 def offset_mask_by_distance(mask: np.ndarray, offset_px: int) -> np.ndarray:
@@ -148,10 +158,6 @@ def process_image(
         
         # 画像の寸法を取得
         h, w = orig.shape[:2]
-        
-        # クラスIDの定義
-        HOUSE_CLASS_ID = 1
-        ROAD_CLASS_ID = 2
         
         # マスクを初期化
         house_mask = np.zeros((h, w), dtype=np.uint8)
