@@ -25,6 +25,8 @@ wheels/
 # YOLOv8関連
 runs/
 *.pt
+*.jpg
+*.txt
 
 # 環境設定
 .env
