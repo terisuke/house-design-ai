@@ -8,9 +8,17 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
+  python3-dev \
   git \
   libgl1-mesa-dev \
   libglib2.0-0 \
+  build-essential \
+  pkg-config \
+  libprotobuf-dev \
+  protobuf-compiler \
+  libssl-dev \
+  libffi-dev \
+  libc-ares2 \
   && rm -rf /var/lib/apt/lists/*
 
 # 依存関係のファイルをコピー
