@@ -1,0 +1,19 @@
+# 基本的な依存関係
+ultralytics>=8.0.0
+google-cloud-storage>=2.0.0
+google-cloud-aiplatform>=1.0.0
+streamlit>=1.20.0
+PyYAML>=6.0
+opencv-python>=4.7.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+pillow>=9.0.0
+
+# 開発用ツール
+pytest>=7.0.0
+ruff>=0.0.270
+black>=23.0.0
+
+# その他の依存関係
+ipython>=8.0.0  # notebooks用
+pydantic>=2.0.0  # データ検証用
