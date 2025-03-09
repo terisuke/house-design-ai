@@ -17,16 +17,16 @@ JOB_NAME = os.environ.get("JOB_NAME", "yolov8-custom-training-job")
 # 最新のイメージタグを使用するか、環境変数で指定する
 CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3") # 例：v3部分は適宜変更
 SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT", "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com")
-STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://yolo-v8-training-staging")
+STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://yolo-v11-training-staging")
 
 # タイムスタンプで一意なディレクトリ名を作成
 now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-save_dir = f"gs://yolo-v8-training/runs/segment/train_{now}"
+save_dir = f"gs://yolo-v11-training/runs/segment/train_{now}"
 
 # app.py (実際には src/train.py) に渡す引数 (リスト形式)
 args = [
     "train", # trainコマンドを追加
-    "--bucket_name", "yolo-v8-training",
+    "--bucket_name", "yolo-v11-training",
     "--model", "yolo11m-seg.pt",
     "--epochs", "600",
     "--batch_size", "16",

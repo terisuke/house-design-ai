@@ -1,9 +1,14 @@
-# YOLOv8 が期待するディレクトリ構造に合わせる
-train: /app/datasets/house/train/images
-val: /app/datasets/house/val/images
 
-# number of classes (House, Road, Direction, Space の4クラス + Direction2をDirectionに統合)
+# Vertex AI用パス (コメントアウト)
+train: /app/datasets/house/train
+val: /app/datasets/house/val
+
+# ローカルでのディレクトリパス
+# train: datasets/house/train
+# val: datasets/house/val
+
+
+# number of classes
 nc: 5
-
 # class names
 names: ['Direction', 'Direction2', 'House', 'Road', 'Space']

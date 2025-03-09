@@ -45,7 +45,7 @@ def load_yolo_model() -> None:
             # Google Cloud Storageからモデルをダウンロード
             try:
                 model_path = download_model_from_gcs(
-                    bucket_name="yolo-v8-training",
+                    bucket_name="yolo-v11-training",
                     blob_name="trained_models/best.pt"
                 )
                 

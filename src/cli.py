@@ -34,7 +34,7 @@ def setup_vertex_parser(subparsers):
     parser.add_argument("--service_account", type=str,
                        default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",
                        help="サービスアカウント")
-    parser.add_argument("--staging_bucket", type=str, default="gs://yolo-v8-training-staging",
+    parser.add_argument("--staging_bucket", type=str, default="gs://yolo-v11-training-staging",
                        help="ステージングバケット (gs://から始まる)")
     parser.add_argument("--machine_type", type=str, default="n1-highmem-8",
                        help="マシンタイプ")
@@ -47,7 +47,7 @@ def setup_vertex_parser(subparsers):
     
     # トレーニング用の引数 - デフォルト値を以前の設定に合わせて更新
     train_args = parser.add_argument_group("トレーニング引数", "Vertex AIジョブに転送される引数")
-    train_args.add_argument("--bucket_name", type=str, default="yolo-v8-training",
+    train_args.add_argument("--bucket_name", type=str, default="yolo-v11-training",
                           help="データセット用GCSバケット名")
     train_args.add_argument("--model", type=str, default="yolo11m-seg.pt",
                           help="使用するYOLOモデル")

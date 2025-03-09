@@ -173,16 +173,16 @@ if __name__ == "__main__":
     JOB_NAME = "yolov8-custom-training-job"
     CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3"
     SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
-    STAGING_BUCKET = "gs://yolo-v8-training-staging"
+    STAGING_BUCKET = "gs://yolo-v11-training-staging"
     
     # タイムスタンプで一意なディレクトリ名を作成
     now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    save_dir = f"gs://yolo-v8-training/runs/segment/train_{now}"
+    save_dir = f"gs://yolo-v11-training/runs/segment/train_{now}"
     
     # Dockerコンテナで実行されるコマンド引数リスト
     # 最初に'train'サブコマンドを追加してCLIモードを有効化
     args = [
-        "--bucket_name", "yolo-v8-training",
+        "--bucket_name", "yolo-v11-training",
         "--model", "yolo11m-seg.pt",
         "--epochs", "600",             # エポック数を増加
         "--batch_size", "16",
