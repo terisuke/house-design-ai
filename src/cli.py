@@ -21,62 +21,63 @@ def setup_vertex_parser(subparsers):
     """Vertex AI関連の引数パーサーを設定"""
     parser = subparsers.add_parser("vertex", help="Vertex AI上でカスタムジョブを実行")
     
+    # 基本設定
     parser.add_argument("--project_id", type=str, default="yolov8environment",
-                      help="GCPプロジェクトID")
+                       help="GCPプロジェクトID")
     parser.add_argument("--region", type=str, default="asia-northeast1",
-                      help="GCPリージョン")
+                       help="GCPリージョン")
     parser.add_argument("--job_name", type=str, default="yolov8-custom-training-job",
-                      help="Vertex AIジョブ名")
+                       help="Vertex AIジョブ名")
     parser.add_argument("--container_uri", type=str, 
-                      default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3",
-                      help="コンテナイメージURI")
+                       default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3",
+                       help="コンテナイメージURI")
     parser.add_argument("--service_account", type=str,
-                      default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",
-                      help="サービスアカウント")
+                       default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",
+                       help="サービスアカウント")
     parser.add_argument("--staging_bucket", type=str, default="gs://yolo-v8-training-staging",
-                      help="ステージングバケット (gs://から始まる)")
+                       help="ステージングバケット (gs://から始まる)")
     parser.add_argument("--machine_type", type=str, default="n1-highmem-8",
-                      help="マシンタイプ")
+                       help="マシンタイプ")
     parser.add_argument("--accelerator_type", type=str, default="NVIDIA_TESLA_T4",
-                      help="アクセラレータタイプ (GPUなしの場合は 'none' を指定)")
+                       help="アクセラレータタイプ (GPUなしの場合は 'none' を指定)")
     parser.add_argument("--accelerator_count", type=int, default=1,
-                      help="アクセラレータ数")
+                       help="アクセラレータ数")
     parser.add_argument("--save_dir", type=str,
-                      help="結果保存ディレクトリ (指定しない場合は自動生成)")
+                       help="結果保存ディレクトリ (指定しない場合は自動生成)")
     
-    # トレーニング用の引数
+    # トレーニング用の引数 - デフォルト値を以前の設定に合わせて更新
     train_args = parser.add_argument_group("トレーニング引数", "Vertex AIジョブに転送される引数")
     train_args.add_argument("--bucket_name", type=str, default="yolo-v8-training",
                           help="データセット用GCSバケット名")
-    train_args.add_argument("--model", type=str, default="yolov8m-seg.pt",
+    train_args.add_argument("--model", type=str, default="yolo11m-seg.pt",
                           help="使用するYOLOモデル")
-    train_args.add_argument("--epochs", type=int, default=100,
+    train_args.add_argument("--epochs", type=int, default=600,
                           help="トレーニングエポック数")
     train_args.add_argument("--batch_size", type=int, default=16,
                           help="バッチサイズ")
     train_args.add_argument("--imgsz", type=int, default=640,
                           help="入力画像サイズ")
-    train_args.add_argument("--optimizer", type=str, default="Adam",
+    train_args.add_argument("--optimizer", type=str, default="SGD",  # 変更: Adam → SGD
                           help="オプティマイザ (Adam, SGD)")
-    train_args.add_argument("--lr0", type=float, default=0.01,
+    train_args.add_argument("--lr0", type=float, default=0.005,  # 変更: 0.01 → 0.005
                           help="初期学習率")
     train_args.add_argument("--upload_bucket", type=str, default="yolo-v8-training",
                           help="モデルアップロード先GCSバケット")
     train_args.add_argument("--upload_dir", type=str, default="trained_models",
                           help="アップロード先ディレクトリ")
-    train_args.add_argument("--iou_threshold", type=float, default=0.7,
+    train_args.add_argument("--iou_threshold", type=float, default=0.65,  # 変更: 0.7 → 0.65
                           help="IoUしきい値")
-    train_args.add_argument("--conf_threshold", type=float, default=0.25,
+    train_args.add_argument("--conf_threshold", type=float, default=0.2,  # 変更: 0.25 → 0.2
                           help="信頼度しきい値")
-    train_args.add_argument("--rect", action="store_true",
+    train_args.add_argument("--rect", action="store_true", default=True,  # 変更: default=True を追加
                           help="矩形トレーニングを有効化")
-    train_args.add_argument("--cos_lr", action="store_true",
+    train_args.add_argument("--cos_lr", action="store_true", default=True,  # 変更: default=True を追加
                           help="コサイン学習率スケジューラを使用")
     train_args.add_argument("--mosaic", type=float, default=1.0,
                           help="モザイク拡張確率")
-    train_args.add_argument("--degrees", type=float, default=0.0,
+    train_args.add_argument("--degrees", type=float, default=10.0,  # 変更: 0.0 → 10.0
                           help="画像回転角度")
-    train_args.add_argument("--scale", type=float, default=0.5,
+    train_args.add_argument("--scale", type=float, default=0.6,  # 変更: 0.5 → 0.6
                           help="画像スケール拡張")
     train_args.add_argument("--single_cls", action="store_true",
                           help="すべてのクラスを単一クラスとして扱う")
