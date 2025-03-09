@@ -15,7 +15,7 @@ import datetime
 PROJECT_ID = "yolov8environment"
 REGION = "asia-northeast1"
 JOB_NAME = "yolov8-custom-training-job"
-CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v2"
+CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3"
 SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
 STAGING_BUCKET = "gs://yolo-v8-training-staging"
 

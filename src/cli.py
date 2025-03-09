@@ -28,7 +28,7 @@ def setup_vertex_parser(subparsers):
     parser.add_argument("--job_name", type=str, default="yolov8-custom-training-job",
                       help="Vertex AIジョブ名")
     parser.add_argument("--container_uri", type=str, 
-                      default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v2",
+                      default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3",
                       help="コンテナイメージURI")
     parser.add_argument("--service_account", type=str,
                       default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",

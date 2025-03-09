@@ -24,7 +24,9 @@ COPY src/ /app/src/
 COPY streamlit/ /app/streamlit/
 COPY scripts/ /app/scripts/
 COPY pyproject.toml /app/
-COPY data.yaml /app/
+
+# configディレクトリを作成
+RUN mkdir -p /app/config/
 
 # サービスアカウントキーをコピー
 COPY config/service_account.json /app/config/service_account.json
