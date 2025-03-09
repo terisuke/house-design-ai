@@ -165,7 +165,7 @@ def update_data_yaml(
                 # 既存のYAMLをダウンロード (存在する場合)
                 if blob.exists():
                     blob_content = blob.download_as_string()
-                    with open(temp_path, 'wb') as f:
+                    with open(temp_path, 'w') as f:
                         f.write(blob_content)
                     
                     # YAMLをロード
