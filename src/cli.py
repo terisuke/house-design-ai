@@ -137,6 +137,20 @@ def setup_inference_parser(subparsers):
     return parser
 
 
+def setup_visualize_parser(subparsers):
+    """データセット可視化関連の引数パーサーを設定"""
+    parser = subparsers.add_parser("visualize", help="YOLOv8データセットを視覚化")
+    
+    parser.add_argument("--data_yaml", type=str, default="data.yaml",
+                      help="data.yamlファイルのパス")
+    parser.add_argument("--num_samples", type=int, default=5,
+                      help="表示するサンプル数")
+    parser.add_argument("--output_dir", type=str, default="visualization_results",
+                      help="出力ディレクトリ")
+    
+    return parser
+
+
 def main(args: Optional[List[str]] = None) -> int:
     """メインエントリポイント"""
     parser = argparse.ArgumentParser(
@@ -154,6 +168,7 @@ def main(args: Optional[List[str]] = None) -> int:
     setup_train_parser(subparsers)
     setup_app_parser(subparsers)
     setup_inference_parser(subparsers)
+    setup_visualize_parser(subparsers)
     
     parsed_args = parser.parse_args(args)
     
@@ -258,6 +273,16 @@ def main(args: Optional[List[str]] = None) -> int:
         elif parsed_args.command == "inference":
             from src.inference import run_inference
             return run_inference(parsed_args)
+        
+        # 可視化コマンド
+        elif parsed_args.command == "visualize":
+            from src.visualization.dataset import visualize_dataset
+            success = visualize_dataset(
+                parsed_args.data_yaml,
+                parsed_args.num_samples,
+                parsed_args.output_dir
+            )
+            return 0 if success else 1
         
         else:
             print(f"未実装のコマンド: {parsed_args.command}")
