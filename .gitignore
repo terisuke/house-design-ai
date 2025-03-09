@@ -22,7 +22,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# YOLOv8関連
+# YOLO関連
 runs/
 *.pt
 *.jpg

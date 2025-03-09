@@ -107,6 +107,34 @@ def setup_train_parser(subparsers):
     parser.add_argument("--val_dir", type=str, default="datasets/house/val",
                       help="検証データディレクトリのローカルパス")
     
+    # GCS/Vertex AI用パラメータ
+    parser.add_argument("--bucket_name", type=str,
+                      help="GCSバケット名")
+    parser.add_argument("--optimizer", type=str, default="Adam",
+                      help="最適化アルゴリズム (Adam, SGD, etc.)")
+    parser.add_argument("--lr0", type=float, default=0.01,
+                      help="初期学習率")
+    parser.add_argument("--upload_bucket", type=str,
+                      help="モデルをアップロードするGCSバケット")
+    parser.add_argument("--upload_dir", type=str,
+                      help="モデルをアップロードするGCSディレクトリ")
+    parser.add_argument("--iou_threshold", type=float, default=0.7,
+                      help="IoUのしきい値")
+    parser.add_argument("--conf_threshold", type=float, default=0.25,
+                      help="信頼度のしきい値")
+    parser.add_argument("--rect", action="store_true",
+                      help="矩形トレーニングを有効化")
+    parser.add_argument("--cos_lr", action="store_true",
+                      help="コサイン学習率スケジューラを有効化")
+    parser.add_argument("--mosaic", type=float, default=1.0,
+                      help="モザイクデータ拡張の確率")
+    parser.add_argument("--degrees", type=float, default=0.0,
+                      help="回転データ拡張の最大角度")
+    parser.add_argument("--scale", type=float, default=0.5,
+                      help="スケールデータ拡張の範囲")
+    parser.add_argument("--save_dir", type=str,
+                      help="結果を保存するディレクトリ")
+    
     return parser
 
 

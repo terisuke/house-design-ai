@@ -25,9 +25,10 @@ save_dir = f"gs://yolo-v8-training/runs/segment/train_{now}"
 
 # app.py に渡す引数 (リスト形式)
 args = [
+    "train",
     "--bucket_name", "yolo-v8-training",
     "--model", "yolo11m-seg.pt",  
-    "--epochs", "500",
+    "--epochs", "600",
     "--batch_size", "16",
     "--imgsz", "640",
     "--optimizer", "SGD",
@@ -41,6 +42,9 @@ args = [
     "--mosaic", "1.0",
     "--degrees", "10.0",
     "--scale", "0.6",
+    "--data_yaml", "/app/config/data.yaml",
+    "--train_dir", "gs://yolo-v8-training/datasets/house/train/images",
+    "--val_dir", "gs://yolo-v8-training/datasets/house/val/images",
     "--save_dir", save_dir
 ]
 

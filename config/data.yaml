@@ -1,7 +1,11 @@
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-# Vertex AI用パス
-train: /app/datasets/house/train
-val: /app/datasets/house/val
+# コンテナ内の相対パスを使用（YOLOv8と互換性がある）
+train: /app/datasets/house/train/images
+val: /app/datasets/house/val/images
+
+# ラベルディレクトリを明示的に指定
+train_labels: /app/datasets/house/train/labels
+val_labels: /app/datasets/house/val/labels
 
 # ローカルでのディレクトリパス
 # train: datasets/house/train

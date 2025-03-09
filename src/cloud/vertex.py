@@ -73,7 +73,7 @@ def create_custom_training_job(
                 "replica_count": replica_count,
                 "container_spec": {
                     "image_uri": container_image_uri,
-                    "command": ["python3", "/app/app.py"],
+                    "command": ["python3", "-m", "src.cli"],
                     "args": args,
                 },
             }
@@ -81,6 +81,10 @@ def create_custom_training_job(
     )
     
     logger.info(f"Created custom training job: {display_name}")
+    logger.info(f"Container image: {container_image_uri}")
+    logger.info(f"Container command: python3 -m src.cli")
+    logger.info(f"Container args: {args}")
+    logger.info(f"Machine type: {machine_type}, Accelerator: {accelerator_type} x {accelerator_count if accelerator_type else 0}")
     return job
 
 
@@ -180,7 +184,7 @@ if __name__ == "__main__":
     args = [
         "--bucket_name", "yolo-v8-training",
         "--model", "yolo11m-seg.pt",
-        "--epochs", "500",             # エポック数を増加
+        "--epochs", "600",             # エポック数を増加
         "--batch_size", "16",
         "--imgsz", "640",
         "--optimizer", "SGD",          # AdamからSGDに変更
