@@ -137,6 +137,14 @@ def run_vertex_job(
         else:
             args.extend(["--save_dir", save_dir])
     
+    # trainサブコマンドが含まれていない場合のみ先頭に追加
+    if len(args) == 0 or args[0] != "train":
+        args = ["train"] + args
+    
+    # 実行コマンドのデバッグログ出力
+    command_str = "python3 -m src.cli " + " ".join(args)
+    logger.info(f"実行されるコマンド: {command_str}")
+    
     # カスタムジョブの作成
     job = create_custom_training_job(
         display_name=job_name,
@@ -167,10 +175,11 @@ if __name__ == "__main__":
     now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     save_dir = f"gs://yolo-v8-training/runs/segment/train_{now}"
     
-    # app.py に渡す引数
+    # Dockerコンテナで実行されるコマンド引数リスト
+    # 最初に'train'サブコマンドを追加してCLIモードを有効化
     args = [
         "--bucket_name", "yolo-v8-training",
-        "--model", "yolo11m-seg.pt",  
+        "--model", "yolo11m-seg.pt",
         "--epochs", "500",             # エポック数を増加
         "--batch_size", "16",
         "--imgsz", "640",

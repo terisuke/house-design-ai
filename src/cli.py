@@ -225,6 +225,10 @@ def main(args: Optional[List[str]] = None) -> int:
             if parsed_args.save_dir:
                 training_args.extend(["--save_dir", parsed_args.save_dir])
             
+            # 引数のデバッグログを追加
+            args_str = " ".join(training_args)
+            logger.info(f"Vertex AIジョブに渡される引数: {args_str}")
+            
             # ジョブを実行
             job = run_vertex_job(
                 project_id=parsed_args.project_id,

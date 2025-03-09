@@ -66,12 +66,6 @@ def train_model(args: argparse.Namespace) -> int:
             logger.error("data.yamlの更新に失敗しました")
             return 1
         
-        # モデル名の標準化（セグメンテーションモデルであることを確認）
-        model_path = args.model
-        if not model_path.endswith("-seg.pt"):
-            base_name = model_path.replace(".pt", "")
-            model_path = f"{base_name}-seg.pt"
-        
         # モデルのインポート
         try:
             from ultralytics import YOLO
@@ -80,8 +74,8 @@ def train_model(args: argparse.Namespace) -> int:
             return 1
         
         # モデルのロード
-        logger.info(f"モデルをロード中: {model_path}")
-        model = YOLO(model_path)
+        logger.info(f"モデルをロード中: {args.model}")
+        model = YOLO(args.model)
         
         # トレーニングパラメータの設定
         train_params = {
