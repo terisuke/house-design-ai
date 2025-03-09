@@ -1,17 +1,8 @@
-# Google Cloud Storageのパス
-train: /app/datasets/house/train
-val: /app/datasets/house/val
+# YOLOv8 が期待するディレクトリ構造に合わせる
+train: /app/datasets/house/train/images
+val: /app/datasets/house/val/images
 
-train_images: /app/datasets/house/train/images
-val_images: /app/datasets/house/val/images
-train_labels: /app/datasets/house/train/labels
-val_labels: /app/datasets/house/val/labels
-
-# ローカルでのディレクトリパス
-# train: datasets/house/train
-# val: datasets/house/val
-
-# number of classes
+# number of classes (House, Road, Direction, Space の4クラス + Direction2をDirectionに統合)
 nc: 5
 
 # class names
