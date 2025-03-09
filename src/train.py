@@ -7,7 +7,7 @@ from google.cloud import storage
 import tempfile
 import subprocess
 import shutil # 追加
-
+from typing import List
 # ロギング設定
 logger = logging.getLogger(__name__)
 
