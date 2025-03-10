@@ -33,54 +33,20 @@ def download_dataset_from_gcs(
         # ローカルディレクトリが存在することを確認(無ければ作成)
         os.makedirs(local_dir, exist_ok=True)
         
-        # gsutilを使用してデータをダウンロード（再帰的に）
+        # Python APIのみを使用する
         logger.info(f"GCSからデータセットをダウンロード: gs://{gcs_bucket_name}/{gcs_prefix} -> {local_dir}")
-        
-        # 方法1: gsutilコマンドを使用（より高速で信頼性が高い）
-        gsutil_success = False
-        try:
-            # gsutilが存在するか確認
-            check_gsutil = subprocess.run("which gsutil", shell=True, capture_output=True, text=True)
-            if check_gsutil.returncode == 0:
-                logger.info(f"gsutilパス: {check_gsutil.stdout.strip()}")
-                
-                # 除外パターンをgsutilコマンドに組み込む (正しい構文で設定)
-                exclude_str = ""
-                for pattern in exclude_patterns:
-                    exclude_str += f" --exclude='{pattern}'"
-                gsutil_cmd = f"gsutil -m cp -r{exclude_str} gs://{gcs_bucket_name}/{gcs_prefix}/* {local_dir}"
-                logger.info(f"実行コマンド: {gsutil_cmd}")
-                
-                # 実行と結果の確認
-                result = subprocess.run(gsutil_cmd, shell=True, check=True, capture_output=True, text=True)
-                logger.info(f"gsutil stdout: {result.stdout}") # gsutilの標準出力をログに記録
-                if result.stderr:
-                    logger.warning(f"gsutil stderr: {result.stderr}") # gsutilの標準エラー出力もログに記録
-                
-                logger.info(f"gsutilによるダウンロード完了")
-                gsutil_success = True
-            else:
-                logger.warning(f"gsutilコマンドが見つかりません。Python APIを使用します。")
-        except subprocess.CalledProcessError as e:
-            logger.warning(f"gsutilコマンドが失敗しました: {e}. Python APIを使用して再試行します。")
-            logger.warning(f"gsutil stderr: {e.stderr}") # gsutil のエラーを詳細にログ
-        
-
-        # gsutilが失敗した場合は、Python APIを使用 (変更: 必ずPython APIを試行)
-        if not gsutil_success:
-            logger.info("Google Cloud Storage Python APIを使用してデータセットをダウンロードします。")
-            # Python APIを使用してデータをダウンロード
-            from src.cloud.storage import download_dataset
-            if not download_dataset(
-                bucket_name=gcs_bucket_name,
-                source_prefix=gcs_prefix,
-                destination_dir=local_dir,
-                exclude_patterns=exclude_patterns
-            ):
-                logger.error("Google Cloud Storage Python APIを使用したダウンロードに失敗しました。")
-                return False
-            else:
-                logger.info("Google Cloud Storage Python APIを使用したダウンロードが成功しました。")
+        logger.info("[INFO] Python API (google-cloud-storage) を使用してデータセットをダウンロードします。")
+        from src.cloud.storage import download_dataset
+        if not download_dataset(
+            bucket_name=gcs_bucket_name,
+            source_prefix=gcs_prefix,
+            destination_dir=local_dir,
+            exclude_patterns=exclude_patterns
+        ):
+            logger.error("Python APIによるデータセットダウンロードに失敗しました。")
+            return False
+        else:
+            logger.info("Python APIを使用したダウンロードが成功しました。")
 
         # ダウンロードが完了したらファイル一覧を表示
         try:
@@ -91,7 +57,7 @@ def download_dataset_from_gcs(
         except Exception as e:
             logger.warning(f"ローカルディレクトリの確認中にエラー: {e}")
         
-        return True  # gsutil またはPython APIが成功した場合は True
+        return True  # Python APIが成功した場合は True
         
     except Exception as e:
         logger.error(f"データセットダウンロードエラー: {e}")
@@ -234,7 +200,7 @@ def train_model(args: argparse.Namespace) -> int:
             'mosaic':args.mosaic,
             'degrees':args.degrees,
             'scale':args.scale,
-            'single_cls':args.single_cls,
+            'single_cls': getattr(args, 'single_cls', False),
             'exist_ok': True,  # 既存のトレーニング結果を上書き
         }
         

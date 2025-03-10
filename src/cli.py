@@ -134,6 +134,8 @@ def setup_train_parser(subparsers):
                       help="スケールデータ拡張の範囲")
     parser.add_argument("--save_dir", type=str,
                       help="結果を保存するディレクトリ")
+    parser.add_argument("--single_cls", action="store_true",
+                      help="すべてのクラスを単一クラスとして扱う")
     
     return parser
 
