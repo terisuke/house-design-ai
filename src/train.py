@@ -112,7 +112,7 @@ def update_data_yaml(
 
 def train_model(args: argparse.Namespace) -> int:
     """
-    YOLOv8セグメンテーションモデルをトレーニングします。
+    YOLOセグメンテーションモデルをトレーニングします。
     
     Args:
         args: コマンドライン引数
@@ -221,7 +221,7 @@ def train_model(args: argparse.Namespace) -> int:
         # upload_modelは削除。save_dirをアップロードする。
         # Upload the entire save_dir to Cloud Storage
         if args.upload_bucket:
-            from src.cloud.storage import upload_directory # 依存関係の問題を避けるため、ここでのみインポートする
+            from src.cloud.storage import upload_directory_to_gcs as upload_directory # 依存関係の問題を避けるため、ここでのみインポートする
             upload_directory(
                 args.upload_bucket,
                 str(model.trainer.save_dir),  # ローカルの保存先ディレクトリ
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     # 引数パーサーの設定
     parser = argparse.ArgumentParser(description="YOLOv8セグメンテーションモデルのトレーニング")
     
-    parser.add_argument("--model", type=str, default="yolo11m-seg.pt",
+    parser.add_argument("--model", type=str, default="yolo11l-seg.pt",
                       help="ベースYOLOv8モデル")
     parser.add_argument("--epochs", type=int, default=100,
                       help="トレーニングエポック数")

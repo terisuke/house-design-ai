@@ -53,8 +53,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN mkdir -p /root/.config/ultralytics/models/
 
 # YOLO11mセグメンテーションモデルをダウンロード
-RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m-seg.pt -O /root/.config/ultralytics/models/yolo11m-seg.pt && \
-  chmod 644 /root/.config/ultralytics/models/yolo11m-seg.pt && \
+RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-seg.pt -O /root/.config/ultralytics/models/yolo11l-seg.pt && \
+  chmod 644 /root/.config/ultralytics/models/yolo11l-seg.pt && \
   ls -la /root/.config/ultralytics/models/
 
 # プロジェクトファイルをコピー

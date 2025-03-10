@@ -26,7 +26,7 @@ def setup_vertex_parser(subparsers):
                        help="GCPプロジェクトID")
     parser.add_argument("--region", type=str, default="asia-northeast1",
                        help="GCPリージョン")
-    parser.add_argument("--job_name", type=str, default="yolov8-custom-training-job",
+    parser.add_argument("--job_name", type=str, default="yolo11-custom-training-job",
                        help="Vertex AIジョブ名")
     parser.add_argument("--container_uri", type=str, 
                        default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4",
@@ -49,7 +49,7 @@ def setup_vertex_parser(subparsers):
     train_args = parser.add_argument_group("トレーニング引数", "Vertex AIジョブに転送される引数")
     train_args.add_argument("--bucket_name", type=str, default="yolo-v11-training",
                           help="データセット用GCSバケット名")
-    train_args.add_argument("--model", type=str, default="yolo11m-seg.pt",
+    train_args.add_argument("--model", type=str, default="yolo11l-seg.pt",
                           help="使用するYOLOモデル")
     train_args.add_argument("--epochs", type=int, default=600,
                           help="トレーニングエポック数")
@@ -90,7 +90,7 @@ def setup_train_parser(subparsers):
     parser = subparsers.add_parser("train", help="YOLOv8モデルをローカルでトレーニング")
     
     # 基本パラメータ
-    parser.add_argument("--model", type=str, default="yolo11m-seg.pt",
+    parser.add_argument("--model", type=str, default="yolo11l-seg.pt",
                       help="ベースYOLOモデル (例: yolo11n-seg.pt, yolo11s-seg.pt)")
     parser.add_argument("--epochs", type=int, default=100,
                       help="トレーニングエポック数")

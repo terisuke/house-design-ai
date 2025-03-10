@@ -13,7 +13,7 @@ from src.cloud.vertex import run_vertex_job
 # 各種設定 (必要に応じて環境変数から取得)
 PROJECT_ID = os.environ.get("PROJECT_ID", "yolov8environment")
 REGION = os.environ.get("REGION", "asia-northeast1")
-JOB_NAME = os.environ.get("JOB_NAME", "yolov8-custom-training-job")
+JOB_NAME = os.environ.get("JOB_NAME", "yolo11-custom-training-job")
 # 最新のイメージタグを使用するか、環境変数で指定する
 CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4") # 例：v4部分は適宜変更
 SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT", "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com")
@@ -27,7 +27,7 @@ save_dir = f"gs://yolo-v11-training/runs/segment/train_{now}"
 args = [
     "train", # trainコマンドを追加
     "--bucket_name", "yolo-v11-training",
-    "--model", "yolo11m-seg.pt",
+    "--model", "yolo11l-seg.pt",
     "--epochs", "600",
     "--batch_size", "16",
     "--imgsz", "640",

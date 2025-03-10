@@ -170,7 +170,7 @@ if __name__ == "__main__":
     # デフォルト設定
     PROJECT_ID = "yolov8environment"
     REGION = "asia-northeast1"
-    JOB_NAME = "yolov8-custom-training-job"
+    JOB_NAME = "yolo11-custom-training-job"
     CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4"
     SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
     STAGING_BUCKET = "gs://yolo-v11-training-staging"
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     # 最初に'train'サブコマンドを追加してCLIモードを有効化
     args = [
         "--bucket_name", "yolo-v11-training",
-        "--model", "yolo11m-seg.pt",
+        "--model", "yolo11l-seg.pt",
         "--epochs", "600",             # エポック数を増加
         "--batch_size", "16",
         "--imgsz", "640",
