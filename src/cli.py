@@ -29,7 +29,7 @@ def setup_vertex_parser(subparsers):
     parser.add_argument("--job_name", type=str, default="yolov8-custom-training-job",
                        help="Vertex AIジョブ名")
     parser.add_argument("--container_uri", type=str, 
-                       default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3",
+                       default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v5",
                        help="コンテナイメージURI")
     parser.add_argument("--service_account", type=str,
                        default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",
@@ -102,9 +102,9 @@ def setup_train_parser(subparsers):
                       help="data.yamlファイルのパス")
     
     # ローカル実行用パラメータ
-    parser.add_argument("--train_dir", type=str, default="datasets/house/train",
+    parser.add_argument("--train_dir", type=str, default="house/train",
                       help="トレーニングデータディレクトリのローカルパス")
-    parser.add_argument("--val_dir", type=str, default="datasets/house/val",
+    parser.add_argument("--val_dir", type=str, default="house/val",
                       help="検証データディレクトリのローカルパス")
     
     # GCS/Vertex AI用パラメータ

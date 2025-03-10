@@ -171,7 +171,7 @@ if __name__ == "__main__":
     PROJECT_ID = "yolov8environment"
     REGION = "asia-northeast1"
     JOB_NAME = "yolov8-custom-training-job"
-    CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v3"
+    CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v5"
     SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
     STAGING_BUCKET = "gs://yolo-v11-training-staging"
     

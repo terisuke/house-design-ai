@@ -22,7 +22,7 @@ def download_dataset_from_gcs(
     
     Args:
         gcs_bucket_name: GCSバケット名
-        gcs_prefix: GCS内のプレフィックス（datasets/house/等）
+        gcs_prefix: GCS内のプレフィックス（house/等）
         local_dir: データセットを保存するローカルディレクトリ
         exclude_patterns: 除外するファイルパターンのリスト
         
@@ -44,9 +44,11 @@ def download_dataset_from_gcs(
             if check_gsutil.returncode == 0:
                 logger.info(f"gsutilパス: {check_gsutil.stdout.strip()}")
                 
-                # 除外パターンをgsutilコマンドに組み込む
-                exclude_str = " ".join([f"--exclude='{pattern}'" for pattern in exclude_patterns])
-                gsutil_cmd = f"gsutil -m cp -r {exclude_str} gs://{gcs_bucket_name}/{gcs_prefix}/* {local_dir}"
+                # 除外パターンをgsutilコマンドに組み込む (正しい構文で設定)
+                exclude_str = ""
+                for pattern in exclude_patterns:
+                    exclude_str += f" --exclude='{pattern}'"
+                gsutil_cmd = f"gsutil -m cp -r{exclude_str} gs://{gcs_bucket_name}/{gcs_prefix}/* {local_dir}"
                 logger.info(f"実行コマンド: {gsutil_cmd}")
                 
                 # 実行と結果の確認
@@ -64,10 +66,21 @@ def download_dataset_from_gcs(
             logger.warning(f"gsutil stderr: {e.stderr}") # gsutil のエラーを詳細にログ
         
 
-        # gsutilが失敗した場合のみPython APIを使用 (今回は使用しない)
+        # gsutilが失敗した場合は、Python APIを使用 (変更: 必ずPython APIを試行)
         if not gsutil_success:
-            logger.warning("gsutilコマンドが失敗したため、google-cloud-storageライブラリを使用したダウンロードはスキップします。")
-            return False
+            logger.info("Google Cloud Storage Python APIを使用してデータセットをダウンロードします。")
+            # Python APIを使用してデータをダウンロード
+            from src.cloud.storage import download_dataset
+            if not download_dataset(
+                bucket_name=gcs_bucket_name,
+                source_prefix=gcs_prefix,
+                destination_dir=local_dir,
+                exclude_patterns=exclude_patterns
+            ):
+                logger.error("Google Cloud Storage Python APIを使用したダウンロードに失敗しました。")
+                return False
+            else:
+                logger.info("Google Cloud Storage Python APIを使用したダウンロードが成功しました。")
 
         # ダウンロードが完了したらファイル一覧を表示
         try:
@@ -78,7 +91,7 @@ def download_dataset_from_gcs(
         except Exception as e:
             logger.warning(f"ローカルディレクトリの確認中にエラー: {e}")
         
-        return True  # gsutil が成功した場合は True
+        return True  # gsutil またはPython APIが成功した場合は True
         
     except Exception as e:
         logger.error(f"データセットダウンロードエラー: {e}")
@@ -97,8 +110,8 @@ def update_data_yaml(
 
     Args:
         yaml_path: data.yamlファイルのパス
-        train_dir: トレーニングデータディレクトリのパス(/app/datasets/house/train)
-        val_dir: 検証データディレクトリのパス(/app/datasets/house/val)
+        train_dir: トレーニングデータディレクトリのパス(/app/house/train)
+        val_dir: 検証データディレクトリのパス(/app/house/val)
 
     Returns:
         更新成功時はTrue、失敗時はFalse
@@ -156,7 +169,7 @@ def train_model(args: argparse.Namespace) -> int:
             logger.info(f"GCSからデータセットをダウンロードします: {args.bucket_name}")
             
             # トレーニングデータのダウンロード
-            train_dir = "/app/datasets/house/train"
+            train_dir = "/app/house/train"
             # train_dir が存在し、空でない場合は削除 (Vertex AI 環境を想定)
             if os.path.exists(train_dir) and os.listdir(train_dir):
                 logger.warning(f"{train_dir} は空ではありません。削除します。")
@@ -164,14 +177,14 @@ def train_model(args: argparse.Namespace) -> int:
             
             if not download_dataset_from_gcs(
                 gcs_bucket_name=args.bucket_name,
-                gcs_prefix="datasets/house/train",  # GCS上のtrainディレクトリ
+                gcs_prefix="house/train",  # GCS上のtrainディレクトリ
                 local_dir=train_dir  # ローカルのtrainディレクトリ
             ):
                 logger.error("トレーニングデータのダウンロードに失敗しました")
                 return 1
                 
             # 検証データのダウンロード
-            val_dir = "/app/datasets/house/val"
+            val_dir = "/app/house/val"
             # val_dir が存在し、空でない場合は削除
             if os.path.exists(val_dir) and os.listdir(val_dir):
                 logger.warning(f"{val_dir} は空ではありません。削除します。")
@@ -179,7 +192,7 @@ def train_model(args: argparse.Namespace) -> int:
             
             if not download_dataset_from_gcs(
                 gcs_bucket_name=args.bucket_name,
-                gcs_prefix="datasets/house/val",  # GCS上のvalディレクトリ
+                gcs_prefix="house/val",  # GCS上のvalディレクトリ
                 local_dir=val_dir  # ローカルのvalディレクトリ
             ):
                 logger.error("検証データのダウンロードに失敗しました")
@@ -191,7 +204,7 @@ def train_model(args: argparse.Namespace) -> int:
         data_yaml_path = "/app/config/data.yaml"
         
         # データ設定ファイルの更新
-        if not update_data_yaml(data_yaml_path, '/app/datasets/house/train/images', '/app/datasets/house/val/images'):
+        if not update_data_yaml(data_yaml_path, '/app/house/train/images', '/app/house/val/images'):
             logger.error("data.yamlの更新に失敗しました")
             return 1
         
@@ -202,9 +215,43 @@ def train_model(args: argparse.Namespace) -> int:
             logger.error("ultralyticsパッケージがインストールされていません")
             return 1
         
+        # モデルファイルのパスを確認
+        model_path = args.model
+        ultralytics_model_dir = "/root/.config/ultralytics/models/"
+        local_model_path = os.path.join(ultralytics_model_dir, os.path.basename(model_path))
+        
+        # モデルファイルが存在するか確認
+        if os.path.exists(local_model_path):
+            logger.info(f"モデルファイルが見つかりました: {local_model_path}")
+            model_path = local_model_path
+        else:
+            logger.warning(f"モデルファイル {local_model_path} が見つかりません")
+            
+            # GCSからダウンロードを試みる
+            if hasattr(args, 'bucket_name') and args.bucket_name:
+                try:
+                    logger.info(f"GCSからモデルファイルをダウンロードします: {args.bucket_name}/models/{os.path.basename(model_path)}")
+                    # GCSバケットからモデルをダウンロード
+                    storage_client = storage.Client()
+                    bucket = storage_client.bucket(args.bucket_name)
+                    blob = bucket.blob(f"models/{os.path.basename(model_path)}")
+                    
+                    # ディレクトリが存在することを確認
+                    os.makedirs(ultralytics_model_dir, exist_ok=True)
+                    
+                    # ダウンロード
+                    blob.download_to_filename(local_model_path)
+                    logger.info(f"モデルファイルをGCSからダウンロードしました: {local_model_path}")
+                    model_path = local_model_path
+                except Exception as e:
+                    logger.warning(f"GCSからのモデルダウンロードに失敗しました: {e}")
+                    logger.info(f"デフォルトのモデルパスを使用します: {model_path}")
+            else:
+                logger.info(f"GCSバケットが指定されていないため、デフォルトのモデルパス {model_path} を使用します")
+        
         # モデルのロード
-        logger.info(f"モデルをロード中: {args.model}")
-        model = YOLO(args.model)
+        logger.info(f"モデルをロード中: {model_path}")
+        model = YOLO(model_path)
         
         # トレーニングパラメータの設定
         train_params = {
@@ -270,9 +317,9 @@ if __name__ == "__main__":
                       help="入力画像サイズ")
     parser.add_argument("--data_yaml", type=str, default="config/data.yaml",
                       help="data.yamlファイルのパス")
-    parser.add_argument("--train_dir", type=str, default="datasets/house/train",
+    parser.add_argument("--train_dir", type=str, default="house/train",
                       help="トレーニングデータディレクトリのパス")
-    parser.add_argument("--val_dir", type=str, default="datasets/house/val",
+    parser.add_argument("--val_dir", type=str, default="house/val",
                       help="検証データディレクトリのパス")
     
     args = parser.parse_args()

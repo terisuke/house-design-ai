@@ -1,7 +1,7 @@
 
 # Vertex AI用パス (コメントアウト)
-train: /app/datasets/house/train
-val: /app/datasets/house/val
+train: /app/house/train
+val: /app/house/val
 
 # ローカルでのディレクトリパス
 # train: datasets/house/train
