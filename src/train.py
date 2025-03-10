@@ -273,7 +273,7 @@ if __name__ == "__main__":
     # 引数パーサーの設定
     parser = argparse.ArgumentParser(description="YOLOv8セグメンテーションモデルのトレーニング")
     
-    parser.add_argument("--model", type=str, default="yolov8m-seg.pt",
+    parser.add_argument("--model", type=str, default="yolo11m-seg.pt",
                       help="ベースYOLOv8モデル")
     parser.add_argument("--epochs", type=int, default=100,
                       help="トレーニングエポック数")

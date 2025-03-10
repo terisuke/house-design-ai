@@ -34,7 +34,7 @@ def load_yolo_model() -> None:
     """YOLOモデルをロード・初期化"""
     if "model" not in st.session_state or st.session_state.model is None:
         # 環境変数からモデルパスをチェック
-        model_path = os.environ.get("YOLOV8_MODEL_PATH")
+        model_path = os.environ.get("YOLO_MODEL_PATH")
         
         if model_path and os.path.exists(model_path):
             # ローカルのモデルをロード

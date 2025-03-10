@@ -33,7 +33,7 @@ args = [
     "--imgsz", "640",
     "--optimizer", "SGD",
     "--lr0", "0.005",
-    "--upload_bucket", "yolo-v8-training",
+    "--upload_bucket", "yolo-v11-training",
     "--upload_dir", "trained_models",  # モデルをアップロードするバケット内のディレクトリ
     "--iou_threshold", "0.65",
     "--conf_threshold", "0.2",

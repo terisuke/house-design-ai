@@ -29,7 +29,7 @@ def setup_vertex_parser(subparsers):
     parser.add_argument("--job_name", type=str, default="yolov8-custom-training-job",
                        help="Vertex AIジョブ名")
     parser.add_argument("--container_uri", type=str, 
-                       default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v5",
+                       default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4",
                        help="コンテナイメージURI")
     parser.add_argument("--service_account", type=str,
                        default="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com",
@@ -61,7 +61,7 @@ def setup_vertex_parser(subparsers):
                           help="オプティマイザ (Adam, SGD)")
     train_args.add_argument("--lr0", type=float, default=0.005,  # 変更: 0.01 → 0.005
                           help="初期学習率")
-    train_args.add_argument("--upload_bucket", type=str, default="yolo-v8-training",
+    train_args.add_argument("--upload_bucket", type=str, default="yolo-v11-training",
                           help="モデルアップロード先GCSバケット")
     train_args.add_argument("--upload_dir", type=str, default="trained_models",
                           help="アップロード先ディレクトリ")
@@ -90,8 +90,8 @@ def setup_train_parser(subparsers):
     parser = subparsers.add_parser("train", help="YOLOv8モデルをローカルでトレーニング")
     
     # 基本パラメータ
-    parser.add_argument("--model", type=str, default="yolov8m-seg.pt",
-                      help="ベースYOLOv8モデル (例: yolov8n-seg.pt, yolov8s-seg.pt)")
+    parser.add_argument("--model", type=str, default="yolo11m-seg.pt",
+                      help="ベースYOLOモデル (例: yolo11n-seg.pt, yolo11s-seg.pt)")
     parser.add_argument("--epochs", type=int, default=100,
                       help="トレーニングエポック数")
     parser.add_argument("--batch_size", type=int, default=16,
@@ -152,7 +152,7 @@ def setup_app_parser(subparsers):
 
 def setup_inference_parser(subparsers):
     """推論関連の引数パーサーを設定"""
-    parser = subparsers.add_parser("inference", help="YOLOv8モデルを使って推論実行")
+    parser = subparsers.add_parser("inference", help="YOLOモデルを使って推論実行")
     
     parser.add_argument("--model_path", type=str, required=True,
                       help="モデルファイルのパス")
@@ -168,7 +168,7 @@ def setup_inference_parser(subparsers):
 
 def setup_visualize_parser(subparsers):
     """データセット可視化関連の引数パーサーを設定"""
-    parser = subparsers.add_parser("visualize", help="YOLOv8データセットを視覚化")
+    parser = subparsers.add_parser("visualize", help="YOLOデータセットを視覚化")
     
     parser.add_argument("--data_yaml", type=str, default="data.yaml",
                       help="data.yamlファイルのパス")
@@ -280,7 +280,7 @@ def main(args: Optional[List[str]] = None) -> int:
         elif parsed_args.command == "app":
             # モデルパスを環境変数に設定（Streamlitアプリで使用）
             if parsed_args.model_path:
-                os.environ["YOLOV8_MODEL_PATH"] = parsed_args.model_path
+                os.environ["YOLO_MODEL_PATH"] = parsed_args.model_path
             
             # Streamlitをサブプロセスとして起動
             import subprocess

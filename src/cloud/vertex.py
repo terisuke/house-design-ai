@@ -171,7 +171,7 @@ if __name__ == "__main__":
     PROJECT_ID = "yolov8environment"
     REGION = "asia-northeast1"
     JOB_NAME = "yolov8-custom-training-job"
-    CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v5"
+    CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4"
     SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
     STAGING_BUCKET = "gs://yolo-v11-training-staging"
     
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         "--imgsz", "640",
         "--optimizer", "SGD",          # AdamからSGDに変更
         "--lr0", "0.005",              # 初期学習率を調整
-        "--upload_bucket", "yolo-v8-training",
+        "--upload_bucket", "yolo-v11-training",
         "--upload_dir", "trained_models",
         "--iou_threshold", "0.65",     # 少し緩和
         "--conf_threshold", "0.2",     # 少し緩和

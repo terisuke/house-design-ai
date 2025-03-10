@@ -1,5 +1,5 @@
 
-# Vertex AI用パス (コメントアウト)
+# Vertex AI用パス 
 train: /app/house/train
 val: /app/house/val
 
