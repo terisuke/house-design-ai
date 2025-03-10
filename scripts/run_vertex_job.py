@@ -15,7 +15,7 @@ PROJECT_ID = os.environ.get("PROJECT_ID", "yolov8environment")
 REGION = os.environ.get("REGION", "asia-northeast1")
 JOB_NAME = os.environ.get("JOB_NAME", "yolov8-custom-training-job")
 # 最新のイメージタグを使用するか、環境変数で指定する
-CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v5") # v5: ultralytics 8.3.81対応版
+CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4") # 例：v4部分は適宜変更
 SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT", "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com")
 STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://yolo-v11-training-staging")
 

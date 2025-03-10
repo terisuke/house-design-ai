@@ -48,9 +48,6 @@ COPY requirements.txt /app/
 # 依存関係のインストール
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# ultralyticsのバージョンを確認（トラブルシューティングのため）
-RUN pip3 show ultralytics | grep -E "^Version:"
-
 # YOLOモデルをダウンロード
 # ultralyticsのモデルディレクトリを作成
 RUN mkdir -p /root/.config/ultralytics/models/

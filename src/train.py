@@ -215,43 +215,9 @@ def train_model(args: argparse.Namespace) -> int:
             logger.error("ultralyticsパッケージがインストールされていません")
             return 1
         
-        # モデルファイルのパスを確認
-        model_path = args.model
-        ultralytics_model_dir = "/root/.config/ultralytics/models/"
-        local_model_path = os.path.join(ultralytics_model_dir, os.path.basename(model_path))
-        
-        # モデルファイルが存在するか確認
-        if os.path.exists(local_model_path):
-            logger.info(f"モデルファイルが見つかりました: {local_model_path}")
-            model_path = local_model_path
-        else:
-            logger.warning(f"モデルファイル {local_model_path} が見つかりません")
-            
-            # GCSからダウンロードを試みる
-            if hasattr(args, 'bucket_name') and args.bucket_name:
-                try:
-                    logger.info(f"GCSからモデルファイルをダウンロードします: {args.bucket_name}/models/{os.path.basename(model_path)}")
-                    # GCSバケットからモデルをダウンロード
-                    storage_client = storage.Client()
-                    bucket = storage_client.bucket(args.bucket_name)
-                    blob = bucket.blob(f"models/{os.path.basename(model_path)}")
-                    
-                    # ディレクトリが存在することを確認
-                    os.makedirs(ultralytics_model_dir, exist_ok=True)
-                    
-                    # ダウンロード
-                    blob.download_to_filename(local_model_path)
-                    logger.info(f"モデルファイルをGCSからダウンロードしました: {local_model_path}")
-                    model_path = local_model_path
-                except Exception as e:
-                    logger.warning(f"GCSからのモデルダウンロードに失敗しました: {e}")
-                    logger.info(f"デフォルトのモデルパスを使用します: {model_path}")
-            else:
-                logger.info(f"GCSバケットが指定されていないため、デフォルトのモデルパス {model_path} を使用します")
-        
         # モデルのロード
-        logger.info(f"モデルをロード中: {model_path}")
-        model = YOLO(model_path)
+        logger.info(f"モデルをロード中: {args.model}")
+        model = YOLO(args.model)
         
         # トレーニングパラメータの設定
         train_params = {
