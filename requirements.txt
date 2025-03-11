@@ -1,29 +1,24 @@
-# 基本的な依存関係
 ultralytics==8.3.81
 google-cloud-storage==2.13.0
 google-cloud-aiplatform==1.38.1
 streamlit==1.30.0
 PyYAML==6.0.1
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 matplotlib==3.7.5
-# numpy==1.24.4  # ← 削除またはコメントアウト
+# numpy==1.24.4  (★衝突回避のため削除/コメントアウト済みならOK)
 pillow==10.2.0
 
-# クラウド連携
 protobuf==4.25.1
 google-api-core==2.17.0
 google-auth==2.26.1
 google-auth-oauthlib==1.2.0
 
-# 開発用ツール
 pytest==7.4.3
 ruff==0.1.14
 black==23.12.1
 
-# その他の依存関係
 ipython==8.12.3
 pydantic==2.5.3
 
-# Python 3.12 対策
 setuptools>=65.5.0
 wheel
