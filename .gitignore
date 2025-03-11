@@ -61,6 +61,5 @@ visualization_results/
 config/service_account.json
 service-account-key.json
 config/service_account.json  # 追加しました
-# Streamlit
 .streamlit/secrets.toml
 # End of Selection

@@ -23,10 +23,38 @@ def initialize_gcs_client():
     try:
         from google.cloud import storage
         
+        # Streamlit環境で実行されているか確認
+        is_streamlit = False
+        try:
+            import streamlit as st
+            is_streamlit = True
+        except ImportError:
+            pass
+        
         # 認証方法の優先順位:
-        # 1. 指定されたサービスアカウントファイル
-        # 2. 環境変数 GOOGLE_APPLICATION_CREDENTIALS
-        # 3. デフォルトの認証
+        # 1. Streamlit secretsの使用（Streamlit環境の場合）
+        # 2. 指定されたサービスアカウントファイル
+        # 3. 環境変数 GOOGLE_APPLICATION_CREDENTIALS
+        # 4. デフォルトの認証
+        
+        # 1. Streamlit secretsが利用可能かチェック
+        if is_streamlit:
+            try:
+                from google.oauth2 import service_account
+                
+                # st.secretsからGCP認証情報を読み込む
+                if "gcp_service_account" in st.secrets:
+                    logger.info("Streamlit secretsからGCP認証情報を使用します")
+                    credentials = service_account.Credentials.from_service_account_info(
+                        st.secrets["gcp_service_account"]
+                    )
+                    client = storage.Client(credentials=credentials)
+                    return client
+            except Exception as e:
+                logger.warning(f"Streamlit secretsからの認証に失敗しました: {e}")
+                # 他の認証方法にフォールバック
+        
+        # 2. 指定されたサービスアカウントファイルを使用
         service_account_path = os.path.join("config", "service_account.json")
         
         if os.path.exists(service_account_path):
