@@ -1,6 +1,6 @@
 # House Design AI
 
-建物のセグメンテーションとグリッド生成のためのYOLOv8ベースのAIソリューション。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
+建物のセグメンテーションとグリッド生成のためのYOLO11ベースのAIソリューション。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
 
 ## 機能
 
@@ -56,7 +56,7 @@ python -m src.cli app
 ### Vertex AIでのトレーニング
 
 ```bash
-python -m src.cli vertex --model yolov8m-seg.pt --epochs 100
+python -m src.cli vertex --model yolo11l-seg.pt --epochs 100
 ```
 
 詳細なオプションは以下で確認できます:
@@ -65,25 +65,59 @@ python -m src.cli vertex --model yolov8m-seg.pt --epochs 100
 python -m src.cli vertex --help
 ```
 
-### ローカルでの推論
+### ローカルでのモデルトレーニング
 
 ```bash
-python -m src.cli inference --model_path path/to/model.pt --image_path path/to/image.jpg
+python -m src.cli train --data config/data.yaml --model yolo11l-seg.pt --epochs 50
+```
+
+### 推論実行
+
+```bash
+python -m src.cli inference --model_path yolo11l-seg.pt --image_path path/to/image.jpg
+```
+
+### 可視化ツール
+
+```bash
+python -m src.cli visualize --result_path path/to/results --output_dir path/to/output
+```
+
+## Docker対応
+
+Dockerを使用して環境を構築することも可能です:
+
+```bash
+# イメージのビルド
+docker build -t house-design-ai .
+
+# コンテナの実行（Streamlitアプリ）
+docker run -p 8501:8501 house-design-ai
 ```
 
 ## プロジェクト構造
 
 ```
 house-design-ai/
+├── app.py                    # エントリーポイント
+├── Dockerfile                # Dockerコンテナ定義
+├── requirements.txt          # 依存パッケージ
 ├── config/                   # 設定ファイル
+├── datasets/                 # データセットディレクトリ
 ├── deploy/                   # デプロイ関連ファイル
 ├── notebooks/                # Jupyter notebooks
+├── scripts/                  # ユーティリティスクリプト
 ├── src/                      # ソースコード
 │   ├── cloud/                # クラウド連携
 │   ├── processing/           # 画像処理ロジック
 │   ├── utils/                # ユーティリティ
-│   └── visualization/        # 可視化ツール
+│   ├── visualization/        # 可視化ツール
+│   ├── cli.py                # コマンドラインインターフェース
+│   ├── train.py              # モデルトレーニングロジック
+│   └── inference.py          # 推論ロジック
 ├── streamlit/                # Streamlitアプリ
+│   ├── pages/                # マルチページアプリのサブページ
+│   └── app.py                # メインアプリケーション
 └── tests/                    # テストコード
 ```
 
@@ -91,9 +125,17 @@ house-design-ai/
 
 ### コーディング規約
 
-- PEP 8に準拠し、Ruffでコード整形
+- PEP 8に準拠し、Ruffとblackでコード整形
 - すべての関数に型アノテーションとDocstringを追加
 - モジュール性と再利用性を重視したコード設計
+
+### 主要な依存関係
+
+- **ultralytics**: YOLO11モデルの実装
+- **google-cloud-aiplatform**: Vertex AI連携
+- **streamlit**: ウェブインターフェース
+- **opencv-python**: 画像処理
+- **pydantic**: データ検証
 
 ### テスト実行
 
@@ -107,6 +149,6 @@ pytest tests/
 
 ## 謝辞
 
-- YOLOv8: [Ultralytics](https://github.com/ultralytics/ultralytics)
+- YOLO11: [Ultralytics](https://github.com/ultralytics/ultralytics)
 - Streamlit: [Streamlit](https://streamlit.io/)
 - Google Cloud Platform: [GCP](https://cloud.google.com/)
