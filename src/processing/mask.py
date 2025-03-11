@@ -9,6 +9,8 @@ from typing import Optional, Tuple, Dict, Any, Union
 from PIL import Image
 import logging
 import yaml
+import os
+import requests
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -140,14 +142,28 @@ def process_image(
         処理後のPIL Image、エラー時はNone
     """
     try:
-        image_bytes = image_file.getvalue()
+        # 画像ファイルの種類に応じた処理（UploadedFile、BytesIO、ファイルパスなど）
+        if hasattr(image_file, 'getvalue'):
+            # Streamlitのファイルアップローダーの場合
+            image_bytes = image_file.getvalue()
+        elif hasattr(image_file, 'read'):
+            # 一般的なファイルライクオブジェクトの場合
+            image_bytes = image_file.read()
+        elif isinstance(image_file, bytes):
+            # バイト列の場合
+            image_bytes = image_file
+        elif isinstance(image_file, str) and (os.path.exists(image_file) or image_file.startswith('http')):
+            # ファイルパスまたはURLの場合
+            image_bytes = open(image_file, 'rb').read() if os.path.exists(image_file) else requests.get(image_file).content
+        else:
+            logger.error(f"Unsupported image file type: {type(image_file)}")
+            return None
         
         # 一時ファイルに保存して推論を実行
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             tmp.write(image_bytes)
             tmp.close()
             results = model(tmp.name, task="segment")
-            import os
             os.unlink(tmp.name)  # 一時ファイルを削除
         
         # 元の画像を取得

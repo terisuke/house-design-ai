@@ -117,49 +117,59 @@ def main():
         # 左カラム: 元の画像
         with col1:
             st.subheader("元の画像")
-            st.image(uploaded_file, use_container_width=True)
+            try:
+                # アップロードされたファイルを画像として読み込む
+                file_bytes = uploaded_file.getvalue()
+                st.image(file_bytes, use_container_width=True)
+            except Exception as e:
+                st.error(f"画像の表示中にエラーが発生しました: {str(e)}")
+                logger.error(f"画像表示エラー: {e}")
         
         # 右カラム: 処理結果
         with col2:
             st.subheader("処理結果")
             with st.spinner("画像を処理中..."):
-                result = process_image(
-                    model=st.session_state.model,
-                    image_file=uploaded_file,
-                    near_offset_px=offset_near,
-                    far_offset_px=offset_far,
-                    grid_mm=grid_mm,
-                    dpi=dpi_val,
-                    scale=scale_val
-                )
-                
-                if result:
-                    st.image(result, use_container_width=True)
-                    
-                    # ダウンロードボタン
-                    buf = io.BytesIO()
-                    result.save(buf, format="PNG")
-                    st.download_button(
-                        label="結果をダウンロード",
-                        data=buf.getvalue(),
-                        file_name="result.png",
-                        mime="image/png"
+                try:
+                    result = process_image(
+                        model=st.session_state.model,
+                        image_file=uploaded_file,
+                        near_offset_px=offset_near,
+                        far_offset_px=offset_far,
+                        grid_mm=grid_mm,
+                        dpi=dpi_val,
+                        scale=scale_val
                     )
                     
-                    # メタデータ表示
-                    with st.expander("処理メタデータ"):
-                        st.json({
-                            "元画像サイズ": f"{result.width}x{result.height}",
-                            "パラメータ": {
-                                "道路近接領域のオフセット": offset_near,
-                                "道路以外の領域のオフセット": offset_far,
-                                "グリッド間隔(mm)": grid_mm,
-                                "DPI": dpi_val,
-                                "スケール": scale_val
-                            }
-                        })
-                else:
-                    st.error("画像の処理中にエラーが発生しました")
+                    if result:
+                        st.image(result, use_container_width=True)
+                        
+                        # ダウンロードボタン
+                        buf = io.BytesIO()
+                        result.save(buf, format="PNG")
+                        st.download_button(
+                            label="結果をダウンロード",
+                            data=buf.getvalue(),
+                            file_name="result.png",
+                            mime="image/png"
+                        )
+                        
+                        # メタデータ表示
+                        with st.expander("処理メタデータ"):
+                            st.json({
+                                "元画像サイズ": f"{result.width}x{result.height}",
+                                "パラメータ": {
+                                    "道路近接領域のオフセット": offset_near,
+                                    "道路以外の領域のオフセット": offset_far,
+                                    "グリッド間隔(mm)": grid_mm,
+                                    "DPI": dpi_val,
+                                    "スケール": scale_val
+                                }
+                            })
+                    else:
+                        st.error("画像の処理に失敗しました。別の画像を試してください。")
+                except Exception as e:
+                    st.error(f"画像処理中にエラーが発生しました: {str(e)}")
+                    logger.error(f"画像処理エラー: {e}")
     
     # フッター
     st.markdown("---")
