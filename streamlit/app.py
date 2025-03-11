@@ -120,7 +120,7 @@ def main():
             try:
                 # アップロードされたファイルを画像として読み込む
                 file_bytes = uploaded_file.getvalue()
-                st.image(file_bytes, use_container_width=True)
+                st.image(file_bytes, use_column_width=True)
             except Exception as e:
                 st.error(f"画像の表示中にエラーが発生しました: {str(e)}")
                 logger.error(f"画像表示エラー: {e}")
@@ -141,7 +141,7 @@ def main():
                     )
                     
                     if result:
-                        st.image(result, use_container_width=True)
+                        st.image(result, use_column_width=True)
                         
                         # ダウンロードボタン
                         buf = io.BytesIO()
