@@ -21,7 +21,8 @@ STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://yolo-v11-training-stagin
 
 # タイムスタンプで一意なディレクトリ名を作成
 now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-save_dir = f"gs://yolo-v11-training/runs/segment/train_{now}"
+# save_dirを/appからの相対パスにする
+save_dir = f"runs/segment/train_{now}" #  /app/ は自動的に付与される
 
 # app.py (実際には src/train.py) に渡す引数 (リスト形式)
 args = [
@@ -57,8 +58,7 @@ job = run_vertex_job(
     args=args,
     machine_type="n1-highmem-8",  # CPUマシンの例
     accelerator_type= "NVIDIA_TESLA_T4",  # GPUを使用する場合 (NoneでCPUのみ)
-    accelerator_count= 1, # GPUの数
-    save_dir = save_dir
+    accelerator_count= 1 # GPUの数
 )
 
 print(f"CustomJob '{JOB_NAME}' started successfully.")

@@ -251,10 +251,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 if hasattr(parsed_args, name) and getattr(parsed_args, name) is not None:
                     training_args.extend([f"--{name}", str(getattr(parsed_args, name))])
             
-            # 保存ディレクトリ引数が指定されている場合は追加
-            if parsed_args.save_dir:
-                training_args.extend(["--save_dir", parsed_args.save_dir])
-            
             # 引数のデバッグログを追加
             args_str = " ".join(training_args)
             logger.info(f"Vertex AIジョブに渡される引数: {args_str}")
@@ -270,7 +266,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 machine_type=parsed_args.machine_type,
                 accelerator_type=accelerator_type,
                 accelerator_count=parsed_args.accelerator_count,
-                save_dir=parsed_args.save_dir,
                 args=training_args
             )
             

@@ -98,8 +98,7 @@ def run_vertex_job(
     args: List[str],
     machine_type: str = "n1-highmem-8",
     accelerator_type: str = "NVIDIA_TESLA_T4",
-    accelerator_count: int = 1,
-    save_dir: Optional[str] = None
+    accelerator_count: int = 1
 ) -> aiplatform.CustomJob:
     """
     Vertex AI上でカスタムトレーニングジョブを実行します。
@@ -115,31 +114,12 @@ def run_vertex_job(
         machine_type: マシンタイプ
         accelerator_type: アクセラレータタイプ（Noneを指定するとGPUなし）
         accelerator_count: アクセラレータ数
-        save_dir: 結果保存ディレクトリ（指定しない場合は自動生成）
 
     Returns:
         実行されたCustomJobオブジェクト
     """
     # Vertex AI の初期化
     init_vertex_ai(project_id, region, staging_bucket)
-    
-    # 保存ディレクトリが指定されていない場合、タイムスタンプ付きディレクトリを作成
-    if not save_dir:
-        now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        bucket_name = staging_bucket.replace("gs://", "").split("/")[0]
-        save_dir = f"gs://{bucket_name}/runs/segment/train_{now}"
-        
-        # --save_dir 引数を追加または更新
-        save_dir_index = -1
-        for i, arg in enumerate(args):
-            if arg == "--save_dir":
-                save_dir_index = i
-                break
-        
-        if save_dir_index >= 0 and save_dir_index + 1 < len(args):
-            args[save_dir_index + 1] = save_dir
-        else:
-            args.extend(["--save_dir", save_dir])
     
     # trainサブコマンドが含まれていない場合のみ先頭に追加
     if len(args) == 0 or args[0] != "train":
@@ -161,7 +141,7 @@ def run_vertex_job(
     
     # ジョブの実行
     job.run(service_account=service_account)
-    logger.info(f"CustomJob '{job_name}' started successfully. Results will be saved to {save_dir}")
+    logger.info(f"CustomJob '{job_name}' started successfully.")
     return job
 
 
@@ -174,10 +154,6 @@ if __name__ == "__main__":
     CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov8-training-image:v4"
     SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
     STAGING_BUCKET = "gs://yolo-v11-training-staging"
-    
-    # タイムスタンプで一意なディレクトリ名を作成
-    now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    save_dir = f"gs://yolo-v11-training/runs/segment/train_{now}"
     
     # Dockerコンテナで実行されるコマンド引数リスト
     # 最初に'train'サブコマンドを追加してCLIモードを有効化
@@ -198,7 +174,6 @@ if __name__ == "__main__":
         "--mosaic", "1.0",             # モザイク拡張
         "--degrees", "10.0",           # 回転拡張を増加
         "--scale", "0.6",              # スケール拡張を少し増加
-        "--save_dir", save_dir
     ]
     
     # ジョブの実行

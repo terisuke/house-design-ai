@@ -225,7 +225,7 @@ def train_model(args: argparse.Namespace) -> int:
             upload_directory(
                 args.upload_bucket,
                 str(model.trainer.save_dir),  # ローカルの保存先ディレクトリ
-                str(Path(args.save_dir).relative_to('/app')) # GCS上のパス（/appからの相対パス）
+                args.save_dir  # GCS上のパス (/appからの相対パスはrun_vertex_job.pyで計算済み)
             )
         return 0
         
