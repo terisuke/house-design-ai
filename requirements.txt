@@ -6,7 +6,7 @@ streamlit==1.30.0
 PyYAML==6.0.1
 opencv-python==4.9.0.80
 matplotlib==3.7.5
-numpy==1.24.4
+# numpy==1.24.4  # ← 削除またはコメントアウト
 pillow==10.2.0
 
 # クラウド連携
@@ -21,5 +21,9 @@ ruff==0.1.14
 black==23.12.1
 
 # その他の依存関係
-ipython==8.12.3  # notebooks用
-pydantic==2.5.3  # データ検証用
+ipython==8.12.3
+pydantic==2.5.3
+
+# Python 3.12 対策
+setuptools>=65.5.0
+wheel
