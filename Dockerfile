@@ -17,6 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   git \
   libgl1-mesa-dev \
   libglib2.0-0 \
+  libgl1 \
+  libglx0 \
+  libglvnd0 \
+  libsm6 \
+  libxext6 \
+  libxrender1 \
   build-essential \
   pkg-config \
   libprotobuf-dev \

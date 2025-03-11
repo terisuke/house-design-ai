@@ -95,6 +95,30 @@ docker build -t house-design-ai .
 docker run -p 8501:8501 house-design-ai
 ```
 
+## トラブルシューティング
+
+### OpenCVの依存関係エラー
+
+Docker環境で以下のようなエラーが発生した場合：
+
+```
+ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+```
+
+これはOpenCVに必要なシステムライブラリが不足していることを示しています。Dockerfileに以下のライブラリを追加してください：
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  libgl1 \
+  libglx0 \
+  libglvnd0 \
+  libsm6 \
+  libxext6 \
+  libxrender1
+```
+
+その後、再度Dockerイメージをビルドしてください。
+
 ## プロジェクト構造
 
 ```
