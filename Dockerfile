@@ -46,7 +46,7 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 COPY requirements.txt /app/
 
 # 依存関係のインストール
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # YOLOモデルをダウンロード
 # ultralyticsのモデルディレクトリを作成

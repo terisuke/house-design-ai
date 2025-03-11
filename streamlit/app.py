@@ -46,7 +46,7 @@ def load_yolo_model() -> None:
             try:
                 model_path = download_model_from_gcs(
                     bucket_name="yolo-v11-training",
-                    blob_name="trained_models/best.pt"
+                    blob_name="runs/segment/train_20250311-143512/weights/best.pt"
                 )
                 
                 if model_path:
@@ -117,7 +117,7 @@ def main():
         # 左カラム: 元の画像
         with col1:
             st.subheader("元の画像")
-            st.image(uploaded_file, use_column_width=True)
+            st.image(uploaded_file, use_container_width=True)
         
         # 右カラム: 処理結果
         with col2:
@@ -134,7 +134,7 @@ def main():
                 )
                 
                 if result:
-                    st.image(result, use_column_width=True)
+                    st.image(result, use_container_width=True)
                     
                     # ダウンロードボタン
                     buf = io.BytesIO()
@@ -163,7 +163,7 @@ def main():
     
     # フッター
     st.markdown("---")
-    st.markdown("House Design AI - YOLOv8 Segmentation")
+    st.markdown("U-DAKE")
 
 
 if __name__ == "__main__":
