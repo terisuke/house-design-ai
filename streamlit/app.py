@@ -13,12 +13,25 @@ from pathlib import Path
 import logging
 import sys
 
+# OpenCVのインポートエラーをキャッチして適切なメッセージを表示
+try:
+    import cv2
+    cv2_available = True
+except ImportError as e:
+    st.error(f"OpenCVのインポートに失敗しました: {e}")
+    logging.error(f"OpenCVのインポートエラー: {e}")
+    cv2_available = False
+
 # プロジェクトルートをPythonパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # 自作モジュールのインポート
-from src.cloud.storage import download_model_from_gcs
-from src.processing.mask import process_image
+try:
+    from src.cloud.storage import download_model_from_gcs
+    from src.processing.mask import process_image
+except ImportError as e:
+    st.error(f"モジュールのインポートに失敗しました: {e}")
+    logging.error(f"モジュールインポートエラー: {e}")
 
 # ロギング設定
 logging.basicConfig(level=logging.INFO)
