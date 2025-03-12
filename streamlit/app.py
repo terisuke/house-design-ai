@@ -102,8 +102,8 @@ def main():
     st.sidebar.header("パラメータ設定")
 
     # ★dpi, scale は削除し、 grid_mm のみ残す
-    offset_near = st.sidebar.number_input("道路近接領域のオフセット(px)", 0, 5000, 100, 10)
-    offset_far = st.sidebar.number_input("道路以外の領域のオフセット(px)", 0, 5000, 50, 10)
+    offset_near = st.sidebar.number_input("道路近接領域のオフセット(px)", 0, 5000, 296, 10)
+    offset_far = st.sidebar.number_input("道路以外の領域のオフセット(px)", 0, 5000, 30, 10)
     grid_mm = st.sidebar.number_input("グリッド間隔(mm)", 0.1, 100.0, 9.1, 0.1)
 
     with st.sidebar.expander("ヘルプ"):
