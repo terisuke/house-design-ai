@@ -472,7 +472,7 @@ def main():
                                     actual_grid_cols = bbox.get("width", 0) // cell_px
                         
                         if (actual_grid_rows is not None) and (actual_grid_cols is not None):
-                            st.write(f"**グリッドサイズ**: {actual_grid_rows} 行 × {actual_grid_cols} 列")
+                            st.write(f"**グリッドサイズ**: {actual_grid_rows -1} 行 × {actual_grid_cols -1} 列")
                         else:
                             # グリッドを最終的に何行何列描いたかを
                             # まとめていない実装の場合は推測不可なので「(不明)」を表示

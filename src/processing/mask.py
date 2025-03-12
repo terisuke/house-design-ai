@@ -14,6 +14,7 @@ import logging
 import yaml
 import os
 import requests
+import random  # ランダムアルファベット生成用に追加
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -31,6 +32,12 @@ ROAD_CLASS_ID = class_names.index('Road') if 'Road' in class_names else None
 A3_WIDTH_PX = 2481   # A3横幅: 420mm @ 150dpi
 A3_HEIGHT_PX = 1754  # A3高さ: 297mm @ 150dpi
 A3_WIDTH_MM = 420.0  # A3横幅: 420mm
+
+# アルファベットのリスト
+ALPHABET_LIST = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+]
 
 def offset_mask_by_distance(mask: np.ndarray, offset_px: int) -> np.ndarray:
     """
@@ -63,6 +70,7 @@ def draw_grid_on_mask(
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     建物マスク領域に固定間隔のマス目（セル）を描画する。
+    各セル内にランダムアルファベットを配置する。
 
     セルは「マスク内部にすべてが収まる場合のみ」描画するため、
     マスク外にはみ出すセルはスキップされる。
@@ -72,8 +80,6 @@ def draw_grid_on_mask(
         final_mask: グリッドを描画する対象のバイナリマスク(0 or 1)
         grid_mm: 紙上(mm)単位のグリッド間隔（本処理では使わないが、引数として残す）
         px_per_mm: mmあたりのピクセル数(A3横420mm想定)
-        fill_color: セル塗りつぶし色 (BGR)
-        alpha: 塗りつぶしの透明度(0~1)
         line_color: グリッド線の色 (BGR)
         line_thickness: グリッド線の太さ(px)
 
@@ -92,6 +98,7 @@ def draw_grid_on_mask(
         "cells_drawn": 0,           # 実際に描画されたセル数
         "cells_skipped": 0,         # スキップされたセル数
         "reason_not_in_mask": 0,    # スキップ理由が「マスク外」だった回数
+        "alphabet_counts": {},      # 各アルファベットの使用回数
     }
 
     # マスクの輪郭を抽出
@@ -124,11 +131,26 @@ def draw_grid_on_mask(
     # 理論上のグリッドサイズ(単純に w,h を cell_px で割った数)
     grid_cols = w // cell_px
     grid_rows = h // cell_px
+
+    # n+1本の線でn個のセルができるため、実際のセル数は線の数-1
+    grid_lines_cols = grid_cols + 1  # 線の数
+    grid_lines_rows = grid_rows + 1  # 線の数
+    actual_grid_cols = max(0, grid_cols)  # セル数 = 線の数-1
+    actual_grid_rows = max(0, grid_rows)  # セル数 = 線の数-1
+
+    # グリッド情報を記録
+    grid_stats["grid_lines"] = {"rows": grid_lines_rows, "cols": grid_lines_cols}  # 線の数
+    grid_stats["grid_cells"] = {"rows": actual_grid_rows, "cols": actual_grid_cols}  # セル数
+    # 後方互換性のために残す
     grid_stats["theoretical_grid_size"] = {"rows": grid_rows, "cols": grid_cols}
-    
+
     # バウンディングボックス内の総セル数
-    total_cells_in_bbox = grid_rows * grid_cols
+    total_cells_in_bbox = actual_grid_rows * actual_grid_cols
     grid_stats["total_cells_in_bbox"] = total_cells_in_bbox
+
+    # アルファベットの使用回数を初期化
+    for letter in ALPHABET_LIST:
+        grid_stats["alphabet_counts"][letter] = 0
 
     # 行(row)方向に走査
     row = 0
@@ -145,9 +167,6 @@ def draw_grid_on_mask(
             cell_x2 = cell_x1 + cell_px
             if cell_x2 > x_end:
                 break  # 右がはみ出すので次の行へ
-            
-            # (1) バウンディングボックス内のセル数カウント
-            grid_stats["total_cells_in_bbox"] += 1
             
             # (2) マスク内に完全に収まっているか確認
             padding = max(1, line_thickness // 2)
@@ -166,11 +185,44 @@ def draw_grid_on_mask(
                 col += 1
                 continue
             
+            # ランダムなアルファベットを選択
+            cell_letter = random.choice(ALPHABET_LIST)
+            
+            # 使用回数を記録
+            grid_stats["alphabet_counts"][cell_letter] += 1
+            
             # (3) セルの四辺を描画
             cv2.line(out, (cell_x1, cell_y1), (cell_x2, cell_y1), line_color, line_thickness)
             cv2.line(out, (cell_x1, cell_y2), (cell_x2, cell_y2), line_color, line_thickness)
             cv2.line(out, (cell_x1, cell_y1), (cell_x1, cell_y2), line_color, line_thickness)
             cv2.line(out, (cell_x2, cell_y1), (cell_x2, cell_y2), line_color, line_thickness)
+            
+            # (4) セル中心にアルファベットを描画
+            cell_center_x = (cell_x1 + cell_x2) // 2
+            cell_center_y = (cell_y1 + cell_y2) // 2
+            
+            # フォント設定
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.0
+            text_color = (0, 0, 0)  # 黒文字
+            text_thickness = 2
+            
+            # テキストサイズを計算して中央揃えの位置を調整
+            text_size = cv2.getTextSize(cell_letter, font, font_scale, text_thickness)[0]
+            text_x = cell_center_x - text_size[0] // 2
+            text_y = cell_center_y + text_size[1] // 2
+            
+            # アルファベットを描画
+            cv2.putText(
+                out,
+                cell_letter,
+                (text_x, text_y),
+                font,
+                font_scale,
+                text_color,
+                text_thickness,
+                cv2.LINE_AA
+            )
 
             grid_stats["cells_drawn"] += 1
             col += 1
@@ -473,6 +525,10 @@ def process_image(
             
             # グリッド統計情報をデバッグ情報に追加
             debug_info["grid_stats"] = grid_stats
+            
+            # UIに表示するセル数を明示的に設定
+            debug_info["grid_cells"] = grid_stats.get("grid_cells", {})
+            debug_info["total_cells"] = grid_stats.get("total_cells_in_bbox", 0)
             
             # バウンディングボックス情報をデバッグ情報に追加
             if grid_stats.get("bounding_box"):
