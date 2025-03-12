@@ -107,7 +107,7 @@ def main():
             st.subheader("元の画像")
             try:
                 file_bytes = uploaded_file.getvalue()
-                st.image(file_bytes, use_container_width=True)
+                st.image(file_bytes, use_column_width=True)
             except Exception as e:
                 st.error(f"画像の表示中にエラー: {str(e)}")
                 logger.error(f"画像表示エラー: {e}")
@@ -124,7 +124,7 @@ def main():
                         grid_mm=grid_mm  # DPI, scale不要
                     )
                     if result:
-                        st.image(result, use_container_width=True)
+                        st.image(result, use_column_width=True)
 
                         buf = io.BytesIO()
                         result.save(buf, format="PNG")
