@@ -63,14 +63,14 @@ def draw_grid_on_mask(
 ) -> np.ndarray:
     """
     Houseマスクの輪郭からバウンディングボックスを取得し、
-    その矩形範囲にグリッドを引くが、実際にはfinal_mask内にのみ描画する。
+    その矩形範囲内に「完全に収まる」マス目だけを描画する。
 
     Args:
         image: 描画対象のBGR画像
-        final_mask: グリッドを描画する対象のマスク
+        final_mask: グリッドを描画する対象のマスク(0 or 1)
         grid_mm: 紙上(mm)単位のグリッド間隔
-        px_per_mm: mmあたりのピクセル数
-        fill_color: 塗りつぶし色 (BGR)
+        px_per_mm: mmあたりのピクセル数(A3横420mm想定)
+        fill_color: セル塗りつぶし色 (BGR)
         alpha: 塗りつぶしの透明度(0~1)
         line_color: グリッド線の色 (BGR)
         line_thickness: グリッド線の太さ(px)
@@ -94,7 +94,7 @@ def draw_grid_on_mask(
     mask_area[final_mask == 1] = fill_color
     cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
 
-    # 2) grid_mm を pxに変換
+    # grid_mm を pxに変換
     cell_px = int(round(grid_mm * px_per_mm))
 
     # セルが領域より大きすぎる場合はfallback
@@ -103,25 +103,58 @@ def draw_grid_on_mask(
         logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
         cell_px = fallback
 
-    # 3) y方向に cell_px 間隔で線を引く
-    for gy in range(y, y + h + 1, cell_px):
-        # 仮のlineMaskに線を引いて、HouseマスクとANDを取る
-        lineMask = np.zeros_like(final_mask, dtype=np.uint8)
-        cv2.line(lineMask, (x, gy), (x + w, gy), 1, thickness=line_thickness)
+    # ここから「四辺すべてがバウンディングボックスに収まる」セルだけ線を描画する
+    x_end = x + w
+    y_end = y + h
 
-        # House内部だけ残す
-        lineMask = cv2.bitwise_and(lineMask, final_mask)
+    # y方向にセルを走査
+    row = 0
+    while True:
+        cell_y1 = y + row * cell_px
+        cell_y2 = cell_y1 + cell_px
+        if cell_y2 > y_end:
+            # 下がはみ出すので終了
+            break
+        
+        # x方向にセルを走査
+        col = 0
+        while True:
+            cell_x1 = x + col * cell_px
+            cell_x2 = cell_x1 + cell_px
+            if cell_x2 > x_end:
+                # 右がはみ出すので次の行へ
+                break
+            
+            # ===== マスの四隅 (cell_x1, cell_y1) → (cell_x2, cell_y2) =====
+            # 四辺をそれぞれ描画し、かつ House内部だけに制限する
 
-        # out上で lineMask=1 の部分だけに line_colorを描画
-        out[lineMask == 1] = line_color
+            # 上辺
+            line_mask_top = np.zeros_like(final_mask, dtype=np.uint8)
+            cv2.line(line_mask_top, (cell_x1, cell_y1), (cell_x2, cell_y1), 1, thickness=line_thickness)
+            line_mask_top = cv2.bitwise_and(line_mask_top, final_mask)
+            out[line_mask_top == 1] = line_color
 
-    # 4) x方向に cell_px 間隔で線を引く
-    for gx in range(x, x + w + 1, cell_px):
-        lineMask = np.zeros_like(final_mask, dtype=np.uint8)
-        cv2.line(lineMask, (gx, y), (gx, y + h), 1, thickness=line_thickness)
+            # 下辺
+            line_mask_bottom = np.zeros_like(final_mask, dtype=np.uint8)
+            cv2.line(line_mask_bottom, (cell_x1, cell_y2), (cell_x2, cell_y2), 1, thickness=line_thickness)
+            line_mask_bottom = cv2.bitwise_and(line_mask_bottom, final_mask)
+            out[line_mask_bottom == 1] = line_color
 
-        lineMask = cv2.bitwise_and(lineMask, final_mask)
-        out[lineMask == 1] = line_color
+            # 左辺
+            line_mask_left = np.zeros_like(final_mask, dtype=np.uint8)
+            cv2.line(line_mask_left, (cell_x1, cell_y1), (cell_x1, cell_y2), 1, thickness=line_thickness)
+            line_mask_left = cv2.bitwise_and(line_mask_left, final_mask)
+            out[line_mask_left == 1] = line_color
+
+            # 右辺
+            line_mask_right = np.zeros_like(final_mask, dtype=np.uint8)
+            cv2.line(line_mask_right, (cell_x2, cell_y1), (cell_x2, cell_y2), 1, thickness=line_thickness)
+            line_mask_right = cv2.bitwise_and(line_mask_right, final_mask)
+            out[line_mask_right == 1] = line_color
+
+            col += 1
+        
+        row += 1
 
     return out
 
@@ -137,7 +170,8 @@ def draw_grid_on_rect(
 ) -> np.ndarray:
     """
     指定した長方形領域に半透明塗りつぶし+グリッド線を描画。
-    A3(横420mm)想定で「grid_mm」をピクセル換算し、等間隔のグリッドを引く。
+    A3(横420mm)想定で「grid_mm」をピクセル換算し、
+    四辺がすべて領域内に収まるマス目だけを描画する。
 
     Args:
         image: 描画対象のBGR画像
@@ -156,15 +190,15 @@ def draw_grid_on_rect(
     out = image.copy()
 
     x, y, w, h = rect
-    x2, y2 = x + w, y + h
+    x_end, y_end = x + w, y + h
 
     # まず半透明塗りつぶし
     overlay = out.copy()
-    cv2.rectangle(overlay, (x, y), (x2, y2), fill_color, cv2.FILLED)
+    cv2.rectangle(overlay, (x, y), (x_end, y_end), fill_color, cv2.FILLED)
     cv2.addWeighted(overlay, alpha, out, 1 - alpha, 0, out)
 
     # 矩形の外枠
-    cv2.rectangle(out, (x, y), (x2, y2), line_color, line_thickness)
+    cv2.rectangle(out, (x, y), (x_end, y_end), line_color, line_thickness)
 
     # A3横420mm→画面幅image_width_pxより1mm→(image_width_px/420)px
     px_per_mm = image_width_px / A3_WIDTH_MM
@@ -178,13 +212,43 @@ def draw_grid_on_rect(
         logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
         cell_px = fallback
 
-    # 等間隔の水平線
-    for gy in range(y, y2, cell_px):
-        cv2.line(out, (x, gy), (x2, gy), line_color, line_thickness)
+    # 「四辺がすべて領域内に収まる」マス目だけを描画する
+    # y方向にセルを走査
+    row = 0
+    while True:
+        cell_y1 = y + row * cell_px
+        cell_y2 = cell_y1 + cell_px
+        if cell_y2 > y_end:
+            # 下がはみ出すので終了
+            break
+        
+        # x方向にセルを走査
+        col = 0
+        while True:
+            cell_x1 = x + col * cell_px
+            cell_x2 = cell_x1 + cell_px
+            if cell_x2 > x_end:
+                # 右がはみ出すので次の行へ
+                break
+            
+            # ===== マスの四隅 (cell_x1, cell_y1) → (cell_x2, cell_y2) =====
+            # 四辺をそれぞれ描画
 
-    # 等間隔の垂直線
-    for gx in range(x, x2, cell_px):
-        cv2.line(out, (gx, y), (gx, y2), line_color, line_thickness)
+            # 上辺
+            cv2.line(out, (cell_x1, cell_y1), (cell_x2, cell_y1), line_color, line_thickness)
+            
+            # 下辺
+            cv2.line(out, (cell_x1, cell_y2), (cell_x2, cell_y2), line_color, line_thickness)
+            
+            # 左辺
+            cv2.line(out, (cell_x1, cell_y1), (cell_x1, cell_y2), line_color, line_thickness)
+            
+            # 右辺
+            cv2.line(out, (cell_x2, cell_y1), (cell_x2, cell_y2), line_color, line_thickness)
+
+            col += 1
+        
+        row += 1
 
     return out
 
