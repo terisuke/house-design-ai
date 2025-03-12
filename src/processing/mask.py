@@ -27,6 +27,11 @@ with open('config/data.yaml', 'r') as f:
 HOUSE_CLASS_ID = class_names.index('House') if 'House' in class_names else None
 ROAD_CLASS_ID = class_names.index('Road') if 'Road' in class_names else None
 
+# A3サイズの定義 (150dpi想定)
+A3_WIDTH_PX = 2481   # A3横幅: 420mm @ 150dpi
+A3_HEIGHT_PX = 1754  # A3高さ: 297mm @ 150dpi
+A3_WIDTH_MM = 420.0  # A3横幅: 420mm
+
 def offset_mask_by_distance(mask: np.ndarray, offset_px: int) -> np.ndarray:
     """
     マスクを距離変換して内側にオフセットしたバイナリマスクを返します。
@@ -58,12 +63,12 @@ def draw_grid_on_rect(
 ) -> np.ndarray:
     """
     指定した長方形領域に半透明塗りつぶし+グリッド線を描画。
-    ★A3(横420mm)想定で「grid_mm」をピクセル換算し、等間隔のグリッドを引く。
+    A3(横420mm)想定で「grid_mm」をピクセル換算し、等間隔のグリッドを引く。
 
     Args:
         image: 描画対象のBGR画像
         rect: (x, y, width, height) 長方形領域
-        grid_mm: 紙上(mm)単位のグリッド間隔 (例: 9.1→9.1mm)
+        grid_mm: 紙上(mm)単位のグリッド間隔 (例: 9.1mm = 実物910mmの1/100)
         image_width_px: 入力画像の横幅(px)
                        → これを420mmとみなし 1mm = image_width_px/420 px で換算
         fill_color: 塗りつぶし色 (BGR)
@@ -87,8 +92,8 @@ def draw_grid_on_rect(
     # 矩形の外枠
     cv2.rectangle(out, (x, y), (x2, y2), line_color, line_thickness)
 
-    # ★A3横420mm→画面幅image_width_pxより1mm→(image_width_px/420)px
-    px_per_mm = image_width_px / 420.0
+    # A3横420mm→画面幅image_width_pxより1mm→(image_width_px/420)px
+    px_per_mm = image_width_px / A3_WIDTH_MM
 
     # grid_mm（紙上のmm）をピクセル換算
     cell_px = int(round(grid_mm * px_per_mm))
@@ -118,16 +123,16 @@ def process_image(
 ) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を処理して、セグメンテーション・マスク操作・グリッド生成を行う。
-
-    ★A3横420mm想定で grid_mm をピクセル換算してグリッドを描画するので、
-     DPIやscaleは使わず、 image_width_px/420.0 を1mmとする。
-
+    
+    すべての画像をA3サイズ(150dpi: 2481x1754px)にリサイズして処理するため、
+    どんな画像でも常に同じスケールでグリッドが描画される。
+    
     Args:
         model: YOLO推論モデル(YOLOクラスなど)
         image_file: 入力画像(アップローダ等のファイルオブジェクトやパス)
         near_offset_px: 道路近くの住居領域をどれだけ内側にオフセットするか(px)
         far_offset_px: その他の住居領域をどれだけ内側にオフセットするか(px)
-        grid_mm: 紙上のグリッド間隔(mm) (例: 9.1mm)
+        grid_mm: 紙上のグリッド間隔(mm) (例: 9.1mm = 実物910mmの1/100)
     Returns:
         Tuple[処理後のPIL画像, デバッグ情報の辞書] または None (失敗時)
     """
@@ -143,7 +148,9 @@ def process_image(
             "bounding_box": None,
             "cell_px": None,
             "px_per_mm": None,
-            "image_size": None
+            "image_size": None,
+            "resized": False,
+            "original_size": None
         }
 
         # 画像ファイルの読み込み (Streamlit or Path対応)
@@ -169,21 +176,38 @@ def process_image(
             logger.error(f"Unsupported image file type: {type(image_file)}")
             return None
 
-        # 一時ファイルに書き出して推論
+        # 画像をOpenCVで読み込み
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        orig = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if orig is None:
+            logger.error("Failed to decode image")
+            return None
+            
+        # 元の画像サイズを記録
+        orig_h, orig_w = orig.shape[:2]
+        debug_info["original_size"] = {"width_px": orig_w, "height_px": orig_h}
+        
+        # 画像をA3サイズ（2481x1754px @ 150dpi）にリサイズ
+        resized = cv2.resize(orig, (A3_WIDTH_PX, A3_HEIGHT_PX), interpolation=cv2.INTER_LINEAR)
+        debug_info["resized"] = True
+        debug_info["a3_size"] = {"width_px": A3_WIDTH_PX, "height_px": A3_HEIGHT_PX}
+        
+        # リサイズした画像を一時ファイルに書き出して推論
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            tmp.write(image_bytes)
+            is_success, buffer = cv2.imencode(".jpg", resized)
+            if not is_success:
+                logger.error("Failed to encode resized image")
+                return None
+            tmp.write(buffer)
             tmp.close()
             results = model(tmp.name, task="segment")
             os.unlink(tmp.name)  # 一時ファイル削除
 
-        # 推論元のオリジナル画像
-        orig = results[0].orig_img
-        if orig is None:
-            logger.error("Original image not found in YOLO results")
-            return None
-
-        # 画像サイズを取得 (h,w)
-        h, w = orig.shape[:2]
+        # 推論元のオリジナル画像（既にA3サイズにリサイズされている）
+        processed_img = resized.copy()
+        
+        # 画像サイズを取得 (h,w) - A3サイズになっているはず
+        h, w = processed_img.shape[:2]
         debug_info["image_size"] = {"width_px": w, "height_px": h}
 
         # マスク初期化
@@ -195,15 +219,15 @@ def process_image(
             for seg_data, cls_id in zip(results[0].masks.data, results[0].boxes.cls):
                 m = seg_data.cpu().numpy().astype(np.uint8)
                 # YOLO出力マスクを画像サイズ(w,h)にリサイズ
-                resized = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
+                resized_mask = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
 
                 if int(cls_id) == HOUSE_CLASS_ID:
-                    house_mask = np.maximum(house_mask, resized)
+                    house_mask = np.maximum(house_mask, resized_mask)
                 elif int(cls_id) == ROAD_CLASS_ID:
-                    road_mask = np.maximum(road_mask, resized)
+                    road_mask = np.maximum(road_mask, resized_mask)
 
         # 住居マスクを半透明(緑)で描画
-        out_bgr = orig.copy()
+        out_bgr = processed_img.copy()
         overlay = out_bgr.copy()
         overlay[house_mask == 1] = (0, 255, 0)  # BGR
         cv2.addWeighted(overlay, 0.3, out_bgr, 0.7, 0, out_bgr)
@@ -235,8 +259,8 @@ def process_image(
             x, y, wc, hc = cv2.boundingRect(big_contour)
             debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
             
-            # A3横幅=420mmと仮定し、紙上grid_mmをピクセル換算
-            px_per_mm = w / 420.0
+            # A3のピクセル/mm変換比を計算
+            px_per_mm = A3_WIDTH_PX / A3_WIDTH_MM
             cell_px = int(round(grid_mm * px_per_mm))
             debug_info["px_per_mm"] = px_per_mm
             debug_info["cell_px"] = cell_px
@@ -250,12 +274,12 @@ def process_image(
                 debug_info["fallback_cell_px"] = fallback
                 cell_px = fallback
 
-            # ★A3横幅=420mmと仮定し、紙上grid_mmをピクセル換算してグリッド描画
+            # A3サイズでグリッド描画（常に同じスケール）
             out_bgr = draw_grid_on_rect(
                 image=out_bgr,
                 rect=(x, y, wc, hc),
                 grid_mm=grid_mm,
-                image_width_px=w,  # 横幅 w px
+                image_width_px=A3_WIDTH_PX,  # 横幅は固定のA3幅
                 fill_color=(255, 0, 0),
                 alpha=0.4,
                 line_color=(0, 0, 255),
