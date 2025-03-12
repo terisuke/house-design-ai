@@ -60,10 +60,10 @@ def draw_grid_on_mask(
     alpha: float = 0.4,
     line_color: Tuple[int, int, int] = (0, 0, 255),
     line_thickness: int = 2
-) -> np.ndarray:
+) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     Houseマスクの輪郭からバウンディングボックスを取得し、
-    その矩形範囲内に「完全に収まる」マス目だけを描画する。
+    「セル全体がマスク内に完全に収まる」マス目だけを描画する。
 
     Args:
         image: 描画対象のBGR画像
@@ -75,15 +75,24 @@ def draw_grid_on_mask(
         line_color: グリッド線の色 (BGR)
         line_thickness: グリッド線の太さ(px)
     Returns:
-        グリッド描画後の画像(BGR)
+        Tuple[グリッド描画後の画像(BGR), 描画情報の辞書]
     """
     out = image.copy()
+    
+    # 統計情報
+    grid_stats = {
+        "total_cells_in_bbox": 0,
+        "cells_drawn": 0,
+        "cells_skipped": 0,
+        "reason_not_in_mask": 0,
+    }
 
     # 1) final_maskから輪郭・バウンディングボックスを取得
     contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         # マスクが空の場合はそのまま返す
-        return out
+        grid_stats["error"] = "マスクが空です"
+        return out, grid_stats
     
     big_contour = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(big_contour)
@@ -96,16 +105,33 @@ def draw_grid_on_mask(
 
     # grid_mm を pxに変換
     cell_px = int(round(grid_mm * px_per_mm))
+    grid_stats["cell_px"] = cell_px
+    grid_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
     # セルが領域より大きすぎる場合はfallback
     if cell_px > w or cell_px > h:
         fallback = max(1, min(w, h) // 5)
         logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
         cell_px = fallback
+        grid_stats["fallback_cell_px"] = fallback
+        grid_stats["original_cell_px"] = cell_px
+        grid_stats["fallback_activated"] = True
+    else:
+        grid_stats["fallback_activated"] = False
 
-    # ここから「四辺すべてがバウンディングボックスに収まる」セルだけ線を描画する
+    # ここから「四辺すべてがバウンディングボックスに収まる」かつ
+    # 「セル全体がマスク内に収まる」セルだけ線を描画する
     x_end = x + w
     y_end = y + h
+
+    # 理論上のグリッドサイズを計算（バウンディングボックス内の最大マス目数）
+    grid_cols = w // cell_px
+    grid_rows = h // cell_px
+    grid_stats["theoretical_grid_size"] = {"rows": grid_rows, "cols": grid_cols}
+    
+    # バウンディングボックス内の総セル数
+    total_cells_in_bbox = grid_rows * grid_cols
+    grid_stats["total_cells_in_bbox"] = total_cells_in_bbox
 
     # y方向にセルを走査
     row = 0
@@ -125,38 +151,50 @@ def draw_grid_on_mask(
                 # 右がはみ出すので次の行へ
                 break
             
+            # バウンディングボックス内のセル数をカウント
+            grid_stats["total_cells_in_bbox"] += 1
+            
+            # セル領域全体がマスク内に収まっているか確認
+            # 境界線の太さを考慮して少し内側を確認する
+            padding = max(1, line_thickness // 2)
+            check_x1 = max(0, cell_x1 - padding)
+            check_y1 = max(0, cell_y1 - padding)
+            check_x2 = min(final_mask.shape[1] - 1, cell_x2 + padding)
+            check_y2 = min(final_mask.shape[0] - 1, cell_y2 + padding)
+            
+            # マスクのセル領域の範囲を抽出
+            cell_roi = final_mask[check_y1:check_y2, check_x1:check_x2]
+            
+            # セル領域のピクセルがすべて1（マスク内）かどうかチェック
+            if not np.all(cell_roi == 1):
+                # 部分的にでもマスク外ならこのセルはスキップ
+                grid_stats["cells_skipped"] += 1
+                grid_stats["reason_not_in_mask"] += 1
+                col += 1
+                continue
+            
             # ===== マスの四隅 (cell_x1, cell_y1) → (cell_x2, cell_y2) =====
-            # 四辺をそれぞれ描画し、かつ House内部だけに制限する
+            # 四辺をそれぞれ描画（マスク内かのチェックは不要になった）
 
             # 上辺
-            line_mask_top = np.zeros_like(final_mask, dtype=np.uint8)
-            cv2.line(line_mask_top, (cell_x1, cell_y1), (cell_x2, cell_y1), 1, thickness=line_thickness)
-            line_mask_top = cv2.bitwise_and(line_mask_top, final_mask)
-            out[line_mask_top == 1] = line_color
+            cv2.line(out, (cell_x1, cell_y1), (cell_x2, cell_y1), line_color, line_thickness)
 
             # 下辺
-            line_mask_bottom = np.zeros_like(final_mask, dtype=np.uint8)
-            cv2.line(line_mask_bottom, (cell_x1, cell_y2), (cell_x2, cell_y2), 1, thickness=line_thickness)
-            line_mask_bottom = cv2.bitwise_and(line_mask_bottom, final_mask)
-            out[line_mask_bottom == 1] = line_color
+            cv2.line(out, (cell_x1, cell_y2), (cell_x2, cell_y2), line_color, line_thickness)
 
             # 左辺
-            line_mask_left = np.zeros_like(final_mask, dtype=np.uint8)
-            cv2.line(line_mask_left, (cell_x1, cell_y1), (cell_x1, cell_y2), 1, thickness=line_thickness)
-            line_mask_left = cv2.bitwise_and(line_mask_left, final_mask)
-            out[line_mask_left == 1] = line_color
+            cv2.line(out, (cell_x1, cell_y1), (cell_x1, cell_y2), line_color, line_thickness)
 
             # 右辺
-            line_mask_right = np.zeros_like(final_mask, dtype=np.uint8)
-            cv2.line(line_mask_right, (cell_x2, cell_y1), (cell_x2, cell_y2), 1, thickness=line_thickness)
-            line_mask_right = cv2.bitwise_and(line_mask_right, final_mask)
-            out[line_mask_right == 1] = line_color
+            cv2.line(out, (cell_x2, cell_y1), (cell_x2, cell_y2), line_color, line_thickness)
 
+            # 描画したセルをカウント
+            grid_stats["cells_drawn"] += 1
             col += 1
         
         row += 1
 
-    return out
+    return out, grid_stats
 
 def draw_grid_on_rect(
     image: np.ndarray,
@@ -314,7 +352,8 @@ def process_image(
             "px_per_mm": None,
             "image_size": None,
             "resized": False,
-            "original_size": None
+            "original_size": None,
+            "grid_stats": None  # グリッド描画の統計情報
         }
 
         # 画像ファイルの読み込み (Streamlit or Path対応)
@@ -439,7 +478,7 @@ def process_image(
         # 最終マスク内だけにグリッド描画
         if np.sum(final_house) > 0:  # マスクが空でない場合
             # House内部だけにグリッド描画
-            out_bgr = draw_grid_on_mask(
+            out_bgr, grid_stats = draw_grid_on_mask(
                 image=out_bgr,
                 final_mask=final_house,
                 grid_mm=grid_mm,
@@ -450,13 +489,22 @@ def process_image(
                 line_thickness=2
             )
             
+            # グリッド統計情報をデバッグ情報に追加
+            debug_info["grid_stats"] = grid_stats
+            
             # バウンディングボックス情報をデバッグ情報に追加
-            contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if contours:
-                big_contour = max(contours, key=cv2.contourArea)
-                x, y, wc, hc = cv2.boundingRect(big_contour)
-                debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
-                debug_info["cell_px"] = int(round(grid_mm * px_per_mm))
+            if grid_stats.get("bounding_box"):
+                debug_info["bounding_box"] = grid_stats["bounding_box"]
+            
+            # セルサイズ情報をデバッグ情報に追加
+            if grid_stats.get("cell_px"):
+                debug_info["cell_px"] = grid_stats["cell_px"]
+                
+            # fallback情報をデバッグ情報に追加
+            if grid_stats.get("fallback_activated"):
+                debug_info["fallback_activated"] = grid_stats["fallback_activated"]
+                debug_info["original_cell_px"] = grid_stats.get("original_cell_px")
+                debug_info["fallback_cell_px"] = grid_stats.get("fallback_cell_px")
         else:
             logger.warning("オフセット後の住居領域が見つかりません")
             debug_info["error"] = "オフセット後の住居領域が見つかりません"

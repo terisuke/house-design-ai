@@ -210,6 +210,41 @@ def main():
                                 grid_rows = bbox['height'] // cell_px
                                 grid_cols = bbox['width'] // cell_px
                                 st.write(f"📏 **グリッドサイズ**: {grid_rows}行 × {grid_cols}列")
+                                
+                                # グリッド統計情報の表示（新規追加）
+                                if debug_info.get("grid_stats"):
+                                    grid_stats = debug_info["grid_stats"]
+                                    st.subheader("🧩 マス目生成の詳細")
+                                    
+                                    # マス目の統計情報
+                                    st.write(f"- **バウンディングボックス内の全マス目数**: {grid_stats.get('total_cells_in_bbox', '不明')}")
+                                    st.write(f"- **実際に描画されたマス目数**: {grid_stats.get('cells_drawn', '不明')}")
+                                    st.write(f"- **スキップされたマス目数**: {grid_stats.get('cells_skipped', '不明')}")
+                                    
+                                    # 理論上の最大グリッドサイズ
+                                    if grid_stats.get("theoretical_grid_size"):
+                                        theoretical = grid_stats["theoretical_grid_size"]
+                                        st.write(f"- **理論上の最大グリッドサイズ**: {theoretical.get('rows', '?')}行 × {theoretical.get('cols', '?')}列")
+                                    
+                                    # スキップ理由の内訳
+                                    if grid_stats.get("reason_not_in_mask", 0) > 0:
+                                        st.write(f"- **マスク外のためスキップ**: {grid_stats.get('reason_not_in_mask')}マス")
+                                        
+                                    # スキップされたマス目の割合
+                                    if grid_stats.get("total_cells_in_bbox", 0) > 0:
+                                        skip_ratio = grid_stats.get("cells_skipped", 0) / grid_stats.get("total_cells_in_bbox", 1) * 100
+                                        st.write(f"- **スキップ率**: {skip_ratio:.1f}%")
+                                        
+                                        # 建物の形状に関する説明
+                                        if skip_ratio > 50:
+                                            st.info("👉 スキップ率が高いため、建物形状が不規則または複雑な形状であると考えられます。")
+                                        elif skip_ratio > 20:
+                                            st.info("👉 建物形状にある程度の凹凸があるため、一部のマス目がスキップされています。")
+                                        else:
+                                            st.info("👉 建物形状が比較的整っているため、多くのマス目が描画されています。")
+                                            
+                                    # グリッド描画に関する説明
+                                    st.info("ℹ️ **「完全に収まるマス目だけを描画」モードを使用しています。**マス目の一部でもマスク外にはみ出す場合はそのマス目全体を描画しません。これにより整然としたグリッドが表示されます。")
                         
                         # セルサイズとフォールバック情報
                         if debug_info.get("cell_px"):
