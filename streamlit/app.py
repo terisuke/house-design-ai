@@ -125,7 +125,22 @@ def main():
                     )
                     
                     if process_result:
-                        result_image, debug_info = process_result
+                        # 新旧両方の形式に対応: 新形式はタプル(Image, dict)、旧形式はImage単体
+                        if isinstance(process_result, tuple) and len(process_result) == 2:
+                            result_image, debug_info = process_result
+                        else:
+                            # 旧形式の場合はImageオブジェクトだけで、デバッグ情報は手動で作成
+                            result_image = process_result
+                            debug_info = {
+                                "params": {
+                                    "near_offset_px": offset_near,
+                                    "far_offset_px": offset_far,
+                                    "grid_mm": grid_mm
+                                },
+                                "image_size": {"width_px": result_image.width, "height_px": result_image.height},
+                                "note": "基本デバッグ情報のみ（旧バージョンのprocess_image関数使用中）"
+                            }
+                            
                         st.image(result_image, use_column_width=True)
 
                         buf = io.BytesIO()
@@ -180,6 +195,8 @@ def main():
                         # エラー情報があれば表示
                         if debug_info.get("error"):
                             st.error(f"エラー: {debug_info['error']}")
+                        elif debug_info.get("note"):
+                            st.info(debug_info["note"])
                         
                         # メタデータを詳細表示するセクション
                         with st.expander("詳細デバッグ情報 (JSON)"):
