@@ -62,32 +62,39 @@ def draw_grid_on_mask(
     line_thickness: int = 2
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
-    Houseマスクの輪郭からバウンディングボックスを取得し、
-    「セル全体がマスク内に完全に収まる」マス目だけを描画する。
+    建物マスク領域に固定間隔のマス目（セル）を描画する。
+
+    セルは「マスク内部にすべてが収まる場合のみ」描画するため、
+    マスク外にはみ出すセルはスキップされる。
 
     Args:
         image: 描画対象のBGR画像
-        final_mask: グリッドを描画する対象のマスク(0 or 1)
-        grid_mm: 紙上(mm)単位のグリッド間隔
+        final_mask: グリッドを描画する対象のバイナリマスク(0 or 1)
+        grid_mm: 紙上(mm)単位のグリッド間隔（本処理では使わないが、引数として残す）
         px_per_mm: mmあたりのピクセル数(A3横420mm想定)
         fill_color: セル塗りつぶし色 (BGR)
         alpha: 塗りつぶしの透明度(0~1)
         line_color: グリッド線の色 (BGR)
         line_thickness: グリッド線の太さ(px)
+
     Returns:
-        Tuple[グリッド描画後の画像(BGR), 描画情報の辞書]
+        (drawn_image, stats)
+        - drawn_image: グリッド描画後のBGR画像
+        - stats: 描画に関する各種統計情報を含む辞書
     """
     out = image.copy()
     
-    # 統計情報
+    # 統計情報格納用の辞書
     grid_stats = {
-        "total_cells_in_bbox": 0,
-        "cells_drawn": 0,
-        "cells_skipped": 0,
-        "reason_not_in_mask": 0,
+        "cell_px": None,             # 実際に使用したセルサイズ(px)
+        "bounding_box": None,        # マスク全体のバウンディングボックス (x, y, width, height)
+        "total_cells_in_bbox": 0,    # バウンディングボックス内に理論上配置されるセル数
+        "cells_drawn": 0,           # 実際に描画されたセル数
+        "cells_skipped": 0,         # スキップされたセル数
+        "reason_not_in_mask": 0,    # スキップ理由が「マスク外」だった回数
     }
 
-    # 1) final_maskから輪郭・バウンディングボックスを取得
+    # マスクの輪郭を抽出
     contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         # マスクが空の場合はそのまま返す
@@ -103,28 +110,18 @@ def draw_grid_on_mask(
     mask_area[final_mask == 1] = fill_color
     cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
 
-    # grid_mm を pxに変換
-    cell_px = int(round(grid_mm * px_per_mm))
+    # グリッド間隔を固定(px=54)にする（9.1mm相当×5.93px/mm = 約54px）
+    cell_px = 54
     grid_stats["cell_px"] = cell_px
+
+    # バウンディングボックス情報を格納
     grid_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
-    # セルが領域より大きすぎる場合はfallback
-    if cell_px > w or cell_px > h:
-        fallback = max(1, min(w, h) // 5)
-        logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
-        cell_px = fallback
-        grid_stats["fallback_cell_px"] = fallback
-        grid_stats["original_cell_px"] = cell_px
-        grid_stats["fallback_activated"] = True
-    else:
-        grid_stats["fallback_activated"] = False
-
-    # ここから「四辺すべてがバウンディングボックスに収まる」かつ
-    # 「セル全体がマスク内に収まる」セルだけ線を描画する
+    # バウンディングボックス範囲
     x_end = x + w
     y_end = y + h
 
-    # 理論上のグリッドサイズを計算（バウンディングボックス内の最大マス目数）
+    # 理論上のグリッドサイズ(単純に w,h を cell_px で割った数)
     grid_cols = w // cell_px
     grid_rows = h // cell_px
     grid_stats["theoretical_grid_size"] = {"rows": grid_rows, "cols": grid_cols}
@@ -133,65 +130,50 @@ def draw_grid_on_mask(
     total_cells_in_bbox = grid_rows * grid_cols
     grid_stats["total_cells_in_bbox"] = total_cells_in_bbox
 
-    # y方向にセルを走査
+    # 行(row)方向に走査
     row = 0
     while True:
         cell_y1 = y + row * cell_px
         cell_y2 = cell_y1 + cell_px
         if cell_y2 > y_end:
-            # 下がはみ出すので終了
-            break
+            break  # バウンディングボックス外なので終了
         
-        # x方向にセルを走査
+        # 列(col)方向に走査
         col = 0
         while True:
             cell_x1 = x + col * cell_px
             cell_x2 = cell_x1 + cell_px
             if cell_x2 > x_end:
-                # 右がはみ出すので次の行へ
-                break
+                break  # 右がはみ出すので次の行へ
             
-            # バウンディングボックス内のセル数をカウント
+            # (1) バウンディングボックス内のセル数カウント
             grid_stats["total_cells_in_bbox"] += 1
             
-            # セル領域全体がマスク内に収まっているか確認
-            # 境界線の太さを考慮して少し内側を確認する
+            # (2) マスク内に完全に収まっているか確認
             padding = max(1, line_thickness // 2)
             check_x1 = max(0, cell_x1 - padding)
             check_y1 = max(0, cell_y1 - padding)
             check_x2 = min(final_mask.shape[1] - 1, cell_x2 + padding)
             check_y2 = min(final_mask.shape[0] - 1, cell_y2 + padding)
             
-            # マスクのセル領域の範囲を抽出
+            # セル領域のマスク(部分)を抽出
             cell_roi = final_mask[check_y1:check_y2, check_x1:check_x2]
             
-            # セル領域のピクセルがすべて1（マスク内）かどうかチェック
+            # マスク外に1ピクセルでもかかるならスキップ
             if not np.all(cell_roi == 1):
-                # 部分的にでもマスク外ならこのセルはスキップ
                 grid_stats["cells_skipped"] += 1
                 grid_stats["reason_not_in_mask"] += 1
                 col += 1
                 continue
             
-            # ===== マスの四隅 (cell_x1, cell_y1) → (cell_x2, cell_y2) =====
-            # 四辺をそれぞれ描画（マスク内かのチェックは不要になった）
-
-            # 上辺
+            # (3) セルの四辺を描画
             cv2.line(out, (cell_x1, cell_y1), (cell_x2, cell_y1), line_color, line_thickness)
-
-            # 下辺
             cv2.line(out, (cell_x1, cell_y2), (cell_x2, cell_y2), line_color, line_thickness)
-
-            # 左辺
             cv2.line(out, (cell_x1, cell_y1), (cell_x1, cell_y2), line_color, line_thickness)
-
-            # 右辺
             cv2.line(out, (cell_x2, cell_y1), (cell_x2, cell_y2), line_color, line_thickness)
 
-            # 描画したセルをカウント
             grid_stats["cells_drawn"] += 1
             col += 1
-        
         row += 1
 
     return out, grid_stats
@@ -499,12 +481,6 @@ def process_image(
             # セルサイズ情報をデバッグ情報に追加
             if grid_stats.get("cell_px"):
                 debug_info["cell_px"] = grid_stats["cell_px"]
-                
-            # fallback情報をデバッグ情報に追加
-            if grid_stats.get("fallback_activated"):
-                debug_info["fallback_activated"] = grid_stats["fallback_activated"]
-                debug_info["original_cell_px"] = grid_stats.get("original_cell_px")
-                debug_info["fallback_cell_px"] = grid_stats.get("fallback_cell_px")
         else:
             logger.warning("オフセット後の住居領域が見つかりません")
             debug_info["error"] = "オフセット後の住居領域が見つかりません"
