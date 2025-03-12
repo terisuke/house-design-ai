@@ -51,6 +51,80 @@ def offset_mask_by_distance(mask: np.ndarray, offset_px: int) -> np.ndarray:
     shrunk = (dist >= offset_px).astype(np.uint8)
     return shrunk
 
+def draw_grid_on_mask(
+    image: np.ndarray,
+    final_mask: np.ndarray,
+    grid_mm: float,
+    px_per_mm: float,
+    fill_color: Tuple[int, int, int] = (255, 0, 0),
+    alpha: float = 0.4,
+    line_color: Tuple[int, int, int] = (0, 0, 255),
+    line_thickness: int = 2
+) -> np.ndarray:
+    """
+    Houseマスクの輪郭からバウンディングボックスを取得し、
+    その矩形範囲にグリッドを引くが、実際にはfinal_mask内にのみ描画する。
+
+    Args:
+        image: 描画対象のBGR画像
+        final_mask: グリッドを描画する対象のマスク
+        grid_mm: 紙上(mm)単位のグリッド間隔
+        px_per_mm: mmあたりのピクセル数
+        fill_color: 塗りつぶし色 (BGR)
+        alpha: 塗りつぶしの透明度(0~1)
+        line_color: グリッド線の色 (BGR)
+        line_thickness: グリッド線の太さ(px)
+    Returns:
+        グリッド描画後の画像(BGR)
+    """
+    out = image.copy()
+
+    # 1) final_maskから輪郭・バウンディングボックスを取得
+    contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        # マスクが空の場合はそのまま返す
+        return out
+    
+    big_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(big_contour)
+
+    # まず半透明塗りつぶし（マスク内のみ）
+    overlay = out.copy()
+    mask_area = np.zeros_like(out)
+    mask_area[final_mask == 1] = fill_color
+    cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
+
+    # 2) grid_mm を pxに変換
+    cell_px = int(round(grid_mm * px_per_mm))
+
+    # セルが領域より大きすぎる場合はfallback
+    if cell_px > w or cell_px > h:
+        fallback = max(1, min(w, h) // 5)
+        logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
+        cell_px = fallback
+
+    # 3) y方向に cell_px 間隔で線を引く
+    for gy in range(y, y + h + 1, cell_px):
+        # 仮のlineMaskに線を引いて、HouseマスクとANDを取る
+        lineMask = np.zeros_like(final_mask, dtype=np.uint8)
+        cv2.line(lineMask, (x, gy), (x + w, gy), 1, thickness=line_thickness)
+
+        # House内部だけ残す
+        lineMask = cv2.bitwise_and(lineMask, final_mask)
+
+        # out上で lineMask=1 の部分だけに line_colorを描画
+        out[lineMask == 1] = line_color
+
+    # 4) x方向に cell_px 間隔で線を引く
+    for gx in range(x, x + w + 1, cell_px):
+        lineMask = np.zeros_like(final_mask, dtype=np.uint8)
+        cv2.line(lineMask, (gx, y), (gx, y + h), 1, thickness=line_thickness)
+
+        lineMask = cv2.bitwise_and(lineMask, final_mask)
+        out[lineMask == 1] = line_color
+
+    return out
+
 def draw_grid_on_rect(
     image: np.ndarray,
     rect: Tuple[int, int, int, int],
@@ -252,11 +326,18 @@ def process_image(
                 elif int(cls_id) == ROAD_CLASS_ID:
                     road_mask = np.maximum(road_mask, resized_mask)
 
-        # 住居マスクを半透明(緑)で描画
+        # 元画像をコピー
         out_bgr = a3_img.copy()
-        overlay = out_bgr.copy()
-        overlay[house_mask == 1] = (0, 255, 0)  # BGR
-        cv2.addWeighted(overlay, 0.3, out_bgr, 0.7, 0, out_bgr)
+        
+        # 1) House領域を緑色で可視化
+        overlay_house = out_bgr.copy()
+        overlay_house[house_mask == 1] = (0, 255, 0)  # BGR(緑)
+        cv2.addWeighted(overlay_house, 0.3, out_bgr, 0.7, 0, out_bgr)
+        
+        # 2) Road領域をマゼンタで可視化
+        overlay_road = out_bgr.copy()
+        overlay_road[road_mask == 1] = (255, 0, 255)  # BGR(マゼンタ)
+        cv2.addWeighted(overlay_road, 0.3, out_bgr, 0.7, 0, out_bgr)
 
         # --- B) まず建物マスクを "グローバルセットバック" だけ収縮 ---
         # mm→px 換算（A3幅）
@@ -291,41 +372,30 @@ def process_image(
         # 最終マスク = 遠い部分 + 近接部分(追加収縮済み)
         final_house = np.maximum(house_far, house_near_offset)
 
-        # バウンディングボックスを求めてグリッド描画
-        contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
-            logger.warning("オフセット後の住居領域が見つかりません")
-            debug_info["error"] = "オフセット後の住居領域が見つかりません"
-        else:
-            # 最大輪郭を取得
-            big_contour = max(contours, key=cv2.contourArea)
-            x, y, wc, hc = cv2.boundingRect(big_contour)
-            debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
-            
-            # A3のピクセル/mm変換比を計算
-            cell_px = int(round(grid_mm * px_per_mm))
-            debug_info["cell_px"] = cell_px
-            
-            # フォールバックチェック
-            if cell_px > wc or cell_px > hc:
-                fallback = max(1, min(wc, hc) // 5)
-                logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
-                debug_info["fallback_activated"] = True
-                debug_info["original_cell_px"] = cell_px
-                debug_info["fallback_cell_px"] = fallback
-                cell_px = fallback
-
-            # A3サイズでグリッド描画（常に同じスケール）
-            out_bgr = draw_grid_on_rect(
+        # 最終マスク内だけにグリッド描画
+        if np.sum(final_house) > 0:  # マスクが空でない場合
+            # House内部だけにグリッド描画
+            out_bgr = draw_grid_on_mask(
                 image=out_bgr,
-                rect=(x, y, wc, hc),
+                final_mask=final_house,
                 grid_mm=grid_mm,
-                image_width_px=A3_WIDTH_PX,  # 横幅は固定のA3幅
+                px_per_mm=px_per_mm,
                 fill_color=(255, 0, 0),
                 alpha=0.4,
                 line_color=(0, 0, 255),
                 line_thickness=2
             )
+            
+            # バウンディングボックス情報をデバッグ情報に追加
+            contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                big_contour = max(contours, key=cv2.contourArea)
+                x, y, wc, hc = cv2.boundingRect(big_contour)
+                debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
+                debug_info["cell_px"] = int(round(grid_mm * px_per_mm))
+        else:
+            logger.warning("オフセット後の住居領域が見つかりません")
+            debug_info["error"] = "オフセット後の住居領域が見つかりません"
 
         # BGR→RGB変換してPIL画像化
         rgb = cv2.cvtColor(out_bgr, cv2.COLOR_BGR2RGB)
