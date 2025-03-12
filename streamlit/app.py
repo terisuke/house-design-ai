@@ -13,37 +13,43 @@ from pathlib import Path
 import logging
 import sys
 
-# OpenCVのインポートエラーをキャッチして適切なメッセージを表示
-try:
-    import cv2
-    cv2_available = True
-except ImportError as e:
-    st.error(f"OpenCVのインポートに失敗しました: {e}")
-    logging.error(f"OpenCVのインポートエラー: {e}")
-    cv2_available = False
-
-# プロジェクトルートをPythonパスに追加
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# 自作モジュールのインポート
-try:
-    from src.cloud.storage import download_model_from_gcs
-    from src.processing.mask import process_image
-except ImportError as e:
-    st.error(f"モジュールのインポートに失敗しました: {e}")
-    logging.error(f"モジュールインポートエラー: {e}")
-
-# ロギング設定
+# ロギング設定を最初に行う
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("streamlit-app")
 
-# アプリの設定
+# アプリの設定（必ず最初のStreamlitコマンドにする）
 st.set_page_config(
     page_title="建物セグメンテーション＆グリッド生成",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# プロジェクトルートをPythonパスに追加
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# OpenCVとその他の依存関係のインポートをエラーハンドリングする
+cv2_available = False
+import_errors = []
+
+try:
+    import cv2
+    cv2_available = True
+except ImportError as e:
+    error_msg = f"OpenCVのインポートに失敗しました: {e}"
+    logger.error(error_msg)
+    import_errors.append(error_msg)
+
+# 自作モジュールのインポート
+modules_available = False
+try:
+    from src.cloud.storage import download_model_from_gcs
+    from src.processing.mask import process_image
+    modules_available = True
+except ImportError as e:
+    error_msg = f"モジュールのインポートに失敗しました: {e}"
+    logger.error(error_msg)
+    import_errors.append(error_msg)
 
 def load_yolo_model() -> None:
     """YOLOモデルをロード・初期化"""
@@ -80,6 +86,16 @@ def load_yolo_model() -> None:
 
 def main():
     """Streamlitアプリのメインエントリーポイント"""
+    
+    # インポートエラーがあればここで表示
+    if import_errors:
+        st.error("### システムライブラリエラー")
+        for error in import_errors:
+            st.error(error)
+        st.error("アプリケーションの依存関係が正しくインストールされていません。管理者に連絡してください。")
+        st.info("必要なライブラリ: libgl1-mesa-glx, libglib2.0-0, opencv-python-headless等")
+        return  # 重大なエラーなので、ここで処理を中断
+        
     st.title("建物セグメンテーション＆グリッド生成 (A3横向き)")
 
     # サイドバー
