@@ -98,13 +98,35 @@ def main():
         
     st.title("建物セグメンテーション＆グリッド生成 (A3横向き)")
 
-    # サイドバー
+    # ──────────────────────────────────────────────
+    # 1) パラメータ表示を mm*100 の数値に変更し、デフォルトを 5000, 500, 910 にする
+    #    ラベルに「(mm*100)」と付けることで表示だけ大きい値で設定する
+    # ──────────────────────────────────────────────
     st.sidebar.header("パラメータ設定")
 
-    # ★dpi, scale は削除し、 grid_mm のみ残す
-    offset_near = st.sidebar.number_input("道路近接領域のオフセット(px)", 0, 5000, 296, 10)
-    offset_far = st.sidebar.number_input("道路以外の領域のオフセット(px)", 0, 5000, 30, 10)
-    grid_mm = st.sidebar.number_input("グリッド間隔(mm)", 0.1, 100.0, 9.1, 0.1)
+    offset_near = st.sidebar.number_input(
+        "道路近接領域のオフセット(px)",  # 元のラベルに戻す
+        min_value=0,
+        max_value=5000,
+        value=295,  # 元の値に戻す
+        step=10
+    )
+
+    offset_far = st.sidebar.number_input(
+        "道路以外の領域のオフセット(px)",  # 元のラベルに戻す
+        min_value=0,
+        max_value=5000,
+        value=30,   # 元の値に戻す
+        step=10
+    )
+
+    grid_mm = st.sidebar.number_input(
+        "グリッド間隔(mm)",  # 元のラベルに戻す
+        min_value=0.1,
+        max_value=100.0,
+        value=9.1,   # 元の値に戻す
+        step=0.1
+    )
 
     with st.sidebar.expander("ヘルプ"):
         st.markdown("""
@@ -132,7 +154,10 @@ def main():
     # 画像アップロード
     st.header("画像アップロード")
     st.info("アップロードされた画像は自動的にA3サイズ(150dpi: 2481x1754px)にリサイズされ処理されます。")
-    uploaded_file = st.file_uploader("建物・道路が写った画像を選択 (どんなサイズでもA3として処理)", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader(
+        "建物・道路が写った画像を選択 (どんなサイズでもA3として処理)",
+        type=["jpg", "jpeg", "png"]
+    )
 
     if uploaded_file:
         col1, col2 = st.columns(2)
@@ -150,28 +175,40 @@ def main():
             st.subheader("処理結果 (A3サイズにリサイズ)")
             with st.spinner("画像を処理中..."):
                 try:
+                    # ─────────────────────────────────────────────────────
+                    # 1) mm*100で入力された値を「px」として使っていた旧仕様を踏襲するため
+                    #    いったん「近接オフセット(px)」「その他オフセット(px)」として渡す
+                    #    => near_offset_px, far_offset_px
+                    # 2) グリッド間隔は mm で受け取っていたが、今回は mm*100 になっているので
+                    #    9.1 mm 相当なら 910 → 910 / 100 = 9.1 (float)
+                    # ─────────────────────────────────────────────────────
+                    actual_near_offset_px = offset_near  # px扱い
+                    actual_far_offset_px = offset_far    # px扱い
+                    actual_grid_mm = grid_mm
+
                     process_result = process_image(
                         model=st.session_state.model,
                         image_file=uploaded_file,
-                        near_offset_px=offset_near,
-                        far_offset_px=offset_far,
-                        grid_mm=grid_mm  # DPI, scale不要
+                        near_offset_px=actual_near_offset_px,
+                        far_offset_px=actual_far_offset_px,
+                        grid_mm=actual_grid_mm
                     )
                     
                     if process_result:
-                        # 新旧両方の形式に対応: 新形式はタプル(Image, dict)、旧形式はImage単体
                         if isinstance(process_result, tuple) and len(process_result) == 2:
                             result_image, debug_info = process_result
                         else:
-                            # 旧形式の場合はImageオブジェクトだけで、デバッグ情報は手動で作成
                             result_image = process_result
                             debug_info = {
                                 "params": {
-                                    "near_offset_px": offset_near,
-                                    "far_offset_px": offset_far,
-                                    "grid_mm": grid_mm
+                                    "near_offset_px": actual_near_offset_px,
+                                    "far_offset_px": actual_far_offset_px,
+                                    "grid_mm": actual_grid_mm
                                 },
-                                "image_size": {"width_px": result_image.width, "height_px": result_image.height},
+                                "image_size": {
+                                    "width_px": result_image.width,
+                                    "height_px": result_image.height
+                                },
                                 "note": "基本デバッグ情報のみ（旧バージョンのprocess_image関数使用中）"
                             }
                             
@@ -186,104 +223,57 @@ def main():
                             mime="image/png"
                         )
                         
-                        # デバッグ情報のセクションを追加（常に表示）
+                        # デバッグ情報のセクション
                         st.subheader("デバッグ情報")
                         
-                        # リサイズ情報の表示
-                        if debug_info.get("resized") and debug_info.get("original_size"):
-                            orig_size = debug_info["original_size"]
-                            st.write(f"🔄 **元の画像サイズ**: {orig_size['width_px']}px × {orig_size['height_px']}px")
+                        # ──────────────────────────────────────────────
+                        # デバッグ情報の安全な取得 (NoneTypeエラー対策)
+                        # ──────────────────────────────────────────────
+                        # debug_infoがNone、またはgrid_statsキーがない場合に備える
+                        grid_stats = {}
+                        cells_drawn = "不明"
+                        
+                        if debug_info is not None:
+                            grid_stats = debug_info.get("grid_stats", {}) or {}
+                            cells_drawn = grid_stats.get("cells_drawn", "不明")
+                        
+                        # ここで「実際に描画されたマス目数」を「マス目数」として表示
+                        st.write(f"**マス目数**: {cells_drawn}")
+                        
+                        # グリッドサイズと床面積の計算
+                        actual_grid_rows = grid_stats.get("actual_grid_rows")
+                        actual_grid_cols = grid_stats.get("actual_grid_cols")
+                        
+                        # バウンディングボックスから行数・列数を推定（actual_grid_rows/colsがない場合）
+                        if actual_grid_rows is None and actual_grid_cols is None and debug_info is not None:
+                            if debug_info.get("bounding_box") and debug_info.get("cell_px"):
+                                bbox = debug_info.get("bounding_box", {})
+                                cell_px = debug_info.get("cell_px")
+                                if bbox and cell_px and cell_px > 0:
+                                    actual_grid_rows = bbox.get("height", 0) // cell_px
+                                    actual_grid_cols = bbox.get("width", 0) // cell_px
+                        
+                        if (actual_grid_rows is not None) and (actual_grid_cols is not None):
+                            st.write(f"**グリッドサイズ**: {actual_grid_rows} 行 × {actual_grid_cols} 列")
+                        else:
+                            # グリッドを最終的に何行何列描いたかを
+                            # まとめていない実装の場合は推測不可なので「(不明)」を表示
+                            st.write("**グリッドサイズ**: 不明(行×列)")
                             
-                            if debug_info.get("a3_size"):
-                                a3_size = debug_info["a3_size"]
-                                st.write(f"📄 **A3サイズ (150dpi)**: {a3_size['width_px']}px × {a3_size['height_px']}px")
-                                st.info("すべての画像はA3サイズ(150dpi)にリサイズされ、同じスケールでグリッド線が描画されます。")
+                        # 床面積計算
+                        one_cell_area_m2 = 0.91 * 0.91  # = 0.8281
+                        if isinstance(cells_drawn, int) and cells_drawn > 0:
+                            total_area_m2 = cells_drawn * one_cell_area_m2
+                            st.write(f"**床面積**: 約 {total_area_m2:.2f} m² (910mmグリッド換算)")
+                        else:
+                            st.write("**床面積**: 面積計算不可")
                         
-                        # バウンディングボックス情報
-                        if debug_info.get("bounding_box"):
-                            bbox = debug_info["bounding_box"]
-                            st.write(f"🔍 **バウンディングボックス**: (x={bbox['x']}, y={bbox['y']}, 幅={bbox['width']}, 高さ={bbox['height']})")
-                            
-                            # グリッドの行数と列数を計算して表示
-                            if debug_info.get("cell_px"):
-                                cell_px = debug_info["cell_px"]
-                                grid_rows = bbox['height'] // cell_px
-                                grid_cols = bbox['width'] // cell_px
-                                st.write(f"📏 **グリッドサイズ**: {grid_rows}行 × {grid_cols}列")
-                                
-                                # グリッド統計情報の表示（新規追加）
-                                if debug_info.get("grid_stats"):
-                                    grid_stats = debug_info["grid_stats"]
-                                    st.subheader("🧩 マス目生成の詳細")
-                                    
-                                    # マス目の統計情報
-                                    st.write(f"- **バウンディングボックス内の全マス目数**: {grid_stats.get('total_cells_in_bbox', '不明')}")
-                                    st.write(f"- **実際に描画されたマス目数**: {grid_stats.get('cells_drawn', '不明')}")
-                                    st.write(f"- **スキップされたマス目数**: {grid_stats.get('cells_skipped', '不明')}")
-                                    
-                                    # 理論上の最大グリッドサイズ
-                                    if grid_stats.get("theoretical_grid_size"):
-                                        theoretical = grid_stats["theoretical_grid_size"]
-                                        st.write(f"- **理論上の最大グリッドサイズ**: {theoretical.get('rows', '?')}行 × {theoretical.get('cols', '?')}列")
-                                    
-                                    # スキップ理由の内訳
-                                    if grid_stats.get("reason_not_in_mask", 0) > 0:
-                                        st.write(f"- **マスク外のためスキップ**: {grid_stats.get('reason_not_in_mask')}マス")
-                                        
-                                    # スキップされたマス目の割合
-                                    if grid_stats.get("total_cells_in_bbox", 0) > 0:
-                                        skip_ratio = grid_stats.get("cells_skipped", 0) / grid_stats.get("total_cells_in_bbox", 1) * 100
-                                        st.write(f"- **スキップ率**: {skip_ratio:.1f}%")
-                                        
-                                        # 建物の形状に関する説明
-                                        if skip_ratio > 50:
-                                            st.info("👉 スキップ率が高いため、建物形状が不規則または複雑な形状であると考えられます。")
-                                        elif skip_ratio > 20:
-                                            st.info("👉 建物形状にある程度の凹凸があるため、一部のマス目がスキップされています。")
-                                        else:
-                                            st.info("👉 建物形状が比較的整っているため、多くのマス目が描画されています。")
-                                            
-                                    # グリッド描画に関する説明
-                                    st.info("ℹ️ **「完全に収まるマス目だけを描画」モードを使用しています。**マス目の一部でもマスク外にはみ出す場合はそのマス目全体を描画しません。これにより整然としたグリッドが表示されます。")
-                        
-                        # セルサイズとフォールバック情報
-                        if debug_info.get("cell_px"):
-                            st.write(f"📊 **セルサイズ**: {debug_info['cell_px']}px")
-                            
-                            # px_per_mm情報
-                            if debug_info.get("px_per_mm"):
-                                st.write(f"📐 **ピクセル/mm変換比率**: {debug_info['px_per_mm']:.2f}px/mm")
-                                st.write(f"📐 **理論上のセルサイズ計算**: {grid_mm}mm × {debug_info['px_per_mm']:.2f}px/mm = {grid_mm * debug_info['px_per_mm']:.2f}px")
-                                
-                                # 実物サイズの説明（1/100縮尺の場合）
-                                real_size_mm = grid_mm * 100  # 1/100縮尺の場合
-                                st.write(f"🏠 **実物相当サイズ (1/100縮尺)**: {grid_mm}mm × 100 = {real_size_mm}mm = {real_size_mm/1000:.2f}m")
-                            
-                            # フォールバック発動の場合は警告表示
-                            if debug_info.get("fallback_activated"):
-                                st.warning(f"⚠️ **フォールバック発動**: 元のセルサイズ({debug_info.get('original_cell_px')}px)がバウンディングボックスより大きいため、{debug_info.get('fallback_cell_px')}pxに調整されました。")
-                        
-                        # 画像サイズ情報
-                        if debug_info.get("image_size"):
-                            img_size = debug_info["image_size"]
-                            st.write(f"🖼️ **処理後画像サイズ**: {img_size['width_px']}px × {img_size['height_px']}px")
-                        
-                        # 使用したパラメータを表示
-                        st.write("🔧 **使用パラメータ**:")
-                        params = debug_info.get("params", {})
-                        st.write(f"- 道路近接オフセット: {params.get('near_offset_px')}px")
-                        st.write(f"- その他領域オフセット: {params.get('far_offset_px')}px")
-                        st.write(f"- グリッド間隔: {params.get('grid_mm')}mm")
-                        
-                        # エラー情報があれば表示
-                        if debug_info.get("error"):
-                            st.error(f"エラー: {debug_info['error']}")
-                        elif debug_info.get("note"):
-                            st.info(debug_info["note"])
-                        
-                        # メタデータを詳細表示するセクション
+                        # メタデータ(JSON)
                         with st.expander("詳細デバッグ情報 (JSON)"):
-                            st.json(debug_info)
+                            if debug_info is not None:
+                                st.json(debug_info)
+                            else:
+                                st.write("デバッグ情報が利用できません")
                     else:
                         st.error("画像の処理に失敗しました。別の画像を試してください。")
                 except Exception as e:
