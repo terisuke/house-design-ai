@@ -116,34 +116,74 @@ def main():
             st.subheader("処理結果")
             with st.spinner("画像を処理中..."):
                 try:
-                    result = process_image(
+                    process_result = process_image(
                         model=st.session_state.model,
                         image_file=uploaded_file,
                         near_offset_px=offset_near,
                         far_offset_px=offset_far,
                         grid_mm=grid_mm  # DPI, scale不要
                     )
-                    if result:
-                        st.image(result, use_column_width=True)
+                    
+                    if process_result:
+                        result_image, debug_info = process_result
+                        st.image(result_image, use_column_width=True)
 
                         buf = io.BytesIO()
-                        result.save(buf, format="PNG")
+                        result_image.save(buf, format="PNG")
                         st.download_button(
                             label="結果をダウンロード",
                             data=buf.getvalue(),
                             file_name="result.png",
                             mime="image/png"
                         )
-
-                        with st.expander("処理メタデータ"):
-                            st.json({
-                                "元画像サイズ(px)": f"{result.width}x{result.height}",
-                                "パラメータ": {
-                                    "道路近接領域のオフセット(px)": offset_near,
-                                    "道路以外の領域のオフセット(px)": offset_far,
-                                    "グリッド間隔(mm)": grid_mm
-                                }
-                            })
+                        
+                        # デバッグ情報のセクションを追加（常に表示）
+                        st.subheader("デバッグ情報")
+                        
+                        # バウンディングボックス情報
+                        if debug_info.get("bounding_box"):
+                            bbox = debug_info["bounding_box"]
+                            st.write(f"🔍 **バウンディングボックス**: (x={bbox['x']}, y={bbox['y']}, 幅={bbox['width']}, 高さ={bbox['height']})")
+                            
+                            # グリッドの行数と列数を計算して表示
+                            if debug_info.get("cell_px"):
+                                cell_px = debug_info["cell_px"]
+                                grid_rows = bbox['height'] // cell_px
+                                grid_cols = bbox['width'] // cell_px
+                                st.write(f"📏 **グリッドサイズ**: {grid_rows}行 × {grid_cols}列")
+                        
+                        # セルサイズとフォールバック情報
+                        if debug_info.get("cell_px"):
+                            st.write(f"📊 **セルサイズ**: {debug_info['cell_px']}px")
+                            
+                            # px_per_mm情報
+                            if debug_info.get("px_per_mm"):
+                                st.write(f"📐 **ピクセル/mm変換比率**: {debug_info['px_per_mm']:.2f}px/mm")
+                                st.write(f"📐 **理論上のセルサイズ計算**: {grid_mm}mm × {debug_info['px_per_mm']:.2f}px/mm = {grid_mm * debug_info['px_per_mm']:.2f}px")
+                            
+                            # フォールバック発動の場合は警告表示
+                            if debug_info.get("fallback_activated"):
+                                st.warning(f"⚠️ **フォールバック発動**: 元のセルサイズ({debug_info.get('original_cell_px')}px)がバウンディングボックスより大きいため、{debug_info.get('fallback_cell_px')}pxに調整されました。")
+                        
+                        # 画像サイズ情報
+                        if debug_info.get("image_size"):
+                            img_size = debug_info["image_size"]
+                            st.write(f"🖼️ **元画像サイズ**: {img_size['width_px']}px × {img_size['height_px']}px")
+                        
+                        # 使用したパラメータを表示
+                        st.write("🔧 **使用パラメータ**:")
+                        params = debug_info.get("params", {})
+                        st.write(f"- 道路近接オフセット: {params.get('near_offset_px')}px")
+                        st.write(f"- その他領域オフセット: {params.get('far_offset_px')}px")
+                        st.write(f"- グリッド間隔: {params.get('grid_mm')}mm")
+                        
+                        # エラー情報があれば表示
+                        if debug_info.get("error"):
+                            st.error(f"エラー: {debug_info['error']}")
+                        
+                        # メタデータを詳細表示するセクション
+                        with st.expander("詳細デバッグ情報 (JSON)"):
+                            st.json(debug_info)
                     else:
                         st.error("画像の処理に失敗しました。別の画像を試してください。")
                 except Exception as e:

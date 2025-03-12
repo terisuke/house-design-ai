@@ -115,7 +115,7 @@ def process_image(
     near_offset_px: int = 100,
     far_offset_px: int = 50,
     grid_mm: float = 9.1
-) -> Optional[Image.Image]:
+) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を処理して、セグメンテーション・マスク操作・グリッド生成を行う。
 
@@ -129,9 +129,23 @@ def process_image(
         far_offset_px: その他の住居領域をどれだけ内側にオフセットするか(px)
         grid_mm: 紙上のグリッド間隔(mm) (例: 9.1mm)
     Returns:
-        処理後のPIL画像 (失敗時None)
+        Tuple[処理後のPIL画像, デバッグ情報の辞書] または None (失敗時)
     """
     try:
+        # デバッグ情報を格納する辞書
+        debug_info = {
+            "params": {
+                "near_offset_px": near_offset_px,
+                "far_offset_px": far_offset_px,
+                "grid_mm": grid_mm
+            },
+            "fallback_activated": False,
+            "bounding_box": None,
+            "cell_px": None,
+            "px_per_mm": None,
+            "image_size": None
+        }
+
         # 画像ファイルの読み込み (Streamlit or Path対応)
         if hasattr(image_file, 'getvalue'):
             # StreamlitUploaderは getvalue() をもつ
@@ -170,6 +184,7 @@ def process_image(
 
         # 画像サイズを取得 (h,w)
         h, w = orig.shape[:2]
+        debug_info["image_size"] = {"width_px": w, "height_px": h}
 
         # マスク初期化
         house_mask = np.zeros((h, w), dtype=np.uint8)
@@ -213,10 +228,27 @@ def process_image(
         contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             logger.warning("オフセット後の住居領域が見つかりません")
+            debug_info["error"] = "オフセット後の住居領域が見つかりません"
         else:
             # 最大輪郭を取得
             big_contour = max(contours, key=cv2.contourArea)
             x, y, wc, hc = cv2.boundingRect(big_contour)
+            debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
+            
+            # A3横幅=420mmと仮定し、紙上grid_mmをピクセル換算
+            px_per_mm = w / 420.0
+            cell_px = int(round(grid_mm * px_per_mm))
+            debug_info["px_per_mm"] = px_per_mm
+            debug_info["cell_px"] = cell_px
+            
+            # フォールバックチェック
+            if cell_px > wc or cell_px > hc:
+                fallback = max(1, min(wc, hc) // 5)
+                logger.warning(f"セルサイズ {cell_px}px が領域より大きいため、{fallback}px に調整します")
+                debug_info["fallback_activated"] = True
+                debug_info["original_cell_px"] = cell_px
+                debug_info["fallback_cell_px"] = fallback
+                cell_px = fallback
 
             # ★A3横幅=420mmと仮定し、紙上grid_mmをピクセル換算してグリッド描画
             out_bgr = draw_grid_on_rect(
@@ -232,7 +264,7 @@ def process_image(
 
         # BGR→RGB変換してPIL画像化
         rgb = cv2.cvtColor(out_bgr, cv2.COLOR_BGR2RGB)
-        return Image.fromarray(rgb)
+        return Image.fromarray(rgb), debug_info
 
     except Exception as e:
         logger.error(f"画像処理中にエラー: {e}", exc_info=True)
