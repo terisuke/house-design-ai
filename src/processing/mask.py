@@ -117,9 +117,12 @@ def draw_grid_on_rect(
 def process_image(
     model,
     image_file,
-    near_offset_px: int = 100,
-    far_offset_px: int = 50,
-    grid_mm: float = 9.1
+    global_setback_mm: float = 5.0,    # 1. 建物全体のセットバック
+    road_setback_mm: float = 50.0,     # 2. 道路近辺の追加セットバック
+    grid_mm: float = 9.1,              # グリッド間隔 (A3で描画)
+    # 後方互換性のための古いパラメータ（非推奨）
+    near_offset_px: Optional[int] = None,
+    far_offset_px: Optional[int] = None
 ) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を処理して、セグメンテーション・マスク操作・グリッド生成を行う。
@@ -127,21 +130,44 @@ def process_image(
     すべての画像をA3サイズ(150dpi: 2481x1754px)にリサイズして処理するため、
     どんな画像でも常に同じスケールでグリッドが描画される。
     
+    2段階セットバック処理:
+    (1) 全建物を global_setback_mm だけセットバック
+    (2) 道路近くの部分だけ road_setback_mm 追加セットバック
+    (3) 残った領域にグリッド描画
+    
     Args:
         model: YOLO推論モデル(YOLOクラスなど)
         image_file: 入力画像(アップローダ等のファイルオブジェクトやパス)
-        near_offset_px: 道路近くの住居領域をどれだけ内側にオフセットするか(px)
-        far_offset_px: その他の住居領域をどれだけ内側にオフセットするか(px)
+        global_setback_mm: 建物全体のセットバック量(mm)
+        road_setback_mm: 道路近辺の追加セットバック量(mm)
         grid_mm: 紙上のグリッド間隔(mm) (例: 9.1mm = 実物910mmの1/100)
+        near_offset_px: [非推奨] 後方互換性のため。代わりにglobal_setback_mmとroad_setback_mmを使用
+        far_offset_px: [非推奨] 後方互換性のため。代わりにglobal_setback_mmを使用
     Returns:
         Tuple[処理後のPIL画像, デバッグ情報の辞書] または None (失敗時)
     """
     try:
+        # 後方互換性のための変換 (古いパラメータが指定された場合)
+        if near_offset_px is not None or far_offset_px is not None:
+            logger.warning(
+                "near_offset_px/far_offset_pxパラメータは非推奨です。"
+                "代わりにglobal_setback_mm/road_setback_mmを使用してください。"
+            )
+            # A3サイズのピクセル/mm変換比を概算
+            px_per_mm_approx = A3_WIDTH_PX / A3_WIDTH_MM
+            
+            # 古いパラメータから新しいパラメータへの変換
+            if near_offset_px is not None:
+                road_setback_mm = near_offset_px / px_per_mm_approx
+            
+            if far_offset_px is not None:
+                global_setback_mm = far_offset_px / px_per_mm_approx
+        
         # デバッグ情報を格納する辞書
         debug_info = {
             "params": {
-                "near_offset_px": near_offset_px,
-                "far_offset_px": far_offset_px,
+                "global_setback_mm": global_setback_mm,
+                "road_setback_mm": road_setback_mm,
                 "grid_mm": grid_mm
             },
             "fallback_activated": False,
@@ -204,10 +230,10 @@ def process_image(
             os.unlink(tmp.name)  # 一時ファイル削除
 
         # 推論元のオリジナル画像（既にA3サイズにリサイズされている）
-        processed_img = resized.copy()
+        a3_img = resized.copy()
         
         # 画像サイズを取得 (h,w) - A3サイズになっているはず
-        h, w = processed_img.shape[:2]
+        h, w = a3_img.shape[:2]
         debug_info["image_size"] = {"width_px": w, "height_px": h}
 
         # マスク初期化
@@ -227,26 +253,43 @@ def process_image(
                     road_mask = np.maximum(road_mask, resized_mask)
 
         # 住居マスクを半透明(緑)で描画
-        out_bgr = processed_img.copy()
+        out_bgr = a3_img.copy()
         overlay = out_bgr.copy()
         overlay[house_mask == 1] = (0, 255, 0)  # BGR
         cv2.addWeighted(overlay, 0.3, out_bgr, 0.7, 0, out_bgr)
 
-        # 道路からの距離を算出して、近接/遠隔住居を分ける
-        bin_road = (road_mask > 0).astype(np.uint8)
-        dist_road = cv2.distanceTransform(bin_road, cv2.DIST_L2, 5)
-        near_threshold = 20
-        near_road = (dist_road < near_threshold).astype(np.uint8)
-
-        near_house = (house_mask & near_road)
-        far_house = (house_mask & (1 - near_road))
-
-        # それぞれの領域を指定オフセットだけ収縮
-        shrunk_near = offset_mask_by_distance(near_house, near_offset_px)
-        shrunk_far = offset_mask_by_distance(far_house, far_offset_px)
-
-        # 結合して最終住居マスク
-        final_house = np.maximum(shrunk_near, shrunk_far)
+        # --- B) まず建物マスクを "グローバルセットバック" だけ収縮 ---
+        # mm→px 換算（A3幅）
+        px_per_mm = w / A3_WIDTH_MM  # A3の横幅=420mm, 画像幅=w px
+        global_setback_px = int(round(global_setback_mm * px_per_mm))
+        debug_info["px_per_mm"] = px_per_mm
+        debug_info["global_setback_px"] = global_setback_px
+        
+        # 1. 全建物を内側に収縮
+        house_global = offset_mask_by_distance(house_mask, global_setback_px)
+        
+        # --- C) 道路近辺のみ追加で セットバック（＝道路近い箇所だけさらに収縮）---
+        # 1) 道路との距離マップを計算し "dist < road_setback_px" が近接
+        road_setback_px = int(round(road_setback_mm * px_per_mm))
+        debug_info["road_setback_px"] = road_setback_px
+        
+        # 距離変換： 道路を "前景0" にして distanceTransform
+        road_bin = (road_mask > 0).astype(np.uint8)
+        # distanceTransformは「0からの距離」なので、道路=1を反転して0にする
+        dist_map = cv2.distanceTransform(1 - road_bin, cv2.DIST_L2, 5)
+        
+        # 道路からroad_setback_px以内の領域を「近接」とみなす
+        near_road = (dist_map < road_setback_px).astype(np.uint8)
+        
+        # 2) house_global の "near_road" 部分だけ road_setback_px 分だけ追加収縮
+        house_near = (house_global & near_road)
+        house_far = (house_global & (1 - near_road))
+        
+        # 道路近接部のみ追加収縮
+        house_near_offset = offset_mask_by_distance(house_near, road_setback_px)
+        
+        # 最終マスク = 遠い部分 + 近接部分(追加収縮済み)
+        final_house = np.maximum(house_far, house_near_offset)
 
         # バウンディングボックスを求めてグリッド描画
         contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -260,9 +303,7 @@ def process_image(
             debug_info["bounding_box"] = {"x": x, "y": y, "width": wc, "height": hc}
             
             # A3のピクセル/mm変換比を計算
-            px_per_mm = A3_WIDTH_PX / A3_WIDTH_MM
             cell_px = int(round(grid_mm * px_per_mm))
-            debug_info["px_per_mm"] = px_per_mm
             debug_info["cell_px"] = cell_px
             
             # フォールバックチェック

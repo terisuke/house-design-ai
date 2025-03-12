@@ -99,7 +99,8 @@ def plot_segment(
 def visualize_dataset(
     data_yaml: str, 
     num_samples: int = 5, 
-    output_dir: str = 'visualization_results'
+    output_dir: str = 'visualization_results',
+    override_train_path: Optional[str] = None
 ) -> bool:
     """
     データセットの画像とアノテーションを視覚化します。
@@ -108,6 +109,7 @@ def visualize_dataset(
         data_yaml: data.yamlファイルのパス
         num_samples: 視覚化するサンプル数
         output_dir: 出力ディレクトリ
+        override_train_path: 設定ファイルのtrainパスを上書きする場合の値
         
     Returns:
         成功時はTrue、失敗時はFalse
@@ -118,6 +120,12 @@ def visualize_dataset(
         if not data_config:
             logger.error(f"データ設定の読み込みに失敗しました: {data_yaml}")
             return False
+            
+        # override_train_pathが指定されている場合、trainパスを上書き
+        if override_train_path:
+            original_train = data_config.get('train', '')
+            data_config['train'] = override_train_path
+            logger.info(f"トレーニングパスを上書きしました: {original_train} -> {override_train_path}")
             
         class_names = data_config.get('names', [])
         if not class_names:
@@ -271,6 +279,7 @@ def main() -> int:
     parser.add_argument("--data_yaml", type=str, default="data.yaml", help="data.yamlファイルのパス")
     parser.add_argument("--num_samples", type=int, default=5, help="表示するサンプル数")
     parser.add_argument("--output_dir", type=str, default="visualization_results", help="出力ディレクトリ")
+    parser.add_argument("--override_train_path", type=str, help="データ設定のtrainパスを上書きする値")
     
     args = parser.parse_args()
     
@@ -280,7 +289,12 @@ def main() -> int:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     
-    success = visualize_dataset(args.data_yaml, args.num_samples, args.output_dir)
+    success = visualize_dataset(
+        args.data_yaml, 
+        args.num_samples, 
+        args.output_dir,
+        args.override_train_path
+    )
     
     if success:
         print(f"可視化結果は {args.output_dir} ディレクトリに保存されました")

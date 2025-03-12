@@ -95,6 +95,25 @@ docker build -t house-design-ai .
 docker run -p 8501:8501 house-design-ai
 ```
 
+### 可視化ツール
+
+```bash
+# 推論結果の可視化
+python -m src.cli visualize --result_path path/to/results --output_dir path/to/output
+
+# データセットの可視化
+python -m src.visualization.dataset --data_yaml=config/data.yaml --num_samples=5 --output_dir=visualization_results
+
+# Dockerパスとローカルパスが異なる場合、オーバーライドオプションを使用
+python -m src.visualization.dataset --data_yaml=config/data.yaml --override_train_path=datasets/house/train
+```
+
+オプション:
+- `--data_yaml`: データセット設定ファイルへのパス
+- `--num_samples`: 視覚化するサンプル数（デフォルト: 5）
+- `--output_dir`: 出力ディレクトリ（デフォルト: visualization_results）
+- `--override_train_path`: data.yamlのtrainパスを上書き（Docker/クラウド用のパスをローカル環境用に変更する場合に使用）
+
 ## トラブルシューティング
 
 ### OpenCVの依存関係エラー
