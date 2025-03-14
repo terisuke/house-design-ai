@@ -16,7 +16,7 @@ import os
 import requests
 import random  # ランダムアルファベット生成用に追加
 import sys
-from src.processing.arrrangement import Site, Madori, OrderedDict
+from src.processing.arrrangement import Site, Madori, OrderedDict, create_madori_odict, arrange_rooms_in_rows, fill_corridor
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -244,6 +244,7 @@ def draw_floorplan_on_mask(
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     建物マスク領域に間取りを配置し、色分けして表示する。
+    右上から横方向に部屋を整列配置し、残りスペースを廊下で埋める。
     
     Args:
         image: 描画対象のBGR画像
@@ -299,27 +300,25 @@ def draw_floorplan_on_mask(
     
     floorplan_stats["grid_size"] = {"rows": grid_rows, "cols": grid_cols}
     
-    # 領域が十分に大きい場合は通常の間取り定義を使用
+    # グリッドサイズに合わせてLDKのサイズを調整
     if grid_rows >= 8 and grid_cols >= 8:
-        # 標準サイズの間取り情報の定義
-        madori_odict = OrderedDict(
-            E=Madori('E', 1, 2, 2, None),  # 玄関
-            L=Madori('L', 2, 4, 3, 'E'),   # リビング (サイズを5→4に縮小)
-            D=Madori('D', 3, 3, 2, 'L'),   # ダイニング (高さを3→2に縮小)
-            K=Madori('K', 4, 2, 2, 'D'),   # キッチン (高さを3→2に縮小)
-            B=Madori('B', 5, 2, 2, 'L'),   # バスルーム
-            T=Madori('T', 6, 1, 2, 'B')    # トイレ
-        )
+        # 大きめの敷地用間取りサイズ
+        L_size = (4, 3)  # リビング
+        D_size = (3, 2)  # ダイニング
+        K_size = (2, 2)  # キッチン
+    elif grid_rows >= 6 and grid_cols >= 6:
+        # 中くらいの敷地用間取りサイズ
+        L_size = (3, 2)  # リビング
+        D_size = (2, 2)  # ダイニング
+        K_size = (2, 1)  # キッチン
     else:
-        # 小さな領域用の縮小版間取り
-        madori_odict = OrderedDict(
-            E=Madori('E', 1, 1, 1, None),  # 玄関
-            L=Madori('L', 2, 2, 2, 'E'),   # リビング
-            D=Madori('D', 3, 2, 1, 'L'),   # ダイニング
-            K=Madori('K', 4, 1, 1, 'D'),   # キッチン
-            B=Madori('B', 5, 1, 1, 'L'),   # バスルーム
-            T=Madori('T', 6, 1, 1, 'B')    # トイレ
-        )
+        # 小さな敷地用間取りサイズ
+        L_size = (2, 2)  # リビング
+        D_size = (2, 1)  # ダイニング
+        K_size = (1, 1)  # キッチン
+    
+    # 可変サイズの間取り情報を作成
+    madori_odict = create_madori_odict(L_size=L_size, D_size=D_size, K_size=K_size)
     
     # 間取りの配色を定義 (BGR形式)
     colors = {
@@ -328,7 +327,8 @@ def draw_floorplan_on_mask(
         'D': (255, 191, 0),    # ダイニング: 明るい青
         'K': (147, 20, 255),   # キッチン: 明るい紫
         'B': (95, 158, 160),   # バスルーム: ターコイズ
-        'T': (180, 105, 255)   # トイレ: ピンク
+        'T': (180, 105, 255),  # トイレ: ピンク
+        'C': (220, 220, 220)   # 廊下: 薄いグレー
     }
     
     # Site オブジェクトを作成して間取り情報を設定
@@ -337,49 +337,15 @@ def draw_floorplan_on_mask(
     
     # マス目と位置情報の初期化
     grid = site.init_grid()
-    positions = OrderedDict()
     
-    # 間取りを配置
-    madori_choices = dict()
+    # 部屋の配置順序を定義
+    order = ["E", "L", "D", "K", "B", "T"]
     
-    # 再帰のエラーを防ぐため、元の再帰制限を取得し一時的に引き上げる
-    original_recursion_limit = sys.getrecursionlimit()
-    try:
-        # 再帰制限を一時的に引き上げる(標準は1000)
-        sys.setrecursionlimit(2000)
-        
-        # 各間取りを1つずつ配置していく（玄関から）
-        successful_rooms = []
-        
-        # 最初にEとLは必ず配置を試みる（基本的な部屋）
-        for madori in list(site.get_madori_info())[:2]:  # 最初の2つ(E, L)
-            try:
-                madori_name = madori.name
-                neighbor_name = madori.neighbor_name
-                grid, positions, madori_choices = site.set_madori(grid, positions, madori_name, neighbor_name, madori_choices)
-                successful_rooms.append(madori_name)
-            except Exception as e:
-                logger.warning(f"{madori_name}の配置中にエラー: {e}")
-                break
-        
-        # 残りの部屋も順に配置を試みる
-        for madori in list(site.get_madori_info())[2:]:
-            try:
-                madori_name = madori.name
-                neighbor_name = madori.neighbor_name
-                grid, positions, madori_choices = site.set_madori(grid, positions, madori_name, neighbor_name, madori_choices)
-                successful_rooms.append(madori_name)
-            except Exception as e:
-                logger.warning(f"{madori_name}の配置中にエラー: {e}")
-                # エラーが発生しても続行（残りの部屋を配置）
-                continue
-    except Exception as e:
-        # グローバルエラーが発生した場合
-        logger.warning(f"間取り配置中にエラー: {e}")
-        floorplan_stats["warning"] = f"間取り配置の一部が失敗: {str(e)}"
-    finally:
-        # 再帰制限を元に戻す
-        sys.setrecursionlimit(original_recursion_limit)
+    # 右上から整列配置
+    grid, positions = arrange_rooms_in_rows(grid, site, order)
+    
+    # 空きスペースを廊下(C)で埋める
+    grid = fill_corridor(grid, corridor_code=7)
     
     # 間取り情報と位置情報を統計情報に記録
     for madori_name, pos in positions.items():
@@ -397,38 +363,18 @@ def draw_floorplan_on_mask(
             "grid_y": y + pos[1] * cell_px
         }
     
-    # 間取りが1つも配置できなかった場合はフォールバックとして単純な配置を行う
-    if not positions:
-        logger.warning("間取り配置に失敗したため、フォールバック配置を使用します")
-        floorplan_stats["warning"] = "通常の間取り配置に失敗したため、単純配置を使用"
-        
-        # 左上から順に玄関、リビング、ダイニング、キッチンを配置
-        fallback_positions = {
-            'E': (0, 0),
-            'L': (2, 0),
-            'D': (0, 2),
-            'K': (3, 2),
-            'B': (0, 4),
-            'T': (2, 4)
-        }
-        
-        # 各部屋がグリッド内に収まるか確認して配置
-        for madori_name, pos in fallback_positions.items():
-            if pos[0] + madori_odict[madori_name].width <= grid_cols and pos[1] + madori_odict[madori_name].height <= grid_rows:
-                positions[madori_name] = pos
-                madori = madori_odict[madori_name]
-                floorplan_stats["madori_info"][madori_name] = {
-                    "name": madori.name,
-                    "width": madori.width,
-                    "height": madori.height,
-                    "neighbor": madori.neighbor_name
-                }
-                floorplan_stats["positions"][madori_name] = {
-                    "x": pos[0],
-                    "y": pos[1],
-                    "grid_x": x + pos[0] * cell_px,
-                    "grid_y": y + pos[1] * cell_px
-                }
+    # 廊下の情報も追加
+    if 'C' in madori_odict:
+        # 廊下の数をカウント（コード7のセルの数）
+        corridor_count = np.sum(grid == 7)
+        if corridor_count > 0:
+            floorplan_stats["madori_info"]["C"] = {
+                "name": "C",
+                "width": 1,  # 廊下は1x1セル単位
+                "height": 1,
+                "neighbor": None,
+                "count": int(corridor_count)  # 廊下の数を追加
+            }
     
     # グリッド全体の背景を描画（透明度を下げた版）
     grid_overlay = np.zeros_like(out)
@@ -439,7 +385,35 @@ def draw_floorplan_on_mask(
     grid_overlay = grid_overlay * np.expand_dims(mask_roi[:,:,0], axis=2)
     cv2.addWeighted(grid_overlay, 0.2, out, 1, 0, out)
     
-    # 間取りを描画
+    # グリッド内の各セルを塗りつぶし
+    for i in range(grid_rows):
+        for j in range(grid_cols):
+            cell_code = grid[i, j]
+            if cell_code > 0:  # 0以外（何らかの部屋）の場合
+                # コードから部屋名を取得
+                for madori_name, madori in madori_odict.items():
+                    if madori.code == cell_code:
+                        room_name = madori_name
+                        break
+                else:
+                    room_name = None
+                
+                # セルの座標
+                cell_x = x + j * cell_px
+                cell_y = y + i * cell_px
+                
+                # 部屋の色を取得
+                color = colors.get(room_name, (200, 200, 200))  # デフォルトはグレー
+                
+                # セルを塗りつぶし
+                cv2.rectangle(out, (cell_x, cell_y), (cell_x + cell_px, cell_y + cell_px), 
+                              color, -1)
+                
+                # セルの枠線を描画
+                cv2.rectangle(out, (cell_x, cell_y), (cell_x + cell_px, cell_y + cell_px), 
+                              (100, 100, 100), 1)
+    
+    # 部屋名を各部屋の中央に表示（廊下除く）
     for madori_name, pos in positions.items():
         madori = madori_odict[madori_name]
         grid_x = x + pos[0] * cell_px
@@ -447,18 +421,7 @@ def draw_floorplan_on_mask(
         grid_w = madori.width * cell_px
         grid_h = madori.height * cell_px
         
-        # 間取りの色を取得
-        color = colors.get(madori_name, (200, 200, 200))  # デフォルトはグレー
-        
-        # 間取りを塗りつぶし
-        cv2.rectangle(out, (grid_x, grid_y), (grid_x + grid_w, grid_y + grid_h), 
-                      color, -1)
-        
-        # 間取りの枠線を描画
-        cv2.rectangle(out, (grid_x, grid_y), (grid_x + grid_w, grid_y + grid_h), 
-                      (0, 0, 0), line_thickness)
-        
-        # 間取り名を中央に描画
+        # 部屋名を中央に描画
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 1.0 if madori.width >= 2 and madori.height >= 2 else 0.8
         text_size = cv2.getTextSize(madori_name, font, font_scale, 2)[0]
@@ -466,15 +429,6 @@ def draw_floorplan_on_mask(
         text_y = grid_y + (grid_h + text_size[1]) // 2
         cv2.putText(out, madori_name, (text_x, text_y), font, font_scale, 
                     (0, 0, 0), 2, cv2.LINE_AA)
-    
-    # グリッド線を描画
-    for i in range(grid_rows + 1):
-        y_pos = y + i * cell_px
-        cv2.line(out, (x, y_pos), (x + grid_cols * cell_px, y_pos), (100, 100, 100), 1)
-    
-    for j in range(grid_cols + 1):
-        x_pos = x + j * cell_px
-        cv2.line(out, (x_pos, y), (x_pos, y + grid_rows * cell_px), (100, 100, 100), 1)
     
     # 凡例を描画
     legend_x = x
@@ -489,10 +443,16 @@ def draw_floorplan_on_mask(
         'D': 'ダイニング',
         'K': 'キッチン',
         'B': 'バスルーム',
-        'T': 'トイレ'
+        'T': 'トイレ',
+        'C': '廊下'
     }
     
-    for i, madori_name in enumerate(positions.keys()):
+    # 部屋コードのリストを取得（Cは最後に表示）
+    room_codes = list(positions.keys())
+    if np.any(grid == 7):  # 廊下が存在する場合
+        room_codes.append('C')
+    
+    for i, madori_name in enumerate(room_codes):
         # 凡例の位置を計算
         legend_pos_x = legend_x + i * legend_spacing
         

@@ -108,6 +108,111 @@ class Site:
         grid, positions, madori_choices = self.set_madori(grid, positions, target_name, neighbor_name, madori_choices)
         return grid, positions, madori_choices
 
+# 廊下（Corridor）用のMadori定義を追加
+corridor = Madori(name='C', code=7, width=1, height=1, neighbor_name=None)
+
+# LDKサイズを柔軟に設定できる関数
+def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2)):
+    """
+    LDKのサイズを可変にした間取り情報を作成する。
+    E, B, Tは固定サイズ。
+    
+    Args:
+        L_size: リビングのサイズ (width, height)
+        D_size: ダイニングのサイズ (width, height)
+        K_size: キッチンのサイズ (width, height)
+    
+    Returns:
+        間取り情報のOrderedDict
+    """
+    return OrderedDict(
+        E=Madori('E', 1, 2, 2, None),       # 玄関（固定）
+        L=Madori('L', 2, L_size[0], L_size[1], 'E'),
+        D=Madori('D', 3, D_size[0], D_size[1], 'L'),
+        K=Madori('K', 4, K_size[0], K_size[1], 'D'),
+        B=Madori('B', 5, 2, 2, 'L'),        # バスルーム（固定）
+        T=Madori('T', 6, 1, 2, 'B'),        # トイレ（固定）
+        C=corridor                           # 廊下
+    )
+
+def arrange_rooms_in_rows(grid, site: Site, order: list[str]):
+    """
+    右上を起点に、指定した順番(order)で横方向に部屋を配置する。
+    残りスペースが足りなければ次の行へ移る。
+    
+    Args:
+        grid: 2次元numpy配列 (site.init_grid() した後のもの)
+        site: Siteオブジェクト
+        order: 配置する部屋名のリスト (例: ["E","L","D","K","B","T"])
+    
+    Returns:
+        配置後の grid, positions(OrderedDict)
+    """
+    positions = OrderedDict()
+    row_top = 0
+    row_height = 0
+    x_pos = site.grid_w  # 右端（※配列インデックスは0～grid_w-1なので注意）
+
+    for room_name in order:
+        if room_name not in site.madori_info:
+            continue
+            
+        madori = site.madori_info[room_name]
+        w = madori.width
+        h = madori.height
+
+        # もし横に置くスペースが足りなければ次の行へ
+        if x_pos - w < 0:
+            # 次の行へ
+            row_top += row_height
+            x_pos = site.grid_w
+            row_height = 0
+
+        # さらに、縦もはみ出る場合は配置不可
+        if row_top + h > site.grid_h:
+            # これ以上配置できないので、このルームはスキップ
+            continue
+
+        # gridに配置
+        # x座標は (x_pos - w) から (x_pos-1) まで
+        start_x = x_pos - w
+        end_x = x_pos
+        start_y = row_top
+        end_y = row_top + h
+
+        # チェック：その領域がすでに埋まっていないか確認
+        if np.any(grid[start_y:end_y, start_x:end_x] != 0):
+            # もし埋まっていたら飛ばす
+            continue
+
+        # 配置
+        grid[start_y:end_y, start_x:end_x] = madori.code
+        positions[room_name] = (start_x, start_y)
+        
+        # row_height更新（同じ行に置ける最大の高さをとる）
+        if h > row_height:
+            row_height = h
+        
+        # x_pos を詰める
+        x_pos -= w
+
+    return grid, positions
+
+def fill_corridor(grid, corridor_code=7):
+    """
+    空きスペース（0）を廊下コードで埋める
+    
+    Args:
+        grid: 配置済みの2次元numpy配列
+        corridor_code: 廊下のコード
+    
+    Returns:
+        廊下埋め込み後のgrid
+    """
+    mask_empty = (grid == 0)
+    grid[mask_empty] = corridor_code
+    return grid
+
 # 間取り情報 (間取り名, 間取り番号, 幅, 高さ, 隣接間取り名)
 madori_odict = OrderedDict(
     E=Madori('E', 1, 2, 2, None), # 玄関
@@ -118,78 +223,103 @@ madori_odict = OrderedDict(
     T=Madori('T', 6, 1, 2, 'B')
 )
 
-# @title 敷地の縦横を設定
-site_w = 10 # @param {"type":"integer","placeholder":"敷地幅"}
-site_h = 10 # @param {"type":"integer","placeholder":"敷地高さ"}
+if __name__ == "__main__":
+    # @title 敷地の縦横を設定
+    site_w = 10 # @param {"type":"integer","placeholder":"敷地幅"}
+    site_h = 10 # @param {"type":"integer","placeholder":"敷地高さ"}
 
-# 敷地を引く (縦・横マス数)
-site = Site(site_w, site_h)
-site.set_madori_info(madori_odict)
+    # 敷地を引く (縦・横マス数)
+    site = Site(site_w, site_h)
+    site.set_madori_info(madori_odict)
 
-# マス目と位置情報
-grid = site.init_grid()
-positions = OrderedDict()
+    # マス目と位置情報
+    grid = site.init_grid()
+    positions = OrderedDict()
 
-# 間取りを配置
-madori_choices = dict()
-for madori in site.get_madori_info():
-    madori_name = madori.name
-    neighbor_name = madori.neighbor_name
-    grid, positions, madori_choices = site.set_madori(grid, positions, madori_name, neighbor_name, madori_choices)
+    # 間取りを配置
+    madori_choices = dict()
+    for madori in site.get_madori_info():
+        madori_name = madori.name
+        neighbor_name = madori.neighbor_name
+        grid, positions, madori_choices = site.set_madori(grid, positions, madori_name, neighbor_name, madori_choices)
 
-# 間取り確認
-print(grid)
-print(positions)
-print(madori_choices)
+    # 間取り確認
+    print(grid)
+    print(positions)
+    print(madori_choices)
 
-# コード→名前に変換
-replace_dict = {}
-for madori in site.get_madori_info():
-    replace_dict[madori.code] = madori.name
-replace_dict[0] = ' '
-replace_dict
+    # コード→名前に変換
+    replace_dict = {}
+    for madori in site.get_madori_info():
+        replace_dict[madori.code] = madori.name
+    replace_dict[0] = ' '
+    replace_dict
 
-df_grid = pd.DataFrame(grid)
-df_grid.replace(replace_dict, inplace=True)
-df_grid
+    df_grid = pd.DataFrame(grid)
+    df_grid.replace(replace_dict, inplace=True)
+    df_grid
 
-# prompt: df_gridを矩形領域別に連結し、色分けした画像を生成。縦軸・横軸の目盛りや補助線は不要
+    # 新しい配置方法をテスト
+    print("\n新しい右上整列配置方法のテスト:")
+    # L, D, K だけ柔軟に大きさ変更 (例として L=(4,3), D=(3,2), K=(2,2))
+    my_madori_odict = create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2))
+    site.set_madori_info(my_madori_odict)
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+    # 初期化
+    new_grid = site.init_grid()
 
-# 各間取りの矩形情報を取得
-madori_rects = {}
-for madori_name, pos in positions.items():
-    madori = site.madori_info[madori_name]
-    x, y = pos
-    madori_rects[madori_name] = (x, y, madori.width, madori.height, madori_name)
+    # 配置順は例えば E -> L -> D -> K -> B -> T
+    order = ["E","L","D","K","B","T"]
 
-# 画像サイズを設定
-fig, ax = plt.subplots(figsize=(site.grid_w, site.grid_h))
+    new_grid, new_positions = arrange_rooms_in_rows(new_grid, site, order)
+    
+    # 余白を廊下(C)で埋める
+    new_grid = fill_corridor(new_grid, corridor_code=7)
 
-# 各部屋の色を設定
-colors = {'E': 'lightcoral',
-          'L': 'lightblue',
-          'D': 'lightgreen',
-          'K': 'lightyellow',
-          'B': 'lightpink',
-          'T': 'lightgray'}
+    # 可視化のためにDataFrame化
+    # コード→名前変換
+    new_replace_dict = {}
+    for madori_name, madori in site.madori_info.items():
+        new_replace_dict[madori.code] = madori.name
+    new_replace_dict[0] = ' '
+    
+    new_df_grid = pd.DataFrame(new_grid)
+    new_df_grid.replace(new_replace_dict, inplace=True)
+    print(new_df_grid)
+    print(new_positions)
 
-# 座標系を左上に変更
-ax.set_xlim(0, site.grid_w)
-ax.set_ylim(site.grid_h, 0) # y軸を反転
+    # 各間取りの矩形情報を取得
+    madori_rects = {}
+    for madori_name, pos in positions.items():
+        madori = site.madori_info[madori_name]
+        x, y = pos
+        madori_rects[madori_name] = (x, y, madori.width, madori.height, madori_name)
 
-for madori_name, rect_info in madori_rects.items():
-    x, y, width, height, label = rect_info
-    rect = patches.Rectangle((x, y), width, height, linewidth=2, edgecolor='black', facecolor=colors.get(madori_name, 'lightblue')) # 色分けを適用
-    ax.add_patch(rect)
-    ax.text(x + width / 2, y + height / 2, label, ha='center', va='center', fontsize=24)
+    # 画像サイズを設定
+    fig, ax = plt.subplots(figsize=(site.grid_w, site.grid_h))
 
-# 軸目盛りと補助線を非表示にする
-ax.set_xticks([])
-ax.set_yticks([])
-ax.axis('off')
+    # 各部屋の色を設定
+    colors = {'E': 'lightcoral',
+              'L': 'lightblue',
+              'D': 'lightgreen',
+              'K': 'lightyellow',
+              'B': 'lightpink',
+              'T': 'lightgray'}
 
-# 画像を表示
-plt.show()
+    # 座標系を左上に変更
+    ax.set_xlim(0, site.grid_w)
+    ax.set_ylim(site.grid_h, 0) # y軸を反転
+
+    for madori_name, rect_info in madori_rects.items():
+        x, y, width, height, label = rect_info
+        rect = patches.Rectangle((x, y), width, height, linewidth=2, edgecolor='black', facecolor=colors.get(madori_name, 'lightblue')) # 色分けを適用
+        ax.add_patch(rect)
+        ax.text(x + width / 2, y + height / 2, label, ha='center', va='center', fontsize=24)
+
+    # 軸目盛りと補助線を非表示にする
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.axis('off')
+
+    # 画像を表示
+    plt.show()
