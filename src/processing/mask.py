@@ -230,6 +230,210 @@ def draw_grid_on_mask(
 
     return out, grid_stats
 
+def draw_floorplan_on_mask(
+    image: np.ndarray,
+    final_mask: np.ndarray,
+    grid_mm: float,
+    px_per_mm: float,
+    fill_color: Tuple[int, int, int] = (255, 0, 0),
+    alpha: float = 0.4,
+    line_color: Tuple[int, int, int] = (0, 0, 255),
+    line_thickness: int = 2
+) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """
+    建物マスク領域に間取りを配置し、色分けして表示する。
+    
+    Args:
+        image: 描画対象のBGR画像
+        final_mask: グリッドを描画する対象のバイナリマスク(0 or 1)
+        grid_mm: 紙上(mm)単位のグリッド間隔
+        px_per_mm: mmあたりのピクセル数(A3横420mm想定)
+        fill_color: デフォルトの塗りつぶし色 (BGR)
+        alpha: 塗りつぶしの透明度(0~1)
+        line_color: グリッド線の色 (BGR)
+        line_thickness: グリッド線の太さ(px)
+        
+    Returns:
+        (drawn_image, stats)
+        - drawn_image: 間取り描画後のBGR画像
+        - stats: 描画に関する各種統計情報を含む辞書
+    """
+    from src.processing.arrrangement import Site, Madori, OrderedDict
+    
+    out = image.copy()
+    
+    # 統計情報格納用の辞書
+    floorplan_stats = {
+        "cell_px": None,             # 実際に使用したセルサイズ(px)
+        "bounding_box": None,        # マスク全体のバウンディングボックス
+        "grid_size": None,           # 実際に使用したグリッドサイズ (rows, cols)
+        "madori_info": {},           # 間取り情報
+        "positions": {}              # 各間取りの配置位置
+    }
+    
+    # マスクの輪郭を抽出
+    contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        # マスクが空の場合はそのまま返す
+        floorplan_stats["error"] = "マスクが空です"
+        return out, floorplan_stats
+    
+    big_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(big_contour)
+    
+    # バウンディングボックス情報を格納
+    floorplan_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
+    
+    # グリッド間隔を固定(px=54)にする（9.1mm相当×5.93px/mm = 約54px）
+    cell_px = 54
+    floorplan_stats["cell_px"] = cell_px
+    
+    # グリッドサイズを計算 (マスク内に収まる最大の行数と列数)
+    grid_rows = h // cell_px
+    grid_cols = w // cell_px
+    
+    # あまりに小さすぎる場合は処理しない
+    if grid_rows < 3 or grid_cols < 3:
+        floorplan_stats["error"] = f"マスクが小さすぎます（{grid_rows}×{grid_cols}グリッド）"
+        return out, floorplan_stats
+    
+    floorplan_stats["grid_size"] = {"rows": grid_rows, "cols": grid_cols}
+    
+    # 間取り情報の定義
+    madori_odict = OrderedDict(
+        E=Madori('E', 1, 2, 2, None),  # 玄関
+        L=Madori('L', 2, 5, 3, 'E'),   # リビング
+        D=Madori('D', 3, 3, 3, 'L'),   # ダイニング
+        K=Madori('K', 4, 2, 3, 'D'),   # キッチン
+        B=Madori('B', 5, 2, 2, 'L'),   # バスルーム
+        T=Madori('T', 6, 1, 2, 'B')    # トイレ
+    )
+    
+    # 間取りの配色を定義 (BGR形式)
+    colors = {
+        'E': (102, 178, 255),  # 玄関: 明るいオレンジ
+        'L': (144, 238, 144),  # リビング: 明るい緑
+        'D': (255, 191, 0),    # ダイニング: 明るい青
+        'K': (147, 20, 255),   # キッチン: 明るい紫
+        'B': (95, 158, 160),   # バスルーム: ターコイズ
+        'T': (180, 105, 255)   # トイレ: ピンク
+    }
+    
+    # Site オブジェクトを作成して間取り情報を設定
+    site = Site(grid_cols, grid_rows)
+    site.set_madori_info(madori_odict)
+    
+    # マス目と位置情報の初期化
+    grid = site.init_grid()
+    positions = OrderedDict()
+    
+    # 間取りを配置
+    madori_choices = dict()
+    try:
+        for madori in site.get_madori_info():
+            madori_name = madori.name
+            neighbor_name = madori.neighbor_name
+            grid, positions, madori_choices = site.set_madori(grid, positions, madori_name, neighbor_name, madori_choices)
+    except Exception as e:
+        # エラーが発生した場合はログに記録し、これまでの配置情報を使う
+        logger.warning(f"間取り配置中にエラー: {e}")
+        floorplan_stats["warning"] = f"間取り配置の一部が失敗: {str(e)}"
+    
+    # 間取り情報と位置情報を統計情報に記録
+    for madori_name, pos in positions.items():
+        madori = madori_odict[madori_name]
+        floorplan_stats["madori_info"][madori_name] = {
+            "name": madori.name,
+            "width": madori.width,
+            "height": madori.height,
+            "neighbor": madori.neighbor_name
+        }
+        floorplan_stats["positions"][madori_name] = {
+            "x": pos[0],
+            "y": pos[1],
+            "grid_x": x + pos[0] * cell_px,
+            "grid_y": y + pos[1] * cell_px
+        }
+    
+    # グリッド全体の背景を描画（透明度を下げた版）
+    grid_overlay = np.zeros_like(out)
+    cv2.rectangle(grid_overlay, (x, y), (x + grid_cols * cell_px, y + grid_rows * cell_px), 
+                  (220, 220, 220), -1)  # 薄いグレー
+    mask_roi = np.zeros_like(grid_overlay, dtype=np.uint8)
+    mask_roi[y:y + grid_rows * cell_px, x:x + grid_cols * cell_px] = 1
+    grid_overlay = grid_overlay * np.expand_dims(mask_roi[:,:,0], axis=2)
+    cv2.addWeighted(grid_overlay, 0.2, out, 1, 0, out)
+    
+    # 間取りを描画
+    for madori_name, pos in positions.items():
+        madori = madori_odict[madori_name]
+        grid_x = x + pos[0] * cell_px
+        grid_y = y + pos[1] * cell_px
+        grid_w = madori.width * cell_px
+        grid_h = madori.height * cell_px
+        
+        # 間取りの色を取得
+        color = colors.get(madori_name, (200, 200, 200))  # デフォルトはグレー
+        
+        # 間取りを塗りつぶし
+        cv2.rectangle(out, (grid_x, grid_y), (grid_x + grid_w, grid_y + grid_h), 
+                      color, -1)
+        
+        # 間取りの枠線を描画
+        cv2.rectangle(out, (grid_x, grid_y), (grid_x + grid_w, grid_y + grid_h), 
+                      (0, 0, 0), line_thickness)
+        
+        # 間取り名を中央に描画
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.0 if madori.width >= 2 and madori.height >= 2 else 0.8
+        text_size = cv2.getTextSize(madori_name, font, font_scale, 2)[0]
+        text_x = grid_x + (grid_w - text_size[0]) // 2
+        text_y = grid_y + (grid_h + text_size[1]) // 2
+        cv2.putText(out, madori_name, (text_x, text_y), font, font_scale, 
+                    (0, 0, 0), 2, cv2.LINE_AA)
+    
+    # グリッド線を描画
+    for i in range(grid_rows + 1):
+        y_pos = y + i * cell_px
+        cv2.line(out, (x, y_pos), (x + grid_cols * cell_px, y_pos), (100, 100, 100), 1)
+    
+    for j in range(grid_cols + 1):
+        x_pos = x + j * cell_px
+        cv2.line(out, (x_pos, y), (x_pos, y + grid_rows * cell_px), (100, 100, 100), 1)
+    
+    # 凡例を描画
+    legend_x = x
+    legend_y = y + grid_rows * cell_px + 20
+    legend_spacing = 120
+    font_scale = 0.7
+    
+    for i, (madori_name, color) in enumerate(colors.items()):
+        # 凡例の位置を計算
+        legend_pos_x = legend_x + i * legend_spacing
+        
+        # 色付きの四角形を描画
+        cv2.rectangle(out, (legend_pos_x, legend_y), 
+                      (legend_pos_x + 30, legend_y + 30), color, -1)
+        cv2.rectangle(out, (legend_pos_x, legend_y), 
+                      (legend_pos_x + 30, legend_y + 30), (0, 0, 0), 1)
+        
+        # 間取り名と説明を描画
+        descriptions = {
+            'E': '玄関',
+            'L': 'リビング',
+            'D': 'ダイニング',
+            'K': 'キッチン',
+            'B': 'バスルーム',
+            'T': 'トイレ'
+        }
+        description = descriptions.get(madori_name, '')
+        text = f"{madori_name}: {description}"
+        
+        cv2.putText(out, text, (legend_pos_x + 35, legend_y + 22), 
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 1, cv2.LINE_AA)
+    
+    return out, floorplan_stats
+
 def draw_grid_on_rect(
     image: np.ndarray,
     rect: Tuple[int, int, int, int],
@@ -332,7 +536,9 @@ def process_image(
     grid_mm: float = 9.1,              # グリッド間隔 (A3で描画)
     # 後方互換性のための古いパラメータ（非推奨）
     near_offset_px: Optional[int] = None,
-    far_offset_px: Optional[int] = None
+    far_offset_px: Optional[int] = None,
+    # 間取り表示モード
+    floorplan_mode: bool = False       # Trueなら間取り表示、Falseならランダムアルファベット
 ) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を処理して、セグメンテーション・マスク操作・グリッド生成を行う。
@@ -353,6 +559,7 @@ def process_image(
         grid_mm: 紙上のグリッド間隔(mm) (例: 9.1mm = 実物910mmの1/100)
         near_offset_px: [非推奨] 後方互換性のため。代わりにglobal_setback_mmとroad_setback_mmを使用
         far_offset_px: [非推奨] 後方互換性のため。代わりにglobal_setback_mmを使用
+        floorplan_mode: 間取り表示モードが有効かどうか (True=間取り表示, False=ランダムアルファベット)
     Returns:
         Tuple[処理後のPIL画像, デバッグ情報の辞書] または None (失敗時)
     """
@@ -378,7 +585,8 @@ def process_image(
             "params": {
                 "global_setback_mm": global_setback_mm,
                 "road_setback_mm": road_setback_mm,
-                "grid_mm": grid_mm
+                "grid_mm": grid_mm,
+                "floorplan_mode": floorplan_mode
             },
             "fallback_activated": False,
             "bounding_box": None,
@@ -511,32 +719,67 @@ def process_image(
 
         # 最終マスク内だけにグリッド描画
         if np.sum(final_house) > 0:  # マスクが空でない場合
-            # House内部だけにグリッド描画
-            out_bgr, grid_stats = draw_grid_on_mask(
-                image=out_bgr,
-                final_mask=final_house,
-                grid_mm=grid_mm,
-                px_per_mm=px_per_mm,
-                fill_color=(255, 0, 0),
-                alpha=0.4,
-                line_color=(0, 0, 255),
-                line_thickness=2
-            )
-            
-            # グリッド統計情報をデバッグ情報に追加
-            debug_info["grid_stats"] = grid_stats
-            
-            # UIに表示するセル数を明示的に設定
-            debug_info["grid_cells"] = grid_stats.get("grid_cells", {})
-            debug_info["total_cells"] = grid_stats.get("total_cells_in_bbox", 0)
-            
-            # バウンディングボックス情報をデバッグ情報に追加
-            if grid_stats.get("bounding_box"):
-                debug_info["bounding_box"] = grid_stats["bounding_box"]
-            
-            # セルサイズ情報をデバッグ情報に追加
-            if grid_stats.get("cell_px"):
-                debug_info["cell_px"] = grid_stats["cell_px"]
+            if floorplan_mode:
+                # 間取り表示モード
+                out_bgr, floorplan_stats = draw_floorplan_on_mask(
+                    image=out_bgr,
+                    final_mask=final_house,
+                    grid_mm=grid_mm,
+                    px_per_mm=px_per_mm,
+                    fill_color=(255, 0, 0),
+                    alpha=0.4,
+                    line_color=(0, 0, 255),
+                    line_thickness=2
+                )
+                
+                # 間取り情報をデバッグ情報に追加
+                debug_info["floorplan_stats"] = floorplan_stats
+                
+                # バウンディングボックス情報をデバッグ情報に追加
+                if floorplan_stats.get("bounding_box"):
+                    debug_info["bounding_box"] = floorplan_stats["bounding_box"]
+                
+                # セルサイズ情報をデバッグ情報に追加
+                if floorplan_stats.get("cell_px"):
+                    debug_info["cell_px"] = floorplan_stats["cell_px"]
+                
+                # UIに表示する間取り情報
+                debug_info["madori_info"] = floorplan_stats.get("madori_info", {})
+                
+                # 最後にグリッド統計情報にデータをコピー（互換性のため）
+                debug_info["grid_stats"] = {
+                    "cells_drawn": len(floorplan_stats.get("positions", {})),
+                    "cell_px": floorplan_stats.get("cell_px"),
+                    "bounding_box": floorplan_stats.get("bounding_box"),
+                    "grid_cells": floorplan_stats.get("grid_size")
+                }
+            else:
+                # 通常のランダムアルファベットモード
+                out_bgr, grid_stats = draw_grid_on_mask(
+                    image=out_bgr,
+                    final_mask=final_house,
+                    grid_mm=grid_mm,
+                    px_per_mm=px_per_mm,
+                    fill_color=(255, 0, 0),
+                    alpha=0.4,
+                    line_color=(0, 0, 255),
+                    line_thickness=2
+                )
+                
+                # グリッド統計情報をデバッグ情報に追加
+                debug_info["grid_stats"] = grid_stats
+                
+                # UIに表示するセル数を明示的に設定
+                debug_info["grid_cells"] = grid_stats.get("grid_cells", {})
+                debug_info["total_cells"] = grid_stats.get("total_cells_in_bbox", 0)
+                
+                # バウンディングボックス情報をデバッグ情報に追加
+                if grid_stats.get("bounding_box"):
+                    debug_info["bounding_box"] = grid_stats["bounding_box"]
+                
+                # セルサイズ情報をデバッグ情報に追加
+                if grid_stats.get("cell_px"):
+                    debug_info["cell_px"] = grid_stats["cell_px"]
         else:
             logger.warning("オフセット後の住居領域が見つかりません")
             debug_info["error"] = "オフセット後の住居領域が見つかりません"

@@ -362,6 +362,13 @@ def main():
         value=9.1,   # 元の値に戻す
         step=0.1
     )
+    
+    # 間取り表示モードの選択オプション
+    floorplan_mode = st.sidebar.checkbox(
+        "間取り表示モード",
+        value=False,
+        help="オンにすると、ランダムアルファベットの代わりに間取り（LDKなど）を表示します"
+    )
 
     with st.sidebar.expander("ヘルプ"):
         st.markdown("""
@@ -369,6 +376,7 @@ def main():
         - **道路近接領域のオフセット(px)**: 道路に近い住居境界から内側に何ピクセル収縮するか
         - **道路以外の領域のオフセット(px)**: その他の住居境界から内側に何ピクセル収縮するか
         - **グリッド間隔(mm)**: A3横420mm図面での紙上のマス目サイズ(例: 9.1mm = 実物910mmの1/100)
+        - **間取り表示モード**: オンにすると、ランダムアルファベットの代わりにLDK等の間取りを配置します
         """)
 
     # モデルロード
@@ -410,7 +418,8 @@ def main():
                         image_file=uploaded_file,
                         near_offset_px=actual_near_offset_px,
                         far_offset_px=actual_far_offset_px,
-                        grid_mm=actual_grid_mm
+                        grid_mm=actual_grid_mm,
+                        floorplan_mode=floorplan_mode
                     )
                     
                     if process_result:
@@ -455,6 +464,41 @@ def main():
                             grid_stats = debug_info.get("grid_stats", {}) or {}
                             cells_drawn = grid_stats.get("cells_drawn", "不明")
                         
+                        # 間取りモードの場合は間取り情報を表示
+                        if floorplan_mode and debug_info is not None:
+                            madori_info = debug_info.get("madori_info", {})
+                            if madori_info:
+                                st.subheader("間取り情報")
+                                madori_descriptions = {
+                                    'E': '玄関',
+                                    'L': 'リビング',
+                                    'D': 'ダイニング',
+                                    'K': 'キッチン',
+                                    'B': 'バスルーム',
+                                    'T': 'トイレ'
+                                }
+                                
+                                # 間取りデータをテーブル形式で表示
+                                madori_data = []
+                                for madori_name, info in madori_info.items():
+                                    description = madori_descriptions.get(madori_name, '')
+                                    width = info.get('width', 0)
+                                    height = info.get('height', 0)
+                                    area = width * height * 0.91 * 0.91  # 1グリッド = 0.91m x 0.91m
+                                    madori_data.append({
+                                        "記号": madori_name,
+                                        "名称": description,
+                                        "幅": f"{width}マス",
+                                        "高さ": f"{height}マス",
+                                        "床面積": f"{area:.2f}㎡"
+                                    })
+                                
+                                # DataFrameに変換して表示
+                                if madori_data:
+                                    import pandas as pd
+                                    df = pd.DataFrame(madori_data)
+                                    st.table(df)
+                        
                         # ここで「実際に描画されたマス目数」を「マス目数」として表示
                         st.write(f"**マス目数**: {cells_drawn}")
                         
@@ -480,7 +524,23 @@ def main():
                             
                         # 床面積計算
                         one_cell_area_m2 = 0.91 * 0.91  # = 0.8281
-                        if isinstance(cells_drawn, int) and cells_drawn > 0:
+                        if floorplan_mode and debug_info is not None:
+                            # 間取りモードの場合
+                            madori_info = debug_info.get("madori_info", {})
+                            total_area_m2 = 0
+                            
+                            for madori_name, info in madori_info.items():
+                                width = info.get('width', 0)
+                                height = info.get('height', 0)
+                                area = width * height * one_cell_area_m2
+                                total_area_m2 += area
+                                
+                            if total_area_m2 > 0:
+                                st.write(f"**合計床面積**: 約 {total_area_m2:.2f} m² (910mmグリッド換算)")
+                            else:
+                                st.write("**床面積**: 面積計算不可")
+                        elif isinstance(cells_drawn, int) and cells_drawn > 0:
+                            # 通常のグリッドモードの場合
                             total_area_m2 = cells_drawn * one_cell_area_m2
                             st.write(f"**床面積**: 約 {total_area_m2:.2f} m² (910mmグリッド換算)")
                         else:
