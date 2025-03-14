@@ -214,7 +214,6 @@ def fill_corridor(grid, corridor_code=7):
     return grid
 
 
-#################### ここから修正 ####################
 def process_large_corridors(grid, corridor_code=7, min_room_size=4):
     """
     廊下が大きく広がったエリアを追加部屋に変えるなどの処理。
@@ -254,7 +253,7 @@ def process_large_corridors(grid, corridor_code=7, min_room_size=4):
             best_size = 0
 
             # 単純に「左上から最大の正方形(辺>=2)を探す」アプローチ
-            # 本来なら長方形探索も要るが、最小限修正に留めるため簡易実装
+            #   ※本格的な長方形探索までは行わず、最小限の変更に留める実装
             for r in range(region_h):
                 for c in range(region_w):
                     if sub_grid[r, c] == 1:
@@ -279,13 +278,13 @@ def process_large_corridors(grid, corridor_code=7, min_room_size=4):
             new_code = 10 + new_room_count
             # 該当範囲をR部屋に設定
             sub_grid[best_r:best_r+best_size, best_c:best_c+best_size] = 2
+
             # メイングリッドにも反映
             for rr in range(best_r, best_r+best_size):
                 for cc in range(best_c, best_c+best_size):
                     grid[miny+rr, minx+cc] = new_code
 
     return grid, new_rooms, new_room_count
-#################### ここまで修正 ####################
 
 
 def find_largest_empty_rectangle(grid):
