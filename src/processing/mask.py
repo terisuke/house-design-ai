@@ -289,21 +289,24 @@ def draw_floorplan_on_mask(
     cell_px = 54
     floorplan_stats["cell_px"] = cell_px
     
-    # グリッドサイズを計算 (マスク内に収まる最大の行数と列数)
-    grid_rows = h // cell_px
+    # バウンディングボックス範囲
+    x_end = x + w
+    y_end = y + h
+    
+    # 理論上のグリッドサイズ(単純に w,h を cell_px で割った数)
     grid_cols = w // cell_px
+    grid_rows = h // cell_px
     
     # あまりに小さすぎる場合は処理しない
     if grid_rows < 3 or grid_cols < 3:
         floorplan_stats["error"] = f"マスクが小さすぎます（{grid_rows}×{grid_cols}グリッド）"
         return out, floorplan_stats
     
-    # ランダムアルファベット配置と同じ仕様にするための修正
     # n+1本の線でn個のセルができるため、実際のセル数は線の数-1
-    grid_lines_rows = grid_rows # 線の数
-    grid_lines_cols = grid_cols # 線の数
-    actual_grid_rows = grid_rows - 1  # セル数
-    actual_grid_cols = grid_cols - 1  # セル数
+    grid_lines_cols = grid_cols + 1  # 線の数
+    grid_lines_rows = grid_rows + 1  # 線の数
+    actual_grid_cols = max(0, grid_cols)  # セル数
+    actual_grid_rows = max(0, grid_rows)  # セル数
     
     # グリッド情報を記録
     floorplan_stats["grid_size"] = {"rows": actual_grid_rows, "cols": actual_grid_cols}  # セル数
@@ -315,41 +318,46 @@ def draw_floorplan_on_mask(
         L_size = (4, 3)  # リビング
         D_size = (3, 2)  # ダイニング：6マス (3×2)
         K_size = (2, 2)  # キッチン：4マス (2×2)
+        UT_size = (2, 2)  # 脱衣所：4マス (2×2)
     elif grid_rows >= 6 and grid_cols >= 6:
         # 中くらいの敷地用間取りサイズ
         L_size = (3, 2)  # リビング
         D_size = (2, 2)  # ダイニング：4マス (2×2)
         K_size = (2, 1)  # キッチン：2マス (2×1)
+        UT_size = (2, 1)  # 脱衣所：2マス (2×1)
     else:
         # 小さな敷地用間取りサイズ
         L_size = (2, 2)  # リビング：4マス
         D_size = (2, 2)  # ダイニング：4マス (最低4マスに修正)
         K_size = (2, 1)  # キッチン：2マス (最低2マスに修正)
+        UT_size = (2, 1)  # 脱衣所：2マス (2×1)
     
     # 可変サイズの間取り情報を作成
-    madori_odict = create_madori_odict(L_size=L_size, D_size=D_size, K_size=K_size)
+    madori_odict = create_madori_odict(L_size=L_size, D_size=D_size, K_size=K_size, UT_size=UT_size)
     
-    # 間取りの配色を定義 (BGR形式)
+    # 間取りの配色を定義 (BGR形式) - UTを追加
     colors = {
-        'E': (102, 178, 255),  # 玄関: 明るいオレンジ
         'L': (144, 238, 144),  # リビング: 明るい緑
         'D': (255, 191, 0),    # ダイニング: 明るい青
         'K': (147, 20, 255),   # キッチン: 明るい紫
+        'E': (102, 178, 255),  # 玄関: 明るいオレンジ
         'B': (95, 158, 160),   # バスルーム: ターコイズ
         'T': (180, 105, 255),  # トイレ: ピンク
+        'UT': (160, 190, 240), # 脱衣所: 薄い青
         'C': (220, 220, 220)   # 廊下: 薄いグレー
     }
     
     # Site オブジェクトを作成して間取り情報を設定
-    # ランダムアルファベットモードと同じサイズにするため、グリッドサイズを-1する
+    # ランダムアルファベットモードと同じサイズにするため、グリッドサイズを調整
     site = Site(actual_grid_cols, actual_grid_rows)
     site.set_madori_info(madori_odict)
     
     # マス目と位置情報の初期化
     grid = site.init_grid()
     
-    # 部屋の配置順序を定義
-    order = ["L", "D", "K", "E", "B", "T"] 
+    # 部屋の配置順序を定義（生活動線を考慮）
+    # UT（脱衣所）を追加し、L→D→K→E→UT→B→Tの順に配置
+    order = ["L", "D", "K", "E", "UT", "B", "T"]
     
     # 右上から整列配置
     grid, positions = arrange_rooms_in_rows(grid, site, order)
@@ -454,6 +462,7 @@ def draw_floorplan_on_mask(
         'K': 'キッチン',
         'B': 'バスルーム',
         'T': 'トイレ',
+        'UT': '脱衣所',  # 脱衣所の説明を追加
         'C': '廊下'
     }
     

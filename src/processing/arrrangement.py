@@ -103,15 +103,16 @@ class Site:
 corridor = Madori(name='C', code=7, width=1, height=1, neighbor_name=None)
 
 # LDKサイズを柔軟に設定できる関数
-def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2)):
+def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2), UT_size=(2,2)):
     """
     LDKのサイズを可変にした間取り情報を作成する。
-    E, B, Tは固定サイズ。
+    E, B, Tは固定サイズ。UTは脱衣所。
     
     Args:
         L_size: リビングのサイズ (width, height)
         D_size: ダイニングのサイズ (width, height)
         K_size: キッチンのサイズ (width, height)
+        UT_size: 脱衣所のサイズ (width, height)
     
     Returns:
         間取り情報のOrderedDict
@@ -123,18 +124,21 @@ def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2)):
         D=Madori('D', 3, D_size[0], D_size[1], 'K'),  # ダイニングはキッチンに隣接（変更）
         B=Madori('B', 5, 2, 2, 'L'),        # バスルーム（固定）
         T=Madori('T', 6, 1, 2, 'B'),        # トイレ（固定）
+        UT=Madori('UT', 8, UT_size[0], UT_size[1], 'B'),  # 脱衣所（バスルームに隣接）
         C=corridor                           # 廊下
     )
 
 def arrange_rooms_in_rows(grid, site: Site, order: list[str]):
     """
-    左上を起点に、指定した順番(order)で横方向に部屋を配置する。
-    残りスペースが足りなければ次の行へ移る。
+    左上を起点に、指定した順番(order)で効率的に部屋を配置する。
+    横方向に配置していき、スペース不足なら次の行へ移る。
+    
+    縦方向のスペースも最大限活用するために、各行を埋めてから次の行へ進む。
     
     Args:
         grid: 2次元numpy配列 (site.init_grid() した後のもの)
         site: Siteオブジェクト
-        order: 配置する部屋名のリスト (例: ["E","L","D","K","B","T"])
+        order: 配置する部屋名のリスト (例: ["L","D","K","E","B","T"])
     
     Returns:
         配置後の grid, positions(OrderedDict)
@@ -142,50 +146,67 @@ def arrange_rooms_in_rows(grid, site: Site, order: list[str]):
     positions = OrderedDict()
     row_top = 0
     row_height = 0
-    x_pos = 0  # 左端から開始（修正：右端から左端に変更）
-
-    for room_name in order:
-        if room_name not in site.madori_info:
-            continue
+    x_pos = 0  # 左端から開始
+    
+    # まだ配置していない部屋のリスト
+    remaining_rooms = list(order)
+    
+    # グリッドサイズを取得
+    grid_h, grid_w = grid.shape
+    
+    # すべての部屋が配置されるまで繰り返す
+    while remaining_rooms:
+        # 現在の行に配置できる部屋を探す
+        placed_any = False
+        
+        # 配置できる部屋を探す
+        for i, room_name in enumerate(remaining_rooms[:]):  # コピーを使ってループ
+            if room_name not in site.madori_info:
+                remaining_rooms.remove(room_name)  # 無効な部屋名はスキップ
+                continue
+                
+            madori = site.madori_info[room_name]
+            w = madori.width
+            h = madori.height
             
-        madori = site.madori_info[room_name]
-        w = madori.width
-        h = madori.height
-
-        # もし横に置くスペースが足りなければ次の行へ
-        if x_pos + w > site.grid_w:  # 修正：左端から配置するため計算方法を変更
-            # 次の行へ
+            # 現在の行に置けるかチェック
+            if x_pos + w <= grid_w and row_top + h <= grid_h:
+                # 配置
+                start_x = x_pos
+                start_y = row_top
+                end_x = x_pos + w
+                end_y = row_top + h
+                
+                # すでに埋まっているか確認
+                if np.any(grid[start_y:end_y, start_x:end_x] != 0):
+                    # 次の部屋を試す
+                    continue
+                
+                grid[start_y:end_y, start_x:end_x] = madori.code
+                positions[room_name] = (start_x, start_y)
+                
+                # row_heightを更新
+                if h > row_height:
+                    row_height = h
+                
+                # x_posを進める
+                x_pos += w
+                
+                # 配置した部屋をリストから削除
+                remaining_rooms.remove(room_name)
+                placed_any = True
+                break
+        
+        # 現在の行にどの部屋も配置できなかった場合
+        if not placed_any:
+            # 次の行へ移動
             row_top += row_height
             x_pos = 0
             row_height = 0
-
-        # さらに、縦もはみ出る場合は配置不可
-        if row_top + h > site.grid_h:
-            # これ以上配置できないので、このルームはスキップ
-            continue
-
-        # gridに配置
-        # x座標は x_pos から (x_pos + w - 1) まで
-        start_x = x_pos
-        end_x = x_pos + w
-        start_y = row_top
-        end_y = row_top + h
-
-        # チェック：その領域がすでに埋まっていないか確認
-        if np.any(grid[start_y:end_y, start_x:end_x] != 0):
-            # もし埋まっていたら飛ばす
-            continue
-
-        # 配置
-        grid[start_y:end_y, start_x:end_x] = madori.code
-        positions[room_name] = (start_x, start_y)
-        
-        # row_height更新（同じ行に置ける最大の高さをとる）
-        if h > row_height:
-            row_height = h
-        
-        # x_pos を進める
-        x_pos += w  # 修正：左端から配置していくので加算
+            
+            # もし全部の行を試しても配置できない場合はループを抜ける
+            if row_top >= grid_h:
+                break
 
     return grid, positions
 
