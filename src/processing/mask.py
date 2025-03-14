@@ -349,7 +349,7 @@ def draw_floorplan_on_mask(
     grid = site.init_grid()
     
     # 部屋の配置順序を定義
-    order = ["E", "L", "K", "D", "B", "T"]  # K→Dの順に変更して隣接させる
+    order = ["L", "D", "K", "E", "B", "T"] 
     
     # 右上から整列配置
     grid, positions = arrange_rooms_in_rows(grid, site, order)
