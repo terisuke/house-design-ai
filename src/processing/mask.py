@@ -589,15 +589,25 @@ def draw_floorplan_on_mask_with_mask(
     # ただしpositionsにはR系は入っていないので、自前で検索
     # (region masking: label or boundingRect)
     labeled_corr, n_labels_corr = cv2.connectedComponents((grid_data >= 10).astype(np.uint8))
+    # n_labels_corrが整数であることを確認
+    if isinstance(n_labels_corr, np.ndarray):
+        if n_labels_corr.size == 1:
+            n_labels_corr = n_labels_corr.item()
+        else:
+            # 複数要素の場合は最大値を使用
+            n_labels_corr = int(np.max(n_labels_corr)) + 1
     # label=0は背景、それ以外はR部屋
     for lbl in range(1, n_labels_corr):
         region_mask = (labeled_corr == lbl)
-        # codeの代表値を取得
         codes_in_region = grid_data[region_mask]
         code_vals, counts = np.unique(codes_in_region, return_counts=True)
-        # 最大出現 code
+        
+        # code_valsが空の場合はスキップ
+        if len(code_vals) == 0:
+            continue
+            
         r_code = code_vals[np.argmax(counts)]
-        rid = r_code - 10  # R1,R2...
+        rid = r_code - 10
         r_name = f"R{rid}"
         # centroid
         ys, xs = np.where(region_mask)
@@ -653,10 +663,22 @@ def draw_floorplan_on_mask_with_mask(
             "neighbor": m.neighbor_name
         }
     # R部屋にも対応
+    # n_labels_corrが整数であることを確認（念のため再確認）
+    if isinstance(n_labels_corr, np.ndarray):
+        if n_labels_corr.size == 1:
+            n_labels_corr = n_labels_corr.item()
+        else:
+            # 複数要素の場合は最大値を使用
+            n_labels_corr = int(np.max(n_labels_corr)) + 1
     for lbl in range(1, n_labels_corr):
         region_mask = (labeled_corr == lbl)
         codes_in_region = grid_data[region_mask]
         code_vals, counts = np.unique(codes_in_region, return_counts=True)
+        
+        # code_valsが空の場合はスキップ
+        if len(code_vals) == 0:
+            continue
+            
         r_code = code_vals[np.argmax(counts)]
         rid = r_code - 10
         r_name = f"R{rid}"
