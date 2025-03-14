@@ -128,8 +128,8 @@ def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2)):
     return OrderedDict(
         E=Madori('E', 1, 2, 2, None),       # 玄関（固定）
         L=Madori('L', 2, L_size[0], L_size[1], 'E'),
-        D=Madori('D', 3, D_size[0], D_size[1], 'L'),
-        K=Madori('K', 4, K_size[0], K_size[1], 'D'),
+        K=Madori('K', 4, K_size[0], K_size[1], 'L'),  # キッチンはリビングに隣接
+        D=Madori('D', 3, D_size[0], D_size[1], 'K'),  # ダイニングはキッチンに隣接（変更）
         B=Madori('B', 5, 2, 2, 'L'),        # バスルーム（固定）
         T=Madori('T', 6, 1, 2, 'B'),        # トイレ（固定）
         C=corridor                           # 廊下
@@ -217,8 +217,8 @@ def fill_corridor(grid, corridor_code=7):
 madori_odict = OrderedDict(
     E=Madori('E', 1, 2, 2, None), # 玄関
     L=Madori('L', 2, 5, 3, 'E'),
-    D=Madori('D', 3, 3, 3, 'L'),
-    K=Madori('K', 4, 2, 3, 'D'),
+    K=Madori('K', 4, 2, 1, 'L'),  # キッチン：最低2マス (2×1=2マス)、リビングに隣接
+    D=Madori('D', 3, 3, 2, 'K'),  # ダイニング：最低4マス (3×2=6マス)、キッチンに隣接
     B=Madori('B', 5, 2, 2, 'L'),
     T=Madori('T', 6, 1, 2, 'B')
 )
@@ -261,15 +261,15 @@ if __name__ == "__main__":
 
     # 新しい配置方法をテスト
     print("\n新しい右上整列配置方法のテスト:")
-    # L, D, K だけ柔軟に大きさ変更 (例として L=(4,3), D=(3,2), K=(2,2))
-    my_madori_odict = create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2))
+    # L, D, K だけ柔軟に大きさ変更 (Dは最低4マス、Kは最低2マスに設定)
+    my_madori_odict = create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,1))
     site.set_madori_info(my_madori_odict)
 
     # 初期化
     new_grid = site.init_grid()
 
-    # 配置順は例えば E -> L -> D -> K -> B -> T
-    order = ["E","L","D","K","B","T"]
+    # 配置順は例えば E -> L -> K -> D -> B -> T
+    order = ["E","L","K","D","B","T"]  # KとDが隣接するよう順序変更
 
     new_grid, new_positions = arrange_rooms_in_rows(new_grid, site, order)
     

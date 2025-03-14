@@ -298,24 +298,33 @@ def draw_floorplan_on_mask(
         floorplan_stats["error"] = f"マスクが小さすぎます（{grid_rows}×{grid_cols}グリッド）"
         return out, floorplan_stats
     
-    floorplan_stats["grid_size"] = {"rows": grid_rows, "cols": grid_cols}
+    # ランダムアルファベット配置と同じ仕様にするための修正
+    # n+1本の線でn個のセルができるため、実際のセル数は線の数-1
+    grid_lines_rows = grid_rows # 線の数
+    grid_lines_cols = grid_cols # 線の数
+    actual_grid_rows = grid_rows - 1  # セル数
+    actual_grid_cols = grid_cols - 1  # セル数
+    
+    # グリッド情報を記録
+    floorplan_stats["grid_size"] = {"rows": actual_grid_rows, "cols": actual_grid_cols}  # セル数
+    floorplan_stats["grid_lines"] = {"rows": grid_lines_rows, "cols": grid_lines_cols}  # 線の数
     
     # グリッドサイズに合わせてLDKのサイズを調整
     if grid_rows >= 8 and grid_cols >= 8:
         # 大きめの敷地用間取りサイズ
         L_size = (4, 3)  # リビング
-        D_size = (3, 2)  # ダイニング
-        K_size = (2, 2)  # キッチン
+        D_size = (3, 2)  # ダイニング：6マス (3×2)
+        K_size = (2, 2)  # キッチン：4マス (2×2)
     elif grid_rows >= 6 and grid_cols >= 6:
         # 中くらいの敷地用間取りサイズ
         L_size = (3, 2)  # リビング
-        D_size = (2, 2)  # ダイニング
-        K_size = (2, 1)  # キッチン
+        D_size = (2, 2)  # ダイニング：4マス (2×2)
+        K_size = (2, 1)  # キッチン：2マス (2×1)
     else:
         # 小さな敷地用間取りサイズ
-        L_size = (2, 2)  # リビング
-        D_size = (2, 1)  # ダイニング
-        K_size = (1, 1)  # キッチン
+        L_size = (2, 2)  # リビング：4マス
+        D_size = (2, 2)  # ダイニング：4マス (最低4マスに修正)
+        K_size = (2, 1)  # キッチン：2マス (最低2マスに修正)
     
     # 可変サイズの間取り情報を作成
     madori_odict = create_madori_odict(L_size=L_size, D_size=D_size, K_size=K_size)
@@ -332,14 +341,15 @@ def draw_floorplan_on_mask(
     }
     
     # Site オブジェクトを作成して間取り情報を設定
-    site = Site(grid_cols, grid_rows)
+    # ランダムアルファベットモードと同じサイズにするため、グリッドサイズを-1する
+    site = Site(actual_grid_cols, actual_grid_rows)
     site.set_madori_info(madori_odict)
     
     # マス目と位置情報の初期化
     grid = site.init_grid()
     
     # 部屋の配置順序を定義
-    order = ["E", "L", "D", "K", "B", "T"]
+    order = ["E", "L", "K", "D", "B", "T"]  # K→Dの順に変更して隣接させる
     
     # 右上から整列配置
     grid, positions = arrange_rooms_in_rows(grid, site, order)
@@ -378,16 +388,16 @@ def draw_floorplan_on_mask(
     
     # グリッド全体の背景を描画（透明度を下げた版）
     grid_overlay = np.zeros_like(out)
-    cv2.rectangle(grid_overlay, (x, y), (x + grid_cols * cell_px, y + grid_rows * cell_px), 
+    cv2.rectangle(grid_overlay, (x, y), (x + actual_grid_cols * cell_px, y + actual_grid_rows * cell_px), 
                   (220, 220, 220), -1)  # 薄いグレー
     mask_roi = np.zeros_like(grid_overlay, dtype=np.uint8)
-    mask_roi[y:y + grid_rows * cell_px, x:x + grid_cols * cell_px] = 1
+    mask_roi[y:y + actual_grid_rows * cell_px, x:x + actual_grid_cols * cell_px] = 1
     grid_overlay = grid_overlay * np.expand_dims(mask_roi[:,:,0], axis=2)
     cv2.addWeighted(grid_overlay, 0.2, out, 1, 0, out)
     
     # グリッド内の各セルを塗りつぶし
-    for i in range(grid_rows):
-        for j in range(grid_cols):
+    for i in range(actual_grid_rows):
+        for j in range(actual_grid_cols):
             cell_code = grid[i, j]
             if cell_code > 0:  # 0以外（何らかの部屋）の場合
                 # コードから部屋名を取得
