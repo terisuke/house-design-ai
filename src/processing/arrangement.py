@@ -280,10 +280,67 @@ def process_large_corridors(grid, corridor_code=7, min_room_size=4):
     
     return grid, new_rooms, new_room_count
 
+def find_largest_empty_rectangle(grid):
+    """
+    グリッド内の最大の空の長方形を見つける
+    
+    Args:
+        grid: 2次元numpy配列
+    
+    Returns:
+        (x, y, width, height) または None
+    """
+    grid_h, grid_w = grid.shape
+    empty_mask = (grid == 0).astype(np.uint8)
+    
+    if not np.any(empty_mask):
+        return None
+    
+    # 左上から探索
+    max_area = 0
+    max_rect = None
+    
+    for y in range(grid_h):
+        for x in range(grid_w):
+            if empty_mask[y, x] == 1:
+                # この位置から最大の長方形を探す
+                max_w = 1
+                while x + max_w < grid_w and empty_mask[y, x + max_w] == 1:
+                    max_w += 1
+                
+                max_h = 1
+                valid = True
+                while y + max_h < grid_h and valid:
+                    for dx in range(max_w):
+                        if empty_mask[y + max_h, x + dx] == 0:
+                            valid = False
+                            break
+                    if valid:
+                        max_h += 1
+                
+                area = max_w * max_h
+                if area > max_area:
+                    max_area = area
+                    max_rect = (x, y, max_w, max_h)
+    
+    return max_rect
+
+# 間取り情報 (間取り名, 間取り番号, 幅, 高さ, 隣接間取り名)
+madori_odict = OrderedDict(
+    E=Madori('E', 1, 2, 2, None), # 玄関
+    L=Madori('L', 2, 5, 3, 'E'),
+    K=Madori('K', 4, 2, 1, 'L'),  # キッチン：最低2マス (2×1=2マス)、リビングに隣接
+    D=Madori('D', 3, 3, 2, 'K'),  # ダイニング：最低4マス (3×2=6マス)、キッチンに隣接
+    B=Madori('B', 5, 2, 2, 'L'),
+    T=Madori('T', 6, 1, 2, 'B')
+)
+
+# arrange_rooms_with_constraints関数を追加
 def arrange_rooms_with_constraints(grid, site: Site, order: list[str]):
     """
     建築学的な制約を考慮した間取り配置を行う。
     特に水回りは外周（窓側）に配置し、部屋の用途に応じた配置を行う。
+    敷地形状に関わらず、必ずすべての部屋を配置するように努める。
     
     Args:
         grid: 2次元numpy配列
@@ -296,212 +353,440 @@ def arrange_rooms_with_constraints(grid, site: Site, order: list[str]):
     positions = OrderedDict()
     grid_h, grid_w = grid.shape
     
-    # まだ配置していない部屋のリスト
-    remaining_rooms = list(order)
+    # 各部屋のサイズを明示的に確認
+    room_sizes = {}
+    for room_name, madori in site.madori_info.items():
+        if room_name == 'C':  # 廊下はスキップ
+            continue
+        room_sizes[room_name] = (madori.width, madori.height)
     
-    # 1. まず玄関(E)を左下または右下に配置
-    if "E" in remaining_rooms:
-        # 玄関の候補位置（左下・右下）
-        entry_positions = [(0, grid_h-2), (grid_w-2, grid_h-2)]
+    # グリッドが部屋を配置するのに十分な大きさかチェック
+    min_grid_size_needed = sum(w * h for w, h in room_sizes.values())
+    actual_grid_size = grid_h * grid_w
+    scale_factor = 1.0
+    
+    # グリッドが小さすぎる場合、部屋サイズを縮小（ただし最小2x2は保持）
+    if actual_grid_size < min_grid_size_needed:
+        print(f"グリッドサイズ({actual_grid_size})が必要なサイズ({min_grid_size_needed})より小さいです。部屋を縮小します。")
+        scale_factor = min(0.8, actual_grid_size / min_grid_size_needed)  # 最大20%まで縮小
+        
+        # サイズ調整（最小2x2を保持）
+        for room_name in room_sizes:
+            if room_name in ['T', 'E']:  # 玄関とトイレは最小サイズの例外
+                continue
+            w, h = room_sizes[room_name]
+            new_w = max(2, int(w * scale_factor))
+            new_h = max(2, int(h * scale_factor))
+            
+            # サイズを更新
+            if room_name in site.madori_info:
+                room = site.madori_info[room_name]
+                site.madori_info[room_name] = Madori(
+                    room.name, room.code, new_w, new_h, room.neighbor_name
+                )
+    
+    # 既に配置された部屋を記録
+    placed_rooms = set()
+    
+    # 玄関(E)を必ず最初に配置
+    if "E" in site.madori_info:
+        e_w = site.madori_info["E"].width
+        e_h = site.madori_info["E"].height
+        
+        # 左下、右下、左上、右上の順で試行
+        entry_positions = [
+            (0, grid_h - e_h),                # 左下
+            (grid_w - e_w, grid_h - e_h),     # 右下
+            (0, 0),                           # 左上
+            (grid_w - e_w, 0)                 # 右上
+        ]
         
         for pos in entry_positions:
             x, y = pos
-            if "E" in site.madori_info:
-                madori = site.madori_info["E"]
-                w, h = madori.width, madori.height
-                
-                # グリッド範囲内に収まるか確認
-                if x + w <= grid_w and y + h <= grid_h:
-                    # このセルが未使用か確認
-                    if np.all(grid[y:y+h, x:x+w] == 0):
-                        grid[y:y+h, x:x+w] = madori.code
-                        positions["E"] = (x, y)
-                        remaining_rooms.remove("E")
-                        break
-    
-    # 2. リビング(L)をグリッドの中央付近に配置
-    if "L" in remaining_rooms:
-        # リビングの配置候補（中央付近を優先）
-        center_x, center_y = grid_w // 2 - 2, grid_h // 2 - 2
-        living_positions = [
-            (center_x, center_y),
-            (center_x - 1, center_y),
-            (center_x + 1, center_y),
-            (center_x, center_y - 1),
-            (center_x, center_y + 1)
-        ]
-        
-        for pos in living_positions:
-            x, y = pos
-            if "L" in site.madori_info:
-                madori = site.madori_info["L"]
-                w, h = madori.width, madori.height
-                
-                # グリッド範囲内に収まるか確認
-                if x >= 0 and x + w <= grid_w and y >= 0 and y + h <= grid_h:
-                    # このセルが未使用か確認
-                    if np.all(grid[y:y+h, x:x+w] == 0):
-                        grid[y:y+h, x:x+w] = madori.code
-                        positions["L"] = (x, y)
-                        remaining_rooms.remove("L")
-                        break
-    
-    # 3. キッチン(K)とダイニング(D)をリビングの近くに配置
-    # まずキッチンを配置
-    if "K" in remaining_rooms and "L" in positions:
-        lx, ly = positions["L"]
-        l_madori = site.madori_info["L"]
-        lw, lh = l_madori.width, l_madori.height
-        
-        # キッチンの候補位置（リビングの周辺を優先）
-        k_positions = [
-            (lx + lw, ly),          # リビングの右
-            (lx - site.madori_info["K"].width, ly),  # リビングの左
-            (lx, ly - site.madori_info["K"].height), # リビングの上
-            (lx, ly + lh)           # リビングの下
-        ]
-        
-        for pos in k_positions:
-            x, y = pos
-            if "K" in site.madori_info:
-                madori = site.madori_info["K"]
-                w, h = madori.width, madori.height
-                
-                # グリッド範囲内に収まるか確認
-                if x >= 0 and x + w <= grid_w and y >= 0 and y + h <= grid_h:
-                    # このセルが未使用か確認
-                    if np.all(grid[y:y+h, x:x+w] == 0):
-                        grid[y:y+h, x:x+w] = madori.code
-                        positions["K"] = (x, y)
-                        remaining_rooms.remove("K")
-                        break
-    
-    # 次にダイニングを配置（キッチンの隣）
-    if "D" in remaining_rooms and "K" in positions:
-        kx, ky = positions["K"]
-        k_madori = site.madori_info["K"]
-        kw, kh = k_madori.width, k_madori.height
-        
-        # ダイニングの候補位置（キッチンの周辺を優先）
-        d_positions = [
-            (kx + kw, ky),          # キッチンの右
-            (kx - site.madori_info["D"].width, ky),  # キッチンの左
-            (kx, ky - site.madori_info["D"].height), # キッチンの上
-            (kx, ky + kh)           # キッチンの下
-        ]
-        
-        for pos in d_positions:
-            x, y = pos
-            if "D" in site.madori_info:
-                madori = site.madori_info["D"]
-                w, h = madori.width, madori.height
-                
-                # グリッド範囲内に収まるか確認
-                if x >= 0 and x + w <= grid_w and y >= 0 and y + h <= grid_h:
-                    # このセルが未使用か確認
-                    if np.all(grid[y:y+h, x:x+w] == 0):
-                        grid[y:y+h, x:x+w] = madori.code
-                        positions["D"] = (x, y)
-                        remaining_rooms.remove("D")
-                        break
-    
-    # 4. 水回り（バス、トイレ、脱衣所）を外周に配置
-    water_rooms = [r for r in remaining_rooms if r in ["B", "T", "UT"]]
-    
-    # 外周の座標候補（外側のエッジに沿う）
-    edge_positions = []
-    
-    # 左端
-    for y in range(1, grid_h - 2):
-        edge_positions.append((0, y))
-    
-    # 右端
-    for y in range(1, grid_h - 2):
-        edge_positions.append((grid_w - 2, y))
-    
-    # 上端
-    for x in range(1, grid_w - 2):
-        edge_positions.append((x, 0))
-    
-    # 下端
-    for x in range(1, grid_w - 2):
-        edge_positions.append((x, grid_h - 2))
-    
-    # 水回りの部屋を外周に配置
-    for room_name in water_rooms:
-        if room_name in site.madori_info:
-            madori = site.madori_info[room_name]
-            w, h = madori.width, madori.height
-            
-            # 外周の候補位置を試す
-            for pos in edge_positions:
-                x, y = pos
-                
-                # グリッド範囲内に収まるか確認
-                if x + w <= grid_w and y + h <= grid_h:
-                    # このセルが未使用か確認
-                    if np.all(grid[y:y+h, x:x+w] == 0):
-                        grid[y:y+h, x:x+w] = madori.code
-                        positions[room_name] = (x, y)
-                        remaining_rooms.remove(room_name)
-                        break
-    
-    # 5. 残りの部屋を配置（通常の配置ロジック）
-    # 左上から順に配置
-    row_top = 0
-    row_height = 0
-    x_pos = 0
-    
-    while remaining_rooms:
-        placed_any = False
-        
-        for room_name in remaining_rooms[:]:
-            if room_name not in site.madori_info:
-                remaining_rooms.remove(room_name)
-                continue
-                
-            madori = site.madori_info[room_name]
-            w = madori.width
-            h = madori.height
-            
-            if x_pos + w <= grid_w and row_top + h <= grid_h:
-                # このセルが未使用か確認
-                if np.all(grid[row_top:row_top+h, x_pos:x_pos+w] == 0):
-                    grid[row_top:row_top+h, x_pos:x_pos+w] = madori.code
-                    positions[room_name] = (x_pos, row_top)
-                    
-                    if h > row_height:
-                        row_height = h
-                    
-                    x_pos += w
-                    remaining_rooms.remove(room_name)
-                    placed_any = True
+            if x >= 0 and y >= 0 and x + e_w <= grid_w and y + e_h <= grid_h:
+                if np.all(grid[y:y+e_h, x:x+e_w] == 0):
+                    grid[y:y+e_h, x:x+e_w] = site.madori_info["E"].code
+                    positions["E"] = (x, y)
+                    placed_rooms.add("E")
                     break
-                else:
-                    # このセルは使用済み、次のx位置を試す
-                    x_pos += 1
-                    if x_pos + w > grid_w:
+        
+        # どの位置にも配置できなかった場合は強制的に左下に配置
+        if "E" not in placed_rooms:
+            x, y = 0, max(0, grid_h - e_h)
+            grid[y:min(y+e_h, grid_h), x:min(x+e_w, grid_w)] = site.madori_info["E"].code
+            positions["E"] = (x, y)
+            placed_rooms.add("E")
+    
+    # リビング(L)を配置
+    if "L" in site.madori_info and "L" not in placed_rooms:
+        l_w = site.madori_info["L"].width
+        l_h = site.madori_info["L"].height
+        
+        # 玄関の近くに配置
+        if "E" in positions:
+            ex, ey = positions["E"]
+            e_w = site.madori_info["E"].width
+            e_h = site.madori_info["E"].height
+            
+            # リビングの候補位置
+            living_positions = [
+                (ex + e_w, ey),          # 玄関の右
+                (ex - l_w, ey),          # 玄関の左
+                (ex, ey - l_h),          # 玄関の上
+                (ex, ey + e_h)           # 玄関の下
+            ]
+            
+            for pos in living_positions:
+                x, y = pos
+                # グリッド内かつ未使用領域かチェック
+                if (x >= 0 and y >= 0 and 
+                    x + l_w <= grid_w and y + l_h <= grid_h and
+                    np.all(grid[y:y+l_h, x:x+l_w] == 0)):
+                    grid[y:y+l_h, x:x+l_w] = site.madori_info["L"].code
+                    positions["L"] = (x, y)
+                    placed_rooms.add("L")
+                    break
+        
+        # どこにも配置できなかった場合は中央付近に強制配置
+        if "L" not in placed_rooms:
+            center_x = max(0, (grid_w - l_w) // 2)
+            center_y = max(0, (grid_h - l_h) // 2)
+            
+            # 中央から外側に探索
+            for offset in range(max(grid_w, grid_h)):
+                for dx in range(-offset, offset+1):
+                    for dy in range(-offset, offset+1):
+                        if abs(dx) + abs(dy) != offset:  # 特定の距離にあるマスのみ
+                            continue
+                        
+                        x = center_x + dx
+                        y = center_y + dy
+                        
+                        if (x >= 0 and y >= 0 and 
+                            x + l_w <= grid_w and y + l_h <= grid_h and
+                            np.all(grid[y:y+l_h, x:x+l_w] == 0)):
+                            grid[y:y+l_h, x:x+l_w] = site.madori_info["L"].code
+                            positions["L"] = (x, y)
+                            placed_rooms.add("L")
+                            break
+                    if "L" in placed_rooms:
                         break
+                if "L" in placed_rooms:
+                    break
             
-        if not placed_any:
-            row_top += row_height if row_height > 0 else 1
-            x_pos = 0
-            row_height = 0
-            
-            if row_top >= grid_h:
+            # それでも配置できない場合は強制的に配置
+            if "L" not in placed_rooms:
+                for y in range(grid_h - l_h + 1):
+                    for x in range(grid_w - l_w + 1):
+                        if np.sum(grid[y:y+l_h, x:x+l_w]) == 0:  # 完全に空いているエリア
+                            grid[y:y+l_h, x:x+l_w] = site.madori_info["L"].code
+                            positions["L"] = (x, y)
+                            placed_rooms.add("L")
+                            break
+                    if "L" in placed_rooms:
+                        break
+    
+    # LDK関連の配置（Dを先に配置し、次にKを配置）
+    # ダイニング(D)を配置 - リビングに隣接
+    if "D" in site.madori_info and "D" not in placed_rooms and "L" in positions:
+        lx, ly = positions["L"]
+        l_w = site.madori_info["L"].width
+        l_h = site.madori_info["L"].height
+        d_w = site.madori_info["D"].width
+        d_h = site.madori_info["D"].height
+        
+        # ダイニングの候補位置（リビングの隣接）
+        dining_positions = [
+            (lx + l_w, ly),          # リビングの右
+            (lx - d_w, ly),          # リビングの左
+            (lx, ly - d_h),          # リビングの上
+            (lx, ly + l_h)           # リビングの下
+        ]
+        
+        for pos in dining_positions:
+            x, y = pos
+            if (x >= 0 and y >= 0 and 
+                x + d_w <= grid_w and y + d_h <= grid_h and
+                np.all(grid[y:y+d_h, x:x+d_w] == 0)):
+                grid[y:y+d_h, x:x+d_w] = site.madori_info["D"].code
+                positions["D"] = (x, y)
+                placed_rooms.add("D")
                 break
+        
+        # 隣接配置できない場合は最も近い空きエリアを探す
+        if "D" not in placed_rooms:
+            best_distance = float('inf')
+            best_pos = None
+            
+            for y in range(grid_h - d_h + 1):
+                for x in range(grid_w - d_w + 1):
+                    if np.all(grid[y:y+d_h, x:x+d_w] == 0):
+                        dist = abs(x - lx) + abs(y - ly)  # マンハッタン距離
+                        if dist < best_distance:
+                            best_distance = dist
+                            best_pos = (x, y)
+            
+            if best_pos:
+                x, y = best_pos
+                grid[y:y+d_h, x:x+d_w] = site.madori_info["D"].code
+                positions["D"] = (x, y)
+                placed_rooms.add("D")
+    
+    # キッチン(K)を配置 - ダイニングに隣接、または次善としてリビングに隣接
+    if "K" in site.madori_info and "K" not in placed_rooms:
+        k_w = site.madori_info["K"].width
+        k_h = site.madori_info["K"].height
+        
+        # ダイニングがある場合はダイニングに隣接
+        if "D" in positions:
+            dx, dy = positions["D"]
+            d_w = site.madori_info["D"].width
+            d_h = site.madori_info["D"].height
+            
+            kitchen_positions = [
+                (dx + d_w, dy),          # ダイニングの右
+                (dx - k_w, dy),          # ダイニングの左
+                (dx, dy - k_h),          # ダイニングの上
+                (dx, dy + d_h)           # ダイニングの下
+            ]
+            
+            # 玄関から遠い位置を優先
+            if "E" in positions:
+                ex, ey = positions["E"]
+                kitchen_positions.sort(key=lambda pos: -((pos[0]-ex)**2 + (pos[1]-ey)**2))
+            
+            for pos in kitchen_positions:
+                x, y = pos
+                if (x >= 0 and y >= 0 and 
+                    x + k_w <= grid_w and y + k_h <= grid_h and
+                    np.all(grid[y:y+k_h, x:x+k_w] == 0)):
+                    grid[y:y+k_h, x:x+k_w] = site.madori_info["K"].code
+                    positions["K"] = (x, y)
+                    placed_rooms.add("K")
+                    break
+        
+        # ダイニングがないか隣接できない場合はリビングに隣接
+        if "K" not in placed_rooms and "L" in positions:
+            lx, ly = positions["L"]
+            l_w = site.madori_info["L"].width
+            l_h = site.madori_info["L"].height
+            
+            kitchen_positions = [
+                (lx + l_w, ly),          # リビングの右
+                (lx - k_w, ly),          # リビングの左
+                (lx, ly - k_h),          # リビングの上
+                (lx, ly + l_h)           # リビングの下
+            ]
+            
+            # 玄関から遠い位置を優先
+            if "E" in positions:
+                ex, ey = positions["E"]
+                kitchen_positions.sort(key=lambda pos: -((pos[0]-ex)**2 + (pos[1]-ey)**2))
+            
+            for pos in kitchen_positions:
+                x, y = pos
+                if (x >= 0 and y >= 0 and 
+                    x + k_w <= grid_w and y + k_h <= grid_h and
+                    np.all(grid[y:y+k_h, x:x+k_w] == 0)):
+                    grid[y:y+k_h, x:x+k_w] = site.madori_info["K"].code
+                    positions["K"] = (x, y)
+                    placed_rooms.add("K")
+                    break
+        
+        # どこにも配置できない場合は空いているところに配置
+        if "K" not in placed_rooms:
+            for y in range(grid_h - k_h + 1):
+                for x in range(grid_w - k_w + 1):
+                    if np.all(grid[y:y+k_h, x:x+k_w] == 0):
+                        grid[y:y+k_h, x:x+k_w] = site.madori_info["K"].code
+                        positions["K"] = (x, y)
+                        placed_rooms.add("K")
+                        break
+                if "K" in placed_rooms:
+                    break
+    
+    # 水回り（バス、トイレ、脱衣所）をまとめて外周に配置
+    # まずバスルーム(B)を配置
+    if "B" in site.madori_info and "B" not in placed_rooms:
+        b_w = site.madori_info["B"].width
+        b_h = site.madori_info["B"].height
+        
+        # 外周位置の候補を生成（窓が必要な部屋用）
+        perimeter_positions = []
+        
+        # 左端
+        for y in range(grid_h - b_h + 1):
+            perimeter_positions.append((0, y))
+        
+        # 右端
+        for y in range(grid_h - b_h + 1):
+            perimeter_positions.append((grid_w - b_w, y))
+        
+        # 上端
+        for x in range(grid_w - b_w + 1):
+            perimeter_positions.append((x, 0))
+        
+        # 下端
+        for x in range(grid_w - b_w + 1):
+            perimeter_positions.append((x, grid_h - b_h))
+        
+        # 外周をランダムに試す
+        random.shuffle(perimeter_positions)
+        for pos in perimeter_positions:
+            x, y = pos
+            if np.all(grid[y:y+b_h, x:x+b_w] == 0):
+                grid[y:y+b_h, x:x+b_w] = site.madori_info["B"].code
+                positions["B"] = (x, y)
+                placed_rooms.add("B")
+                break
+        
+        # 外周に配置できない場合は任意の場所に配置
+        if "B" not in placed_rooms:
+            for y in range(grid_h - b_h + 1):
+                for x in range(grid_w - b_w + 1):
+                    if np.all(grid[y:y+b_h, x:x+b_w] == 0):
+                        grid[y:y+b_h, x:x+b_w] = site.madori_info["B"].code
+                        positions["B"] = (x, y)
+                        placed_rooms.add("B")
+                        break
+                if "B" in placed_rooms:
+                    break
+    
+    # 脱衣所(UT)を配置 - バスルームに隣接
+    if "UT" in site.madori_info and "UT" not in placed_rooms:
+        ut_w = site.madori_info["UT"].width
+        ut_h = site.madori_info["UT"].height
+        
+        # バスルームに隣接配置
+        if "B" in positions:
+            bx, by = positions["B"]
+            b_w = site.madori_info["B"].width
+            b_h = site.madori_info["B"].height
+            
+            ut_positions = [
+                (bx + b_w, by),          # バスルームの右
+                (bx - ut_w, by),         # バスルームの左
+                (bx, by - ut_h),         # バスルームの上
+                (bx, by + b_h)           # バスルームの下
+            ]
+            
+            for pos in ut_positions:
+                x, y = pos
+                if (x >= 0 and y >= 0 and 
+                    x + ut_w <= grid_w and y + ut_h <= grid_h and
+                    np.all(grid[y:y+ut_h, x:x+ut_w] == 0)):
+                    grid[y:y+ut_h, x:x+ut_w] = site.madori_info["UT"].code
+                    positions["UT"] = (x, y)
+                    placed_rooms.add("UT")
+                    break
+        
+        # バスルームに隣接できない場合は任意の場所に配置
+        if "UT" not in placed_rooms:
+            for y in range(grid_h - ut_h + 1):
+                for x in range(grid_w - ut_w + 1):
+                    if np.all(grid[y:y+ut_h, x:x+ut_w] == 0):
+                        grid[y:y+ut_h, x:x+ut_w] = site.madori_info["UT"].code
+                        positions["UT"] = (x, y)
+                        placed_rooms.add("UT")
+                        break
+                if "UT" in placed_rooms:
+                    break
+    
+    # トイレ(T)を配置 - バスルームまたは脱衣所の近くに
+    if "T" in site.madori_info and "T" not in placed_rooms:
+        t_w = site.madori_info["T"].width
+        t_h = site.madori_info["T"].height
+        
+        # バスルームに隣接
+        if "B" in positions:
+            bx, by = positions["B"]
+            b_w = site.madori_info["B"].width
+            b_h = site.madori_info["B"].height
+            
+            toilet_positions = [
+                (bx + b_w, by),          # バスルームの右
+                (bx - t_w, by),          # バスルームの左
+                (bx, by - t_h),          # バスルームの上
+                (bx, by + b_h)           # バスルームの下
+            ]
+            
+            for pos in toilet_positions:
+                x, y = pos
+                if (x >= 0 and y >= 0 and 
+                    x + t_w <= grid_w and y + t_h <= grid_h and
+                    np.all(grid[y:y+t_h, x:x+t_w] == 0)):
+                    grid[y:y+t_h, x:x+t_w] = site.madori_info["T"].code
+                    positions["T"] = (x, y)
+                    placed_rooms.add("T")
+                    break
+        
+        # バスルームに隣接できない場合は脱衣所に隣接
+        if "T" not in placed_rooms and "UT" in positions:
+            utx, uty = positions["UT"]
+            ut_w = site.madori_info["UT"].width
+            ut_h = site.madori_info["UT"].height
+            
+            toilet_positions = [
+                (utx + ut_w, uty),       # 脱衣所の右
+                (utx - t_w, uty),        # 脱衣所の左
+                (utx, uty - t_h),        # 脱衣所の上
+                (utx, uty + ut_h)        # 脱衣所の下
+            ]
+            
+            for pos in toilet_positions:
+                x, y = pos
+                if (x >= 0 and y >= 0 and 
+                    x + t_w <= grid_w and y + t_h <= grid_h and
+                    np.all(grid[y:y+t_h, x:x+t_w] == 0)):
+                    grid[y:y+t_h, x:x+t_w] = site.madori_info["T"].code
+                    positions["T"] = (x, y)
+                    placed_rooms.add("T")
+                    break
+        
+        # 両方に隣接できない場合は任意の場所に配置
+        if "T" not in placed_rooms:
+            for y in range(grid_h - t_h + 1):
+                for x in range(grid_w - t_w + 1):
+                    if np.all(grid[y:y+t_h, x:x+t_w] == 0):
+                        grid[y:y+t_h, x:x+t_w] = site.madori_info["T"].code
+                        positions["T"] = (x, y)
+                        placed_rooms.add("T")
+                        break
+                if "T" in placed_rooms:
+                    break
+    
+    # 残りの大きい部屋（R1, R2など）を配置 - 必ず四角形にする
+    # グリッドに配置されていない部屋名のリストを作成
+    remaining_rooms = set(site.madori_info.keys()) - placed_rooms - {"C"}
+    
+    # 部屋R1, R2を追加（必要なら）
+    room_count = 1
+    while room_count <= 2:  # R1とR2のみサポート
+        room_name = f"R{room_count}"
+        
+        # すでに部屋が存在するならスキップ
+        if room_name in site.madori_info:
+            room_count += 1
+            continue
+        
+        # まだ大きな空きスペースがあるか確認
+        max_rect = find_largest_empty_rectangle(grid)
+        if max_rect:
+            x, y, width, height = max_rect
+            
+            # 最低2×2サイズを確保
+            if width >= 2 and height >= 2:
+                room_code = 10 + room_count
+                grid[y:y+height, x:x+width] = room_code
+                
+                # 新しい部屋を追加
+                site.madori_info[room_name] = Madori(room_name, room_code, width, height, None)
+                positions[room_name] = (x, y)
+                placed_rooms.add(room_name)
+        
+        room_count += 1
     
     return grid, positions
-
-# 間取り情報 (間取り名, 間取り番号, 幅, 高さ, 隣接間取り名)
-madori_odict = OrderedDict(
-    E=Madori('E', 1, 2, 2, None), # 玄関
-    L=Madori('L', 2, 5, 3, 'E'),
-    K=Madori('K', 4, 2, 1, 'L'),  # キッチン：最低2マス (2×1=2マス)、リビングに隣接
-    D=Madori('D', 3, 3, 2, 'K'),  # ダイニング：最低4マス (3×2=6マス)、キッチンに隣接
-    B=Madori('B', 5, 2, 2, 'L'),
-    T=Madori('T', 6, 1, 2, 'B')
-)
 
 if __name__ == "__main__":
     # @title 敷地の縦横を設定
