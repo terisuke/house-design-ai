@@ -1,14 +1,7 @@
-# src/processing/mask.py
 """
 セグメンテーションマスクの処理と操作のためのユーティリティ関数
-(改変版:
-  1)最初から「マスク内のみ」でのレイアウト配置を行う
-  2)トイレTは (1×2)=2マス
-  3)LDKやRなどは縮小・拡大をサイト(madori_info)設定で制御
-  4)大きな廊下領域を追加部屋Rに変換して廊下をできるだけ細くし、デッドスペースを最小化
-  (ランダムアルファベットモードのロジックは従来通り残す)
+(マスク外の不要グリッドを非表示にする修正版)
 """
-
 import numpy as np
 import cv2
 import tempfile
@@ -29,37 +22,29 @@ from src.processing.arrangement import (
     create_madori_odict,
     arrange_rooms_with_constraints,
     fill_corridor,
-    process_large_corridors,  # ← 大きな廊下を追加部屋Rに変換
+    process_large_corridors,
 )
 
 logger = logging.getLogger(__name__)
 
-# data.yaml からクラス名を読み込み（既存仕様）
+# data.yaml を読み込み
 with open('config/data.yaml', 'r') as f:
     data_config = yaml.safe_load(f)
 class_names = data_config['names']
 
-# クラスID
 HOUSE_CLASS_ID = class_names.index('House') if 'House' in class_names else None
 ROAD_CLASS_ID = class_names.index('Road') if 'Road' in class_names else None
 
-# A3サイズ (150dpi想定)
 A3_WIDTH_PX  = 2481
 A3_HEIGHT_PX = 1754
-A3_WIDTH_MM  = 420.0  # 横420mm
+A3_WIDTH_MM  = 420.0
 
-# ランダムアルファベット (通常モード)
 ALPHABET_LIST = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 
 def offset_mask_by_distance(mask: np.ndarray, offset_px: int) -> np.ndarray:
-    """
-    マスクを距離変換して内側に収縮する関数。
-    offset_px > 0 の場合にのみ収縮する。
-    """
     if offset_px <= 0:
         return mask.copy()
-
     bin_mask = (mask > 0).astype(np.uint8)
     dist = cv2.distanceTransform(bin_mask, cv2.DIST_L2, 5)
     shrunk = (dist >= offset_px).astype(np.uint8)
@@ -78,13 +63,9 @@ def process_image(
 ) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を推論し、マスク処理・レイアウト生成(またはランダムアルファベット表示)を行う。
-    1)建物領域をglobal_setback_mmだけ全体収縮
-    2)道路近接部だけさらにroad_setback_mm分追加収縮
-    3)旗竿形状を除去
-    4)floorplan_mode=Trueなら間取り表示(＋大きな廊下→R部屋化) / Falseなら従来通りランダムアルファベット
     """
     try:
-        # 古いパラメータの互換処理（near_offset_px, far_offset_px）
+        # 古いパラメータ(near_offset_px, far_offset_px)の互換処理
         if near_offset_px is not None or far_offset_px is not None:
             logger.warning(
                 "near_offset_px/far_offset_pxは非推奨。"
@@ -142,12 +123,12 @@ def process_image(
         orig_h, orig_w = orig.shape[:2]
         debug_info["original_size"] = {"width_px": orig_w, "height_px": orig_h}
 
-        # A3サイズにリサイズ (150dpi想定)
+        # A3サイズ(150dpi想定)にリサイズ
         resized = cv2.resize(orig, (A3_WIDTH_PX, A3_HEIGHT_PX), interpolation=cv2.INTER_LINEAR)
         debug_info["resized"] = True
         debug_info["a3_size"] = {"width_px": A3_WIDTH_PX, "height_px": A3_HEIGHT_PX}
 
-        # 一時ファイルで推論
+        # 推論用に一時ファイルに保存
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             is_success, buffer = cv2.imencode(".jpg", resized)
             if not is_success:
@@ -158,7 +139,7 @@ def process_image(
             results = model(tmp.name, task="segment")
             os.unlink(tmp.name)
 
-        # 推論後の画像(リサイズ済み)
+        # 推論後の画像(リサイズ済み)をコピー
         a3_img = resized.copy()
         h, w = a3_img.shape[:2]
         debug_info["image_size"] = {"width_px": w, "height_px": h}
@@ -176,7 +157,7 @@ def process_image(
                 elif int(cls_id) == ROAD_CLASS_ID:
                     road_mask = np.maximum(road_mask, resized_mask)
 
-        # 家=緑, 道路=マゼンタ で可視化
+        # マスク可視化用(緑=House, マゼンタ=Road)
         out_bgr = a3_img.copy()
         overlay_house = out_bgr.copy()
         overlay_house[house_mask == 1] = (0, 255, 0)
@@ -199,7 +180,7 @@ def process_image(
         road_setback_px = int(round(road_setback_mm * px_per_mm))
         debug_info["road_setback_px"] = road_setback_px
 
-        # 距離変換: 道路近いところをさらに収縮
+        # 距離変換: 道路近いところだけさらに収縮
         road_bin = (road_mask > 0).astype(np.uint8)
         dist_map = cv2.distanceTransform(1 - road_bin, cv2.DIST_L2, 5)
         near_road = (dist_map < road_setback_px).astype(np.uint8)
@@ -210,7 +191,7 @@ def process_image(
         house_near_offset = offset_mask_by_distance(house_near, road_setback_px)
         final_house = np.maximum(house_far, house_near_offset)
 
-        # 旗竿形状を除去 (最大連結成分のみ残す)
+        # 旗竿形状(細すぎる領域)を除去: 最大連結成分のみ残す
         num_labels, labels = cv2.connectedComponents(final_house.astype(np.uint8))
         if num_labels > 1:
             largest_label = 1
@@ -222,7 +203,7 @@ def process_image(
                     largest_label = label_i
             final_house = (labels == largest_label).astype(np.uint8)
 
-        # 細長すぎる旗竿を除去
+        # 極端に細長い旗竿形状も除去(アスペクト比>5 かつ面積小さい)
         contours, _ = cv2.findContours(final_house, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in contours:
             rx, ry, rw, rh = cv2.boundingRect(contour)
@@ -234,22 +215,17 @@ def process_image(
         if np.sum(final_house) == 0:
             logger.warning("オフセット後の住居領域が見つかりません")
             debug_info["error"] = "オフセット後の住居領域が見つかりません"
-            # PILイメージ化して返す
             rgb = cv2.cvtColor(out_bgr, cv2.COLOR_BGR2RGB)
             return Image.fromarray(rgb), debug_info
 
-        # =====================
-        # 間取りモード or ランダムアルファベット
-        # =====================
+        # 間取りモード or ランダムアルファベットモード
         if floorplan_mode:
-            # --- 間取り表示モード ---
             out_img, floorplan_stats = draw_floorplan_on_mask_with_mask(
                 base_image=out_bgr,
                 final_mask=final_house,
                 grid_mm=grid_mm,
                 px_per_mm=px_per_mm
             )
-            # デバッグ情報をまとめる
             debug_info["floorplan_stats"] = floorplan_stats
             if floorplan_stats.get("bounding_box"):
                 debug_info["bounding_box"] = floorplan_stats["bounding_box"]
@@ -262,12 +238,9 @@ def process_image(
                 "bounding_box": floorplan_stats.get("bounding_box"),
                 "grid_cells": floorplan_stats.get("grid_size")
             }
-            # PIL変換して返す
             rgb = cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
             return Image.fromarray(rgb), debug_info
-
         else:
-            # --- 従来どおりランダムアルファベットモード ---
             out_img, grid_stats = draw_grid_on_mask(
                 image=out_bgr,
                 final_mask=final_house,
@@ -303,6 +276,7 @@ def draw_grid_on_mask(
     """
     「ランダムアルファベット」モード用の描画:
     マスク内にだけセルを描画し、各セル中心にランダムアルファベットを配置。
+    マスク外にあるグリッドは表示しない。
     """
     out = image.copy()
     grid_stats = {
@@ -315,13 +289,12 @@ def draw_grid_on_mask(
         "alphabet_counts": {}
     }
 
-    # マスク輪郭抽出
+    # マスク輪郭からバウンディングボックス取得
     contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         grid_stats["error"] = "マスクが空です"
         return out, grid_stats
 
-    # 最大の輪郭
     big_contour = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(big_contour)
     grid_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
@@ -332,7 +305,7 @@ def draw_grid_on_mask(
     mask_area[final_mask == 1] = fill_color
     cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
 
-    # セルサイズ固定(約9.1mm)
+    # セルサイズ固定(約9.1mm→54px)
     cell_px = 54
     grid_stats["cell_px"] = cell_px
 
@@ -340,7 +313,6 @@ def draw_grid_on_mask(
     grid_rows = h // cell_px
     grid_lines_cols = grid_cols + 1
     grid_lines_rows = grid_rows + 1
-
     grid_stats["grid_lines"] = {"rows": grid_lines_rows, "cols": grid_lines_cols}
     grid_stats["grid_cells"] = {"rows": grid_rows, "cols": grid_cols}
     total_cells_in_bbox = grid_rows * grid_cols
@@ -350,21 +322,16 @@ def draw_grid_on_mask(
     for letter in ALPHABET_LIST:
         grid_stats["alphabet_counts"][letter] = 0
 
-    # 各セルを走査
+    # 各セルごとにマスク内かどうかチェックして描画
     for row in range(grid_rows):
         cell_y1 = y + row * cell_px
         cell_y2 = cell_y1 + cell_px
         for col in range(grid_cols):
             cell_x1 = x + col * cell_px
             cell_x2 = cell_x1 + cell_px
-            # マスク内に完全に含まれるかチェック
-            padding = max(1, line_thickness // 2)
-            check_x1 = max(0, cell_x1 - padding)
-            check_y1 = max(0, cell_y1 - padding)
-            check_x2 = min(final_mask.shape[1] - 1, cell_x2 + padding)
-            check_y2 = min(final_mask.shape[0] - 1, cell_y2 + padding)
-            cell_roi = final_mask[check_y1:check_y2, check_x1:check_x2]
 
+            # セルが全てマスク内にあるか確認
+            cell_roi = final_mask[cell_y1:cell_y2, cell_x1:cell_x2]
             if not np.all(cell_roi == 1):
                 grid_stats["cells_skipped"] += 1
                 grid_stats["reason_not_in_mask"] += 1
@@ -390,9 +357,9 @@ def draw_grid_on_mask(
             text_size = cv2.getTextSize(cell_letter, font, font_scale, text_thickness)[0]
             text_x = cell_center_x - text_size[0] // 2
             text_y = cell_center_y + text_size[1] // 2
-
             cv2.putText(out, cell_letter, (text_x, text_y),
                         font, font_scale, text_color, text_thickness, cv2.LINE_AA)
+
             grid_stats["cells_drawn"] += 1
 
     return out, grid_stats
@@ -407,9 +374,9 @@ def draw_floorplan_on_mask_with_mask(
     """
     間取り表示モード:
      1) マスクの範囲だけを有効とする valid_grid_mask を作成
-     2) Site(グリッド)に部屋(E,L,D,K,B,UT,T)を配置(=arrange_rooms_with_constraints)
-     3) 空き部分を廊下(C)で埋める→さらに大きい廊下をR部屋化して廊下を細くする
-     4) 最終的な部屋配置をOpenCVで描画
+     2) Site(グリッド)に部屋(E,L,D,K,B,UT,T)を配置
+     3) 空きスペースを廊下(C)で埋める→さらに大きい廊下をR部屋化
+     4) valid_grid_mask=0(=マスク外)のセルに関しては間取りを描画しない
     """
     out = base_image.copy()
     floorplan_stats = {
@@ -434,7 +401,13 @@ def draw_floorplan_on_mask_with_mask(
     x, y, w, h = cv2.boundingRect(big_contour)
     floorplan_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
-    # セルサイズ (固定54px=約9.1mm)
+    # マスク領域を半透明着色(青)
+    overlay = out.copy()
+    mask_area = np.zeros_like(out)
+    mask_area[final_mask == 1] = (255, 0, 0)
+    cv2.addWeighted(mask_area, 0.4, out, 1, 0, out)
+
+    # セルサイズ (約9.1mm→54px)
     cell_px = 54
     floorplan_stats["cell_px"] = cell_px
 
@@ -442,7 +415,7 @@ def draw_floorplan_on_mask_with_mask(
     grid_rows = h // cell_px
     floorplan_stats["grid_size"] = {"rows": grid_rows, "cols": grid_cols}
 
-    # valid_grid_mask を作る(マスク内=1, 外=0)
+    # マスク内セル(=1)だけを有効にするvalid_grid_mask
     valid_grid_mask = np.zeros((grid_rows, grid_cols), dtype=np.uint8)
     for i in range(grid_rows):
         for j in range(grid_cols):
@@ -458,9 +431,8 @@ def draw_floorplan_on_mask_with_mask(
                 floorplan_stats["cells_skipped"] += 1
                 floorplan_stats["reason_not_in_mask"] += 1
 
-    # Site作成
+    # Site作成 & 間取り情報セット
     site = Site(grid_cols, grid_rows)
-    # 間取り情報(L,D,K,UT 可変; T=1x2; E=2x2; B=2x2)
     madori_dict = create_madori_odict(
         L_size=(4,3),
         D_size=(3,2),
@@ -468,11 +440,9 @@ def draw_floorplan_on_mask_with_mask(
         UT_size=(2,2)
     )
     site.set_madori_info(madori_dict)
-
-    # グリッド初期化
     grid_data = site.init_grid()
 
-    # 配置(玄関E→L→K→D→B→UT→Tの順)
+    # 部屋配置(玄関E→L→K→D→B→UT→T)
     order = ["E","L","K","D","B","UT","T"]
     grid_data, positions = arrange_rooms_with_constraints(
         grid_data,
@@ -484,11 +454,11 @@ def draw_floorplan_on_mask_with_mask(
     # 空きスペースを廊下(C=7)で埋める
     grid_data = fill_corridor(grid_data, corridor_code=7)
 
-    # 大きい廊下は部屋(R1,R2...)に変換して廊下を少なくする
+    # 大きな廊下領域をR部屋化
     grid_data, new_rooms, new_room_count = process_large_corridors(
         grid_data,
         corridor_code=7,
-        min_room_size=4  # 2×2以上
+        min_room_size=4
     )
 
     # 部屋ごとに色を割り当て
@@ -502,21 +472,18 @@ def draw_floorplan_on_mask_with_mask(
         'UT': (160, 190, 240),  # 脱衣所
         'C': (220, 220, 220)    # 廊下
     }
-    # 追加部屋(R1,R2...)は後で動的に対応
 
-    # マスク領域を半透明着色(青)
-    overlay = out.copy()
-    mask_area = np.zeros_like(out)
-    mask_area[final_mask == 1] = (255, 0, 0)
-    cv2.addWeighted(mask_area, 0.4, out, 1, 0, out)
-
-    # グリッドを描画
+    # グリッドを描画(但し valid_grid_mask=1 のセルだけ)
     cells_drawn = 0
     for i in range(grid_rows):
         for j in range(grid_cols):
             code = grid_data[i, j]
             if code <= 0:
                 continue
+            # マスク外=0 のセルは間取りを描画しない
+            if valid_grid_mask[i, j] == 0:
+                continue
+
             cell_x1 = x + j * cell_px
             cell_y1 = y + i * cell_px
             cell_x2 = cell_x1 + cell_px
@@ -528,22 +495,20 @@ def draw_floorplan_on_mask_with_mask(
                 if md.code == code:
                     found_name = nm
                     break
-            # R1,R2など追加部屋
+            # R(追加部屋)判定
             if (found_name is None) and (code >= 10):
-                # R(部屋)判定: code-10が番号
                 rid = code - 10
                 found_name = f"R{rid}"
 
             # 色決定
             c = color_map.get(found_name, (200,200,200))
+
+            # 塗りつぶし＋枠線
             cv2.rectangle(out, (cell_x1, cell_y1), (cell_x2, cell_y2), c, -1)
-            # 枠線
-            cv2.rectangle(out, (cell_x1, cell_y1), (cell_x2, cell_y2),
-                          (100,100,100), 1)
+            cv2.rectangle(out, (cell_x1, cell_y1), (cell_x2, cell_y2), (100,100,100), 1)
             cells_drawn += 1
 
-    # 部屋名を表示(中心だけ)
-    # まず標準的な部屋 (positionsに入ってるE,L,K,D,B,UT,T)
+    # 主要部屋(E,L,K,D,B,UT,T)のラベルを描画
     for name, pos in positions.items():
         if name == 'C':
             continue
@@ -553,7 +518,6 @@ def draw_floorplan_on_mask_with_mask(
         room_x, room_y = pos
         w_ = m.width
         h_ = m.height
-
         center_x = room_x + w_//2
         center_y = room_y + h_//2
         px_x = x + center_x*cell_px + cell_px//2
@@ -567,7 +531,6 @@ def draw_floorplan_on_mask_with_mask(
         text_x = px_x - text_size[0] // 2
         text_y = px_y + text_size[1] // 2
 
-        # 背景(白)
         bg_padding = 4
         bg_rect = (
             text_x - bg_padding,
@@ -583,42 +546,42 @@ def draw_floorplan_on_mask_with_mask(
         cv2.putText(out, name, (text_x, text_y), font,
                     font_scale, text_color, text_thickness, cv2.LINE_AA)
 
-    # 次に追加部屋(R1,R2など)を検索して表示
-    # process_large_corridorsで更新された grid_data に code=10,11...が入ってる
-    # それぞれR1,R2...として中央に描画
-    # ただしpositionsにはR系は入っていないので、自前で検索
-    # (region masking: label or boundingRect)
+    # R部屋(R1,R2...)のラベル描画
     labeled_corr, n_labels_corr = cv2.connectedComponents((grid_data >= 10).astype(np.uint8))
-    # n_labels_corrが整数であることを確認
     if isinstance(n_labels_corr, np.ndarray):
         if n_labels_corr.size == 1:
             n_labels_corr = n_labels_corr.item()
         else:
-            # 複数要素の場合は最大値を使用
             n_labels_corr = int(np.max(n_labels_corr)) + 1
-    # label=0は背景、それ以外はR部屋
     for lbl in range(1, n_labels_corr):
         region_mask = (labeled_corr == lbl)
         codes_in_region = grid_data[region_mask]
         code_vals, counts = np.unique(codes_in_region, return_counts=True)
-        
-        # code_valsが空の場合はスキップ
         if len(code_vals) == 0:
             continue
-            
         r_code = code_vals[np.argmax(counts)]
         rid = r_code - 10
         r_name = f"R{rid}"
-        # centroid
+
         ys, xs = np.where(region_mask)
+        miny, maxy = ys.min(), ys.max()
+        minx, maxx = xs.min(), xs.max()
+        w_ = maxx-minx+1
+        h_ = maxy-miny+1
+
+        # 追加部屋情報
+        floorplan_stats["madori_info"][r_name] = {
+            "name": r_name,
+            "width": w_,
+            "height": h_,
+            "neighbor": None
+        }
+
         cy = int(np.mean(ys))
         cx = int(np.mean(xs))
-
-        # grid座標(cx,cy)→ピクセル
         px_x = x + cx*cell_px + cell_px//2
         px_y = y + cy*cell_px + cell_px//2
 
-        # テキスト表示
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 1.2
         text_color = (0, 0, 0)
@@ -644,9 +607,7 @@ def draw_floorplan_on_mask_with_mask(
 
     floorplan_stats["cells_drawn"] = cells_drawn
 
-    # 部屋情報収集: 
-    #   既存(E,L,K,D,B,T,UT)は site.madori_info & positions
-    #   追加R部屋は code>=10 でregionを調べる
+    # 間取り情報(positions & R部屋含む)
     pos_dict = {}
     for name, pos in positions.items():
         m = site.madori_info[name]
@@ -662,41 +623,34 @@ def draw_floorplan_on_mask_with_mask(
             "height": m.height,
             "neighbor": m.neighbor_name
         }
-    # R部屋にも対応
-    # n_labels_corrが整数であることを確認（念のため再確認）
+
     if isinstance(n_labels_corr, np.ndarray):
         if n_labels_corr.size == 1:
             n_labels_corr = n_labels_corr.item()
         else:
-            # 複数要素の場合は最大値を使用
             n_labels_corr = int(np.max(n_labels_corr)) + 1
+
     for lbl in range(1, n_labels_corr):
         region_mask = (labeled_corr == lbl)
         codes_in_region = grid_data[region_mask]
         code_vals, counts = np.unique(codes_in_region, return_counts=True)
-        
-        # code_valsが空の場合はスキップ
         if len(code_vals) == 0:
             continue
-            
         r_code = code_vals[np.argmax(counts)]
         rid = r_code - 10
         r_name = f"R{rid}"
 
-        # regionのw,h
         ys, xs = np.where(region_mask)
         miny, maxy = ys.min(), ys.max()
         minx, maxx = xs.min(), xs.max()
         w_ = maxx-minx+1
         h_ = maxy-miny+1
-
         floorplan_stats["madori_info"][r_name] = {
             "name": r_name,
             "width": w_,
             "height": h_,
             "neighbor": None
         }
-        # 座標は(上左)
         pos_dict[r_name] = {
             "x": minx,
             "y": miny,

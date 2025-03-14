@@ -18,7 +18,7 @@ class Site:
     def __init__(self, grid_w, grid_h):
         self.grid_w = grid_w
         self.grid_h = grid_h
-        self.madori_info = OrderedDict()    # Madoriデータクラス
+        self.madori_info = OrderedDict()
 
     def init_grid(self):
         grid = np.zeros(shape=(self.grid_h, self.grid_w), dtype=int)
@@ -110,7 +110,6 @@ class Site:
             choice_item = random.choice(madori_choice_list)
             madori_choice_list.remove(choice_item)
             cx, cy = choice_item
-            # 配置領域が全部 0 かつ valid_mask があればその中も全部1かどうか確認
             region = grid[cy : cy+target_h, cx : cx+target_w]
             if np.any(region != 0):
                 continue  # 既に使われている
@@ -119,9 +118,9 @@ class Site:
                 # 有効マスクかどうか
                 submask = valid_mask[cy : cy+target_h, cx : cx+target_w]
                 if np.any(submask != 1):
-                    continue  # マスク外(=0)が混在している
+                    continue
 
-            # ここまでOKなら配置
+            # OKなら配置
             grid[cy : cy+target_h, cx : cx+target_w] = target_code
             positions[target_name] = (cx, cy)
             madori_choices[target_name] = madori_choice_list
@@ -137,6 +136,7 @@ class Site:
         grid, positions, madori_choices = self.set_madori(grid, positions, target_name, neighbor_name, madori_choices, valid_mask)
         return grid, positions, madori_choices
 
+
 # 廊下（Corridor）用の定義
 corridor = Madori(name='C', code=7, width=1, height=1, neighbor_name=None)
 
@@ -148,10 +148,10 @@ def create_madori_odict(L_size=(4,3), D_size=(3,2), K_size=(2,2), UT_size=(2,2))
     return OrderedDict(
         E=Madori('E', 1, 2, 2, None),         # 玄関（2×2固定）
         L=Madori('L', 2, L_size[0], L_size[1], 'E'),
-        K=Madori('K', 4, K_size[0], K_size[1], 'L'), 
-        D=Madori('D', 3, D_size[0], D_size[1], 'K'), 
+        K=Madori('K', 4, K_size[0], K_size[1], 'L'),
+        D=Madori('D', 3, D_size[0], D_size[1], 'K'),
         B=Madori('B', 5, 2, 2, 'L'),          # バスルーム (2×2)
-        T=Madori('T', 6, 1, 2, 'B'),          # トイレ (1×2) ←2マスだけ
+        T=Madori('T', 6, 1, 2, 'B'),          # トイレ (1×2)
         UT=Madori('UT', 8, UT_size[0], UT_size[1], 'B'),
         C=corridor
     )
@@ -204,6 +204,7 @@ def arrange_rooms_in_rows(grid, site, order: list[str]):
 
     return grid, positions
 
+
 def fill_corridor(grid, corridor_code=7):
     """
     空きスペースをすべて廊下コードで埋める
@@ -212,9 +213,12 @@ def fill_corridor(grid, corridor_code=7):
     grid[mask_empty] = corridor_code
     return grid
 
+
+#################### ここから修正 ####################
 def process_large_corridors(grid, corridor_code=7, min_room_size=4):
     """
-    廊下が大きく広がったエリアを追加部屋に変えるなどの処理
+    廊下が大きく広がったエリアを追加部屋に変えるなどの処理。
+    (2x2以上の連続領域はまとめて複数のR部屋を作り、残りを廊下のままにする)
     """
     corridor_mask = (grid == corridor_code)
     if not np.any(corridor_mask):
@@ -227,21 +231,62 @@ def process_large_corridors(grid, corridor_code=7, min_room_size=4):
     for region_id in range(1, num_features + 1):
         region_mask = (labeled_array == region_id)
         region_size = np.sum(region_mask)
-        if region_size >= min_room_size:
-            y_indices, x_indices = np.where(region_mask)
-            min_y, max_y = y_indices.min(), y_indices.max()
-            min_x, max_x = x_indices.min(), x_indices.max()
-            height = max_y - min_y + 1
-            width = max_x - min_x + 1
-            aspect_ratio = max(width / height, height / width)
-            if aspect_ratio <= 3:
-                new_room_count += 1
-                new_code = 10 + new_room_count
-                room_name = f"R{new_room_count}"
-                new_rooms[room_name] = (min_y, min_x, height, width)
-                grid[region_mask] = new_code
+
+        # regionが小さい場合はそのまま廊下(C)にする
+        if region_size < min_room_size:
+            continue
+
+        # region全体のバウンディングボックス
+        ys, xs = np.where(region_mask)
+        miny, maxy = ys.min(), ys.max()
+        minx, maxx = xs.min(), xs.max()
+        region_h = maxy - miny + 1
+        region_w = maxx - minx + 1
+
+        # バウンディングボックス内だけのサブグリッド(1=廊下,0=それ以外)
+        sub_grid = np.zeros((region_h, region_w), dtype=int)
+        sub_grid[ys - miny, xs - minx] = 1
+
+        # 2x2以上の正方形(もしくは長方形)をできるだけ切り出してR部屋にする
+        while True:
+            best_r = -1
+            best_c = -1
+            best_size = 0
+
+            # 単純に「左上から最大の正方形(辺>=2)を探す」アプローチ
+            # 本来なら長方形探索も要るが、最小限修正に留めるため簡易実装
+            for r in range(region_h):
+                for c in range(region_w):
+                    if sub_grid[r, c] == 1:
+                        max_possible = min(region_h - r, region_w - c)
+                        cur_size = 0
+                        for s in range(max_possible, 1, -1):
+                            block = sub_grid[r:r+s, c:c+s]
+                            if np.all(block == 1):
+                                cur_size = s
+                                break
+                        if cur_size > best_size:
+                            best_size = cur_size
+                            best_r = r
+                            best_c = c
+
+            if best_size < 2:
+                # 2x2以上が見つからない→打ち切り(細かい領域は廊下のまま)
+                break
+
+            # 新しいR部屋コード
+            new_room_count += 1
+            new_code = 10 + new_room_count
+            # 該当範囲をR部屋に設定
+            sub_grid[best_r:best_r+best_size, best_c:best_c+best_size] = 2
+            # メイングリッドにも反映
+            for rr in range(best_r, best_r+best_size):
+                for cc in range(best_c, best_c+best_size):
+                    grid[miny+rr, minx+cc] = new_code
 
     return grid, new_rooms, new_room_count
+#################### ここまで修正 ####################
+
 
 def find_largest_empty_rectangle(grid):
     """
@@ -277,28 +322,25 @@ def find_largest_empty_rectangle(grid):
 
     return max_rect
 
-# サンプルの初期設定
+
 madori_odict = OrderedDict(
     E=Madori('E', 1, 2, 2, None),   # 玄関
     L=Madori('L', 2, 5, 3, 'E'),
     K=Madori('K', 4, 2, 1, 'L'),
     D=Madori('D', 3, 3, 2, 'K'),
     B=Madori('B', 5, 2, 2, 'L'),
-    # トイレを(1×2)=2マスで確定
     T=Madori('T', 6, 1, 2, 'B')
 )
 
+
 def arrange_rooms_with_constraints(grid, site, order: list[str], valid_mask=None):
     """
-    建築学的な制約を考慮して部屋を配置し、さらにvalid_maskがあれば
-    マスク外にはみ出さないようにする(=最初からマスク内セルだけで配置)。
+    建築学的な制約を考慮して部屋を配置する。
     """
     positions = OrderedDict()
     grid_h, grid_w = grid.shape
 
-    # 一旦、LやDなどは自由に大きさ変えてOK（ただしSiteが持つ madori_info に従う）
-    # 玄関(E)をまず外周に(隅4箇所)配置
-    placed_rooms = set()
+    # 玄関(E)をまず外周の隅に配置
     if "E" in site.madori_info:
         e_w = site.madori_info["E"].width
         e_h = site.madori_info["E"].height
@@ -315,30 +357,25 @@ def arrange_rooms_with_constraints(grid, site, order: list[str], valid_mask=None
                 region = grid[cy : cy+e_h, cx : cx+e_w]
                 if np.any(region != 0):
                     continue
-                # mask判定
                 if valid_mask is not None:
                     submask = valid_mask[cy : cy+e_h, cx : cx+e_w]
                     if np.any(submask != 1):
                         continue
-                # OK
                 grid[cy : cy+e_h, cx : cx+e_w] = site.madori_info["E"].code
                 positions["E"] = (cx, cy)
-                placed_rooms.add("E")
                 success = True
                 break
 
         if not success:
-            # 強制配置
             x, y = 0, max(0, grid_h - e_h)
             grid[y : y+e_h, x : x+e_w] = site.madori_info["E"].code
             positions["E"] = (x, y)
-            placed_rooms.add("E")
 
-    # あとは順番に site.set_madori で配置
+    # あとは順番に set_madori で配置
     madori_choices = dict()
     for name in order:
         if name == "E":
-            continue  # 既に置いた
+            continue
         neighbor = site.madori_info[name].neighbor_name if name in site.madori_info else None
         grid, positions, madori_choices = site.set_madori(
             grid, 
@@ -348,6 +385,5 @@ def arrange_rooms_with_constraints(grid, site, order: list[str], valid_mask=None
             madori_choices,
             valid_mask=valid_mask
         )
-        placed_rooms.add(name)
 
     return grid, positions
