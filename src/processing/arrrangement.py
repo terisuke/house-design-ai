@@ -2,6 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+from scipy import ndimage
 
 from dataclasses import dataclass
 
@@ -224,6 +225,60 @@ def fill_corridor(grid, corridor_code=7):
     mask_empty = (grid == 0)
     grid[mask_empty] = corridor_code
     return grid
+
+def process_large_corridors(grid, corridor_code=7, min_room_size=4):
+    """
+    広い廊下領域を見つけて追加部屋（R1, R2など）に変換し、
+    残りの部分を1マス幅の廊下にする
+    
+    Args:
+        grid: 部屋と廊下が配置されたグリッド
+        corridor_code: 廊下に使用されるコード
+        min_room_size: 部屋とみなす最小サイズ（セル数）
+    
+    Returns:
+        更新されたグリッド、新しい部屋の辞書、新しい部屋の数
+    """
+    # 廊下領域を見つける
+    corridor_mask = (grid == corridor_code)
+    
+    # 廊下がない場合は変更なし
+    if not np.any(corridor_mask):
+        return grid, {}, 0
+    
+    # 連結領域を見つける
+    labeled_array, num_features = ndimage.label(corridor_mask)
+    
+    # 各領域を処理
+    new_room_count = 0
+    new_rooms = {}
+    
+    for region_id in range(1, num_features + 1):
+        region_mask = (labeled_array == region_id)
+        region_size = np.sum(region_mask)
+        
+        if region_size >= min_room_size:
+            # 寸法を計算
+            y_indices, x_indices = np.where(region_mask)
+            min_y, max_y = y_indices.min(), y_indices.max()
+            min_x, max_x = x_indices.min(), x_indices.max()
+            height = max_y - min_y + 1
+            width = max_x - min_x + 1
+            
+            # 変換する価値があるか確認（極端に細長くない）
+            aspect_ratio = max(width / height, height / width)
+            if aspect_ratio <= 3:  # あまり細長くない場合
+                new_room_count += 1
+                new_room_code = 10 + new_room_count
+                room_name = f"R{new_room_count}"
+                
+                # 部屋情報を保存
+                new_rooms[room_name] = (min_y, min_x, height, width)
+                
+                # グリッドを更新
+                grid[region_mask] = new_room_code
+    
+    return grid, new_rooms, new_room_count
 
 # 間取り情報 (間取り名, 間取り番号, 幅, 高さ, 隣接間取り名)
 madori_odict = OrderedDict(

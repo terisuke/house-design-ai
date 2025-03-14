@@ -16,7 +16,7 @@ import os
 import requests
 import random  # ランダムアルファベット生成用に追加
 import sys
-from src.processing.arrrangement import Site, Madori, OrderedDict, create_madori_odict, arrange_rooms_in_rows, fill_corridor
+from src.processing.arrrangement import Site, Madori, OrderedDict, create_madori_odict, arrange_rooms_in_rows, fill_corridor, process_large_corridors
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -155,20 +155,14 @@ def draw_grid_on_mask(
         grid_stats["alphabet_counts"][letter] = 0
 
     # 行(row)方向に走査
-    row = 0
-    while True:
+    for row in range(actual_grid_rows):
         cell_y1 = y + row * cell_px
         cell_y2 = cell_y1 + cell_px
-        if cell_y2 > y_end:
-            break  # バウンディングボックス外なので終了
         
         # 列(col)方向に走査
-        col = 0
-        while True:
+        for col in range(actual_grid_cols):
             cell_x1 = x + col * cell_px
             cell_x2 = cell_x1 + cell_px
-            if cell_x2 > x_end:
-                break  # 右がはみ出すので次の行へ
             
             # (2) マスク内に完全に収まっているか確認
             padding = max(1, line_thickness // 2)
@@ -184,7 +178,6 @@ def draw_grid_on_mask(
             if not np.all(cell_roi == 1):
                 grid_stats["cells_skipped"] += 1
                 grid_stats["reason_not_in_mask"] += 1
-                col += 1
                 continue
             
             # ランダムなアルファベットを選択
@@ -227,8 +220,6 @@ def draw_grid_on_mask(
             )
 
             grid_stats["cells_drawn"] += 1
-            col += 1
-        row += 1
 
     return out, grid_stats
 
@@ -365,6 +356,49 @@ def draw_floorplan_on_mask(
     # 空きスペースを廊下(C)で埋める
     grid = fill_corridor(grid, corridor_code=7)
     
+    # 広い廊下を処理
+    grid, new_rooms, new_room_count = process_large_corridors(grid, corridor_code=7, min_room_size=4)
+    
+    # 新しい部屋用の説明を準備
+    if 'descriptions' not in locals():
+        descriptions = {
+            'E': '玄関',
+            'L': 'リビング',
+            'D': 'ダイニング',
+            'K': 'キッチン',
+            'B': 'バスルーム',
+            'T': 'トイレ',
+            'UT': '脱衣所',  # 脱衣所の説明
+            'C': '廊下'
+        }
+    
+    # 新しい部屋を統計と表示用に追加
+    for room_name, (room_y, room_x, height, width) in new_rooms.items():
+        # 統計に追加
+        floorplan_stats["madori_info"][room_name] = {
+            "name": room_name,
+            "width": width,
+            "height": height,
+            "neighbor": None
+        }
+        
+        # グリッド位置を計算（バウンディングボックスのオフセットを考慮）
+        grid_x = x + room_x * cell_px
+        grid_y = y + room_y * cell_px
+        
+        floorplan_stats["positions"][room_name] = {
+            "x": room_x,
+            "y": room_y,
+            "grid_x": grid_x,
+            "grid_y": grid_y
+        }
+        
+        # 色マッピングに追加 (ランダムな色)
+        colors[room_name] = (random.randint(100, 200), random.randint(100, 200), random.randint(100, 200))
+        
+        # 説明マッピングに追加
+        descriptions[room_name] = f'部屋{room_name[1:]}'
+    
     # 間取り情報と位置情報を統計情報に記録
     for madori_name, pos in positions.items():
         madori = madori_odict[madori_name]
@@ -408,13 +442,17 @@ def draw_floorplan_on_mask(
         for j in range(actual_grid_cols):
             cell_code = grid[i, j]
             if cell_code > 0:  # 0以外（何らかの部屋）の場合
+                room_name = None
                 # コードから部屋名を取得
                 for madori_name, madori in madori_odict.items():
                     if madori.code == cell_code:
                         room_name = madori_name
                         break
-                else:
-                    room_name = None
+                
+                # 新しい部屋（R1, R2など、コード10以上）の場合
+                if room_name is None and cell_code >= 10:
+                    room_id = cell_code - 10
+                    room_name = f"R{room_id}"
                 
                 # セルの座標
                 cell_x = x + j * cell_px
@@ -454,26 +492,21 @@ def draw_floorplan_on_mask(
     legend_spacing = 120
     font_scale = 0.7
     
-    # 実際に配置された間取りのみ凡例に表示
-    descriptions = {
-        'E': '玄関',
-        'L': 'リビング',
-        'D': 'ダイニング',
-        'K': 'キッチン',
-        'B': 'バスルーム',
-        'T': 'トイレ',
-        'UT': '脱衣所',  # 脱衣所の説明を追加
-        'C': '廊下'
-    }
-    
-    # 部屋コードのリストを取得（Cは最後に表示）
+    # 部屋コードのリストを取得（新しい部屋タイプを含む）
     room_codes = list(positions.keys())
+    
+    # 新しく作成された部屋（R1,R2など）を追加
+    for room_name in new_rooms.keys():
+        if room_name not in room_codes:
+            room_codes.append(room_name)
+    
+    # 廊下がある場合はそれも追加
     if np.any(grid == 7):  # 廊下が存在する場合
         room_codes.append('C')
     
     for i, madori_name in enumerate(room_codes):
         # 凡例の位置を計算
-        legend_pos_x = legend_x + i * legend_spacing
+        legend_pos_x = x + i * legend_spacing
         
         # 色を取得
         color = colors.get(madori_name, (200, 200, 200))
