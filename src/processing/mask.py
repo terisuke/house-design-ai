@@ -16,7 +16,7 @@ import os
 import requests
 import random  # ランダムアルファベット生成用に追加
 import sys
-from src.processing.arrrangement import Site, Madori, OrderedDict, create_madori_odict, arrange_rooms_in_rows, fill_corridor, process_large_corridors
+from src.processing.arrangement import Site, Madori, OrderedDict, create_madori_odict, arrange_rooms_in_rows, fill_corridor, process_large_corridors, arrange_rooms_with_constraints
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -119,10 +119,6 @@ def draw_grid_on_mask(
     mask_area[final_mask == 1] = fill_color
     cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
 
-    # グリッド間隔を固定(px=54)にする（9.1mm相当×5.93px/mm = 約54px）
-    cell_px = 54
-    grid_stats["cell_px"] = cell_px
-
     # バウンディングボックス情報を格納
     grid_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
@@ -130,15 +126,19 @@ def draw_grid_on_mask(
     x_end = x + w
     y_end = y + h
 
-    # 理論上のグリッドサイズ(単純に w,h を cell_px で割った数)
+    # グリッド間隔を固定(px=54)にする（9.1mm相当×5.93px/mm = 約54px）
+    cell_px = 54
+    grid_stats["cell_px"] = cell_px
+
+    # 実際のグリッドサイズを計算（実際に配置できるセル数）
     grid_cols = w // cell_px
     grid_rows = h // cell_px
-
+    
     # n+1本の線でn個のセルができるため、実際のセル数は線の数-1
     grid_lines_cols = grid_cols + 1  # 線の数
     grid_lines_rows = grid_rows + 1  # 線の数
-    actual_grid_cols = max(0, grid_cols)  # セル数 = 線の数-1
-    actual_grid_rows = max(0, grid_rows)  # セル数 = 線の数-1
+    actual_grid_cols = grid_cols  # セル数
+    actual_grid_rows = grid_rows  # セル数
 
     # グリッド情報を記録
     grid_stats["grid_lines"] = {"rows": grid_lines_rows, "cols": grid_lines_cols}  # 線の数
@@ -350,8 +350,11 @@ def draw_floorplan_on_mask(
     # UT（脱衣所）を追加し、L→D→K→E→UT→B→Tの順に配置
     order = ["L", "D", "K", "E", "UT", "B", "T"]
     
-    # 右上から整列配置
-    grid, positions = arrange_rooms_in_rows(grid, site, order)
+    # 右上から整列配置（旧方式）
+    # grid, positions = arrange_rooms_in_rows(grid, site, order)
+    
+    # 建築学的制約を考慮した配置（新方式）
+    grid, positions = arrange_rooms_with_constraints(grid, site, order)
     
     # 空きスペースを廊下(C)で埋める
     grid = fill_corridor(grid, corridor_code=7)
@@ -360,17 +363,26 @@ def draw_floorplan_on_mask(
     grid, new_rooms, new_room_count = process_large_corridors(grid, corridor_code=7, min_room_size=4)
     
     # 新しい部屋用の説明を準備
-    if 'descriptions' not in locals():
-        descriptions = {
-            'E': '玄関',
-            'L': 'リビング',
-            'D': 'ダイニング',
-            'K': 'キッチン',
-            'B': 'バスルーム',
-            'T': 'トイレ',
-            'UT': '脱衣所',  # 脱衣所の説明
-            'C': '廊下'
-        }
+    descriptions = {
+        'E': '玄関',
+        'L': 'リビング',
+        'D': 'ダイニング',
+        'K': 'キッチン',
+        'B': 'バスルーム',
+        'T': 'トイレ',
+        'UT': '脱衣所',  # 脱衣所の説明
+        'C': '廊下'
+    }
+    
+    # 新しい部屋の色と説明を準備
+    for i in range(1, new_room_count + 1):
+        room_name = f"R{i}"
+        colors[room_name] = (
+            random.randint(100, 200),
+            random.randint(100, 200),
+            random.randint(100, 200)
+        )
+        descriptions[room_name] = f'部屋{i}'
     
     # 新しい部屋を統計と表示用に追加
     for room_name, (room_y, room_x, height, width) in new_rooms.items():
@@ -393,12 +405,9 @@ def draw_floorplan_on_mask(
             "grid_y": grid_y
         }
         
-        # 色マッピングに追加 (ランダムな色)
+        # 色マッピングに追加
         colors[room_name] = (random.randint(100, 200), random.randint(100, 200), random.randint(100, 200))
-        
-        # 説明マッピングに追加
-        descriptions[room_name] = f'部屋{room_name[1:]}'
-    
+
     # 間取り情報と位置情報を統計情報に記録
     for madori_name, pos in positions.items():
         madori = madori_odict[madori_name]
@@ -808,6 +817,34 @@ def process_image(
         
         # 最終マスク = 遠い部分 + 近接部分(追加収縮済み)
         final_house = np.maximum(house_far, house_near_offset)
+        
+        # 旗竿部分を除去するための処理を追加
+        # マスクの連結成分を見つける
+        num_labels, labels = cv2.connectedComponents(final_house.astype(np.uint8))
+        
+        # 最大の連結成分のみを保持（これが主要な建物部分）
+        if num_labels > 1:
+            largest_label = 1  # 0はバックグラウンド
+            largest_size = 0
+            
+            for label in range(1, num_labels):
+                size = np.sum(labels == label)
+                if size > largest_size:
+                    largest_size = size
+                    largest_label = label
+            
+            # 主要部分のみのマスクを作成
+            final_house = (labels == largest_label).astype(np.uint8)
+        
+        # アスペクト比に基づいてさらにフィルタリング（旗竿部分は細長い）
+        contours, _ = cv2.findContours(final_house.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            x, y, w, h = cv2.boundingRect(contour)
+            aspect_ratio = max(w/h, h/w)
+            area = w * h
+            # アスペクト比が高すぎる（細長すぎる）部分を除去
+            if aspect_ratio > 5.0 and area < (final_house.shape[0] * final_house.shape[1]) * 0.2:
+                cv2.fillPoly(final_house, [contour], 0)
 
         # 最終マスク内だけにグリッド描画
         if np.sum(final_house) > 0:  # マスクが空でない場合
