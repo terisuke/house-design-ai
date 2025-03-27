@@ -33,6 +33,8 @@ runs/
 .venv
 venv/
 ENV/
+venv-py311/
+venv-py39/
 
 # IDE関連
 .idea/
