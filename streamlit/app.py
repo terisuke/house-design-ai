@@ -2,6 +2,7 @@
 """
 建物・道路セグメンテーションとグリッド生成のためのStreamlitアプリ
 (2025-03-12 修正版: A3横向き換算でマス目描画)
+(2025-03-27 修正版: FreeCADを使用したCAD風間取り図の生成機能を追加)
 """
 
 import streamlit as st
@@ -280,6 +281,20 @@ except ImportError as e:
     logger.error(error_msg)
     import_errors.append(error_msg)
 
+# CAD表示モジュールのインポート
+cad_display_available = False
+try:
+    from src.visualization.cad_display import (
+        display_cad_floorplan,
+        display_floorplan_details,
+        display_download_options
+    )
+    cad_display_available = True
+except ImportError as e:
+    error_msg = f"CAD表示モジュールのインポートに失敗しました: {e}"
+    logger.error(error_msg)
+    import_errors.append(error_msg)
+
 def load_yolo_model() -> None:
     """YOLOモデルをロード・初期化"""
     if "model" not in st.session_state or st.session_state.model is None:
@@ -297,21 +312,17 @@ def load_yolo_model() -> None:
                     bucket_name="yolo-v11-training",
                     blob_name="runs/segment/train_20250311-143512/weights/best.pt"
                 )
-                if model_path:
+                
+                if model_path and os.path.exists(model_path):
                     from ultralytics import YOLO
                     st.session_state.model = YOLO(model_path)
-                    st.success("クラウドストレージからモデルをロードしました")
+                    st.success(f"クラウドからモデルをダウンロードしました: {model_path}")
                 else:
-                    st.error("モデルのダウンロードに失敗しました")
-                    # デフォルトモデルを試す
-                    try:
-                        from ultralytics import YOLO
-                        st.session_state.model = YOLO("yolov8m-seg.pt")
-                        st.warning("デフォルトYOLOv8mセグメンテーションモデルを使用します")
-                    except Exception as e:
-                        st.error(f"デフォルトモデルのロードにも失敗: {e}")
+                    st.error("モデルのダウンロードに失敗しました。")
             except Exception as e:
-                st.error(f"モデルロードエラー: {e}")
+                st.error(f"モデルのダウンロード中にエラーが発生しました: {str(e)}")
+                logger.error(f"モデルダウンロードエラー: {e}")
+
 
 def main():
     """Streamlitアプリのメインエントリーポイント"""
@@ -366,9 +377,22 @@ def main():
     # 間取り表示モードの選択オプション
     floorplan_mode = st.sidebar.checkbox(
         "間取り表示モード",
-        value=False,
+        value=True,  # デフォルトでオン
         help="オンにすると、ランダムアルファベットの代わりに間取り（LDKなど）を表示します"
     )
+    
+    # CAD風表示のオプション
+    cad_style = st.sidebar.checkbox(
+        "CAD風表示",
+        value=True,  # デフォルトでオン
+        help="オンにすると、CAD風の間取り図を表示します"
+    )
+    
+    # CAD表示の詳細オプション
+    if cad_style and cad_display_available:
+        with st.sidebar.expander("CAD表示オプション"):
+            show_dimensions = st.checkbox("寸法情報を表示", value=True)
+            show_furniture = st.checkbox("家具・設備を表示", value=True)
 
     with st.sidebar.expander("ヘルプ"):
         st.markdown("""
@@ -377,6 +401,7 @@ def main():
         - **道路以外の領域のオフセット(px)**: その他の住居境界から内側に何ピクセル収縮するか
         - **グリッド間隔(mm)**: A3横420mm図面での紙上のマス目サイズ(例: 9.1mm = 実物910mmの1/100)
         - **間取り表示モード**: オンにすると、ランダムアルファベットの代わりにLDK等の間取りを配置します
+        - **CAD風表示**: オンにすると、FreeCADを使用したCAD風の間取り図を表示します
         """)
 
     # モデルロード
@@ -439,17 +464,39 @@ def main():
                                 },
                                 "note": "基本デバッグ情報のみ（旧バージョンのprocess_image関数使用中）"
                             }
+                        
+                        # CAD風表示が有効で、CAD表示モジュールが利用可能な場合
+                        if cad_style and cad_display_available and floorplan_mode:
+                            # 通常の結果画像を表示
+                            st.image(result_image, use_column_width=True, caption="標準表示")
                             
-                        st.image(result_image, use_column_width=True)
-
-                        buf = io.BytesIO()
-                        result_image.save(buf, format="PNG")
-                        st.download_button(
-                            label="結果をダウンロード",
-                            data=buf.getvalue(),
-                            file_name="result.png",
-                            mime="image/png"
-                        )
+                            # CAD風の間取り図を表示
+                            st.subheader("CAD風間取り図")
+                            display_cad_floorplan(
+                                result_image, 
+                                debug_info, 
+                                show_dimensions=show_dimensions, 
+                                show_furniture=show_furniture
+                            )
+                            
+                            # 間取り詳細情報を表示
+                            display_floorplan_details(debug_info)
+                            
+                            # ダウンロードオプションを表示
+                            display_download_options(result_image, debug_info)
+                        else:
+                            # 通常の結果画像を表示
+                            st.image(result_image, use_column_width=True)
+                            
+                            # 通常のダウンロードボタン
+                            buf = io.BytesIO()
+                            result_image.save(buf, format="PNG")
+                            st.download_button(
+                                label="結果をダウンロード",
+                                data=buf.getvalue(),
+                                file_name="result.png",
+                                mime="image/png"
+                            )
                         
                         # デバッグ情報のセクション
                         
@@ -464,8 +511,8 @@ def main():
                             grid_stats = debug_info.get("grid_stats", {}) or {}
                             cells_drawn = grid_stats.get("cells_drawn", "不明")
                         
-                        # 間取りモードの場合は間取り情報を表示
-                        if floorplan_mode and debug_info is not None:
+                        # 間取りモードの場合は間取り情報を表示（CAD風表示が無効の場合のみ）
+                        if floorplan_mode and debug_info is not None and not (cad_style and cad_display_available):
                             madori_info = debug_info.get("madori_info", {})
                             if madori_info:
                                 st.subheader("間取り情報")
@@ -498,76 +545,47 @@ def main():
                                 if madori_data:
                                     import pandas as pd
                                     df = pd.DataFrame(madori_data)
-                                    st.table(df)
+                                    st.dataframe(df)
                         
-                        # ここで「実際に描画されたマス目数」を「マス目数」として表示
-                        st.write(f"**マス目数**: {cells_drawn}")
-                        
-                        # グリッドサイズと床面積の計算
-                        actual_grid_rows = grid_stats.get("actual_grid_rows")
-                        actual_grid_cols = grid_stats.get("actual_grid_cols")
-                        
-                        # バウンディングボックスから行数・列数を推定（actual_grid_rows/colsがない場合）
-                        if actual_grid_rows is None and actual_grid_cols is None and debug_info is not None:
-                            if debug_info.get("bounding_box") and debug_info.get("cell_px"):
-                                bbox = debug_info.get("bounding_box", {})
-                                cell_px = debug_info.get("cell_px")
-                                if bbox and cell_px and cell_px > 0:
-                                    actual_grid_rows = bbox.get("height", 0) // cell_px
-                                    actual_grid_cols = bbox.get("width", 0) // cell_px
-                        
-                        if (actual_grid_rows is not None) and (actual_grid_cols is not None):
-                            st.write(f"**グリッドサイズ**: {actual_grid_rows} 行 × {actual_grid_cols} 列")
-                        else:
-                            # グリッドを最終的に何行何列描いたかを
-                            # まとめていない実装の場合は推測不可なので「(不明)」を表示
-                            st.write("**グリッドサイズ**: 不明(行×列)")
+                        # 詳細デバッグ情報（エキスパートモード）
+                        with st.expander("詳細デバッグ情報"):
+                            st.json(debug_info)
                             
-                        # 床面積計算
-                        one_cell_area_m2 = 0.91 * 0.91  # = 0.8281
-                        if floorplan_mode and debug_info is not None:
-                            # 間取りモードの場合
-                            madori_info = debug_info.get("madori_info", {})
-                            total_area_m2 = 0
+                            # 処理パラメータ
+                            st.subheader("処理パラメータ")
+                            params = debug_info.get("params", {})
+                            st.write(f"- 道路近接領域オフセット: {params.get('road_setback_mm', '不明')}mm")
+                            st.write(f"- その他領域オフセット: {params.get('global_setback_mm', '不明')}mm")
+                            st.write(f"- グリッド間隔: {params.get('grid_mm', '不明')}mm")
+                            st.write(f"- 間取りモード: {'有効' if params.get('floorplan_mode', False) else '無効'}")
                             
-                            for madori_name, info in madori_info.items():
-                                width = info.get('width', 0)
-                                height = info.get('height', 0)
-                                area = width * height * one_cell_area_m2
-                                total_area_m2 += area
-                                
-                            if total_area_m2 > 0:
-                                st.write(f"**合計床面積**: 約 {total_area_m2:.2f} m² (910mmグリッド換算)")
-                            else:
-                                st.write("**床面積**: 面積計算不可")
-                        elif isinstance(cells_drawn, int) and cells_drawn > 0:
-                            # 通常のグリッドモードの場合
-                            total_area_m2 = cells_drawn * one_cell_area_m2
-                            st.write(f"**床面積**: 約 {total_area_m2:.2f} m² (910mmグリッド換算)")
-                        else:
-                            st.write("**床面積**: 面積計算不可")
-                        
-                        # メタデータ(JSON)
-                        with st.expander("デバッグ情報 (JSON)"):
-                            if debug_info is not None:
-                                st.json(debug_info)
-                            else:
-                                st.write("デバッグ情報が利用できません")
-                    else:
-                        st.error("画像の処理に失敗しました。別の画像を試してください。")
+                            # 画像サイズ情報
+                            st.subheader("画像サイズ情報")
+                            original_size = debug_info.get("original_size", {})
+                            image_size = debug_info.get("image_size", {})
+                            st.write(f"- 元画像: {original_size.get('width_px', '不明')}px × {original_size.get('height_px', '不明')}px")
+                            st.write(f"- 処理画像: {image_size.get('width_px', '不明')}px × {image_size.get('height_px', '不明')}px")
+                            
+                            # グリッド情報
+                            st.subheader("グリッド情報")
+                            st.write(f"- 描画セル数: {cells_drawn}")
+                            st.write(f"- スキップセル数: {grid_stats.get('cells_skipped', '不明')}")
+                            st.write(f"- マスク外理由: {grid_stats.get('reason_not_in_mask', '不明')}")
+                            
                 except Exception as e:
-                    st.error(f"画像処理中にエラー: {str(e)}")
-                    logger.error(f"画像処理エラー: {e}")
+                    st.error(f"画像処理中にエラーが発生しました: {str(e)}")
+                    logger.exception(f"画像処理エラー: {e}")
+                    
+        # フッター
+        st.markdown(
+            """
+            <div class="footer">
+                © 2025 U-DAKE - 土地画像から間取りを生成するAIツール
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    # フッターの追加
-    st.markdown(
-        """
-        <div class="footer" style="font-size: 24px; font-weight: bold;">
-            U-DAKE (©2025)
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
 
 if __name__ == "__main__":
     main()
