@@ -1,7 +1,13 @@
 #!/bin/bash
 
+# スクリプトのディレクトリを取得
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
 # 依存関係の更新スクリプト
 echo "依存関係の更新を開始します..."
+echo "プロジェクトルート: $PROJECT_ROOT"
 
 # 仮想環境のアクティベート
 if [ -d "venv-py311" ]; then
@@ -20,12 +26,12 @@ python -m pip install --upgrade pip
 
 # 依存関係の更新
 echo "依存関係を更新しています..."
-pip install -r requirements.txt
+pip install -r "$PROJECT_ROOT/requirements.txt"
 
 # 開発用依存関係の更新（存在する場合）
-if [ -f "requirements-dev.txt" ]; then
+if [ -f "$PROJECT_ROOT/requirements-dev.txt" ]; then
     echo "開発用依存関係を更新しています..."
-    pip install -r requirements-dev.txt
+    pip install -r "$PROJECT_ROOT/requirements-dev.txt"
 fi
 
 # 依存関係の状態を確認
