@@ -402,7 +402,7 @@ def convert_to_2d_drawing(fcstd_file_path: str) -> Optional[str]:
         if response.status_code == 200:
             result = response.json()
             logger.info(f"FreeCAD API 2D conversion response: {result}")
-            return result.get("file_url")
+            return result.get("public_url")
         else:
             logger.error(f"FreeCAD API 2D conversion error: {response.text}")
             return None
@@ -673,13 +673,80 @@ def main():
                                             st.success("3Dモデルの生成に成功しました")
                                             st.info(f"モデルURL: {cad_model_url}")
 
-                                            # 2D図面の生成
-                                            if st.button("2D図面を生成"):
-                                                with st.spinner("2D図面を生成中..."):
-                                                    # TODO: FreeCADファイルをダウンロードして2D図面に変換
-                                                    # 現在はダミーの処理
-                                                    st.info(
-                                                        "2D図面の生成機能は準備中です"
+                                            # 3Dモデルをダウンロード
+                                            with st.spinner(
+                                                "3Dモデルをダウンロード中..."
+                                            ):
+                                                try:
+                                                    # Cloud Storageからファイルをダウンロード
+                                                    bucket_name = os.environ.get(
+                                                        "BUCKET_NAME",
+                                                        "house-design-ai-data",
+                                                    )
+                                                    file_name = cad_model_url.split(
+                                                        "/"
+                                                    )[-1]
+
+                                                    # 一時ファイルとして保存
+                                                    with tempfile.NamedTemporaryFile(
+                                                        suffix=".fcstd", delete=False
+                                                    ) as temp_file:
+                                                        temp_file_path = temp_file.name
+
+                                                    # Google Cloud Storageからダウンロード
+                                                    from google.cloud import storage
+
+                                                    storage_client = storage.Client()
+                                                    bucket = storage_client.bucket(
+                                                        bucket_name
+                                                    )
+                                                    blob = bucket.blob(
+                                                        f"cad_models/{file_name}"
+                                                    )
+                                                    blob.download_to_filename(
+                                                        temp_file_path
+                                                    )
+
+                                                    # 2D図面の生成
+                                                    if st.button("2D図面を生成"):
+                                                        with st.spinner(
+                                                            "2D図面を生成中..."
+                                                        ):
+                                                            # FreeCAD APIに2D変換をリクエスト
+                                                            drawing_url = (
+                                                                convert_to_2d_drawing(
+                                                                    temp_file_path
+                                                                )
+                                                            )
+
+                                                            if drawing_url:
+                                                                st.success(
+                                                                    "2D図面の生成に成功しました"
+                                                                )
+                                                                st.info(
+                                                                    f"図面URL: {drawing_url}"
+                                                                )
+
+                                                                # 図面を表示
+                                                                st.markdown(
+                                                                    f"### 2D図面"
+                                                                )
+                                                                st.markdown(
+                                                                    f"![2D図面]({drawing_url})"
+                                                                )
+                                                            else:
+                                                                st.error(
+                                                                    "2D図面の生成に失敗しました"
+                                                                )
+
+                                                    # 一時ファイルを削除
+                                                    os.unlink(temp_file_path)
+                                                except Exception as e:
+                                                    st.error(
+                                                        f"3Dモデルのダウンロード中にエラーが発生しました: {str(e)}"
+                                                    )
+                                                    logger.error(
+                                                        f"3Dモデルダウンロードエラー: {e}"
                                                     )
                                         else:
                                             st.error("3Dモデルの生成に失敗しました")
