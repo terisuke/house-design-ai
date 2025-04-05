@@ -26,6 +26,22 @@ module "streamlit_service" {
   allow_unauthenticated = true
 }
 
+# FreeCAD API サービス
+module "freecad_api_service" {
+  source = "../../modules/cloud-run"
+
+  project_id            = var.project_id
+  region                = var.region
+  service_name          = "freecad-api"
+  image                 = var.freecad_api_image
+  memory                = "2Gi"
+  cpu                   = "2"
+  allow_unauthenticated = false
+  environment_variables = {
+    BUCKET_NAME = module.storage.bucket_name
+  }
+}
+
 # Cloud Storage バケット
 module "storage" {
   source = "../../modules/cloud-storage"
@@ -42,4 +58,4 @@ module "artifact_registry" {
   project_id    = var.project_id
   location      = var.region
   repository_id = "house-design-ai"
-} 
+}
