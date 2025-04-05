@@ -3,17 +3,22 @@
 建物・道路セグメンテーションとグリッド生成のためのStreamlitアプリ
 (2025-03-12 修正版: A3横向き換算でマス目描画)
 (2025-03-27 修正版: FreeCADを使用したCAD風間取り図の生成機能を追加)
+(2025-04-05 修正版: FreeCAD APIとの連携機能を追加)
 """
 
-import streamlit as st
-import os
-import tempfile
-import io
-from typing import Optional, Tuple, Dict, Any, Union
-from pathlib import Path
-import logging
-import sys
 import base64
+import io
+import json
+import logging
+import os
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, Union
+
+import requests
+
+import streamlit as st
 
 # ロギング設定を最初に行う
 logging.basicConfig(level=logging.INFO)
@@ -21,11 +26,9 @@ logger = logging.getLogger("streamlit-app")
 
 # アプリの設定（必ず最初のStreamlitコマンドにする）
 st.set_page_config(
-    page_title="U-DAKE",
-    page_icon="🏠",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="U-DAKE", page_icon="🏠", layout="wide", initial_sidebar_state="expanded"
 )
+
 
 # カスタムCSSでアプリのスタイルを設定
 def apply_custom_css():
@@ -236,11 +239,12 @@ def apply_custom_css():
     """
     st.markdown(css, unsafe_allow_html=True)
 
+
 # 画像を表示する関数
 def display_logo():
     """サイドバーにロゴを表示"""
     logo_path = Path(__file__).parent / "logo.png"
-    
+
     if logo_path.exists():
         with open(logo_path, "rb") as f:
             data = f.read()
@@ -255,6 +259,7 @@ def display_logo():
         st.sidebar.warning("ロゴファイル (logo.png) が見つかりません。")
         logger.warning(f"ロゴファイル不見: {logo_path}")
 
+
 # プロジェクトルートをPythonパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -264,6 +269,7 @@ import_errors = []
 
 try:
     import cv2
+
     cv2_available = True
 except ImportError as e:
     error_msg = f"OpenCVのインポートに失敗しました: {e}"
@@ -275,6 +281,7 @@ modules_available = False
 try:
     from src.cloud.storage import download_model_from_gcs
     from src.processing.mask import process_image
+
     modules_available = True
 except ImportError as e:
     error_msg = f"モジュールのインポートに失敗しました: {e}"
@@ -286,14 +293,16 @@ cad_display_available = False
 try:
     from src.visualization.cad_display import (
         display_cad_floorplan,
+        display_download_options,
         display_floorplan_details,
-        display_download_options
     )
+
     cad_display_available = True
 except ImportError as e:
     error_msg = f"CAD表示モジュールのインポートに失敗しました: {e}"
     logger.error(error_msg)
     import_errors.append(error_msg)
+
 
 def load_yolo_model() -> None:
     """YOLOモデルをロード・初期化"""
@@ -303,6 +312,7 @@ def load_yolo_model() -> None:
 
         if model_path and os.path.exists(model_path):
             from ultralytics import YOLO
+
             st.session_state.model = YOLO(model_path)
             st.success(f"ローカルモデルをロードしました: {model_path}")
         else:
@@ -310,13 +320,16 @@ def load_yolo_model() -> None:
             try:
                 model_path = download_model_from_gcs(
                     bucket_name="yolo-v11-training",
-                    blob_name="runs/segment/train_20250311-143512/weights/best.pt"
+                    blob_name="runs/segment/train_20250311-143512/weights/best.pt",
                 )
-                
+
                 if model_path and os.path.exists(model_path):
                     from ultralytics import YOLO
+
                     st.session_state.model = YOLO(model_path)
-                    st.success(f"クラウドからモデルをダウンロードしました: {model_path}")
+                    st.success(
+                        f"クラウドからモデルをダウンロードしました: {model_path}"
+                    )
                 else:
                     st.error("モデルのダウンロードに失敗しました。")
             except Exception as e:
@@ -324,24 +337,102 @@ def load_yolo_model() -> None:
                 logger.error(f"モデルダウンロードエラー: {e}")
 
 
+# FreeCAD APIとの連携機能
+def send_to_freecad_api(grid_data: Dict[str, Any]) -> Optional[str]:
+    """
+    グリッドデータをFreeCAD APIに送信し、CADモデルを生成する
+
+    Args:
+        grid_data: グリッドデータ
+
+    Returns:
+        Optional[str]: 生成されたCADモデルのURL、エラー時はNone
+    """
+    try:
+        # FreeCAD APIのエンドポイント
+        api_url = os.environ.get("FREECAD_API_URL", "http://freecad-api:8000")
+
+        # グリッドデータをJSON形式に変換
+        grid_json = json.dumps(grid_data)
+
+        # 一時ファイルとして保存
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
+            temp_file.write(grid_json.encode())
+            temp_file_path = temp_file.name
+
+        # FreeCAD APIにリクエスト送信
+        with open(temp_file_path, "rb") as f:
+            files = {"file": ("grid_data.json", f, "application/json")}
+            response = requests.post(f"{api_url}/process/grid", files=files)
+
+        # 一時ファイルを削除
+        os.unlink(temp_file_path)
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"FreeCAD API response: {result}")
+            return result.get("file_url")
+        else:
+            logger.error(f"FreeCAD API error: {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"FreeCAD API request error: {str(e)}")
+        return None
+
+
+def convert_to_2d_drawing(fcstd_file_path: str) -> Optional[str]:
+    """
+    FreeCADファイルを2D図面に変換する
+
+    Args:
+        fcstd_file_path: FreeCADファイルのパス
+
+    Returns:
+        Optional[str]: 生成された2D図面のURL、エラー時はNone
+    """
+    try:
+        # FreeCAD APIのエンドポイント
+        api_url = os.environ.get("FREECAD_API_URL", "http://freecad-api:8000")
+
+        # FreeCAD APIにリクエスト送信
+        with open(fcstd_file_path, "rb") as f:
+            files = {"file": ("model.fcstd", f, "application/octet-stream")}
+            response = requests.post(f"{api_url}/convert/2d", files=files)
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"FreeCAD API 2D conversion response: {result}")
+            return result.get("file_url")
+        else:
+            logger.error(f"FreeCAD API 2D conversion error: {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"FreeCAD API 2D conversion request error: {str(e)}")
+        return None
+
+
 def main():
     """Streamlitアプリのメインエントリーポイント"""
-    
+
     # カスタムCSSを適用
     apply_custom_css()
-    
+
     # ロゴを表示
     display_logo()
-    
+
     # インポートエラーがあればここで表示
     if import_errors:
         st.error("### システムライブラリエラー")
         for error in import_errors:
             st.error(error)
-        st.error("アプリケーションの依存関係が正しくインストールされていません。管理者に連絡してください。")
-        st.info("必要なライブラリ: libgl1-mesa-glx, libglib2.0-0, opencv-python-headless等")
+        st.error(
+            "アプリケーションの依存関係が正しくインストールされていません。管理者に連絡してください。"
+        )
+        st.info(
+            "必要なライブラリ: libgl1-mesa-glx, libglib2.0-0, opencv-python-headless等"
+        )
         return  # 重大なエラーなので、ここで処理を中断
-        
+
     st.title("土地画像アップロード")
 
     # ──────────────────────────────────────────────
@@ -355,39 +446,39 @@ def main():
         min_value=0,
         max_value=5000,
         value=295,  # 元の値に戻す
-        step=10
+        step=10,
     )
 
     offset_far = st.sidebar.number_input(
         "道路以外の領域のオフセット(px)",  # 元のラベルに戻す
         min_value=0,
         max_value=5000,
-        value=30,   # 元の値に戻す
-        step=10
+        value=30,  # 元の値に戻す
+        step=10,
     )
 
     grid_mm = st.sidebar.number_input(
         "グリッド間隔(mm)",  # 元のラベルに戻す
         min_value=0.1,
         max_value=100.0,
-        value=9.1,   # 元の値に戻す
-        step=0.1
+        value=9.1,  # 元の値に戻す
+        step=0.1,
     )
-    
+
     # 間取り表示モードの選択オプション
     floorplan_mode = st.sidebar.checkbox(
         "間取り表示モード",
         value=True,  # デフォルトでオン
-        help="オンにすると、ランダムアルファベットの代わりに間取り（LDKなど）を表示します"
+        help="オンにすると、ランダムアルファベットの代わりに間取り（LDKなど）を表示します",
     )
-    
+
     # CAD風表示のオプション
     cad_style = st.sidebar.checkbox(
         "CAD風表示",
         value=True,  # デフォルトでオン
-        help="オンにすると、CAD風の間取り図を表示します"
+        help="オンにすると、CAD風の間取り図を表示します",
     )
-    
+
     # CAD表示の詳細オプション
     if cad_style and cad_display_available:
         with st.sidebar.expander("CAD表示オプション"):
@@ -395,14 +486,16 @@ def main():
             show_furniture = st.checkbox("家具・設備を表示", value=True)
 
     with st.sidebar.expander("ヘルプ"):
-        st.markdown("""
+        st.markdown(
+            """
         ### パラメータ説明
         - **道路近接領域のオフセット(px)**: 道路に近い住居境界から内側に何ピクセル収縮するか
         - **道路以外の領域のオフセット(px)**: その他の住居境界から内側に何ピクセル収縮するか
         - **グリッド間隔(mm)**: A3横420mm図面での紙上のマス目サイズ(例: 9.1mm = 実物910mmの1/100)
         - **間取り表示モード**: オンにすると、ランダムアルファベットの代わりにLDK等の間取りを配置します
         - **CAD風表示**: オンにすると、FreeCADを使用したCAD風の間取り図を表示します
-        """)
+        """
+        )
 
     # モデルロード
     with st.spinner("モデルをロード中..."):
@@ -414,8 +507,7 @@ def main():
 
     # 画像アップロード
     uploaded_file = st.file_uploader(
-        "建物・道路が写った画像を選択",
-        type=["jpg", "jpeg", "png"]
+        "建物・道路が写った画像を選択", type=["jpg", "jpeg", "png"]
     )
 
     if uploaded_file:
@@ -435,7 +527,7 @@ def main():
             with st.spinner("画像を処理中..."):
                 try:
                     actual_near_offset_px = offset_near  # px扱い
-                    actual_far_offset_px = offset_far    # px扱い
+                    actual_far_offset_px = offset_far  # px扱い
                     actual_grid_mm = grid_mm
 
                     process_result = process_image(
@@ -444,11 +536,14 @@ def main():
                         near_offset_px=actual_near_offset_px,
                         far_offset_px=actual_far_offset_px,
                         grid_mm=actual_grid_mm,
-                        floorplan_mode=floorplan_mode
+                        floorplan_mode=floorplan_mode,
                     )
-                    
+
                     if process_result:
-                        if isinstance(process_result, tuple) and len(process_result) == 2:
+                        if (
+                            isinstance(process_result, tuple)
+                            and len(process_result) == 2
+                        ):
                             result_image, debug_info = process_result
                         else:
                             result_image = process_result
@@ -456,38 +551,40 @@ def main():
                                 "params": {
                                     "near_offset_px": actual_near_offset_px,
                                     "far_offset_px": actual_far_offset_px,
-                                    "grid_mm": actual_grid_mm
+                                    "grid_mm": actual_grid_mm,
                                 },
                                 "image_size": {
                                     "width_px": result_image.width,
-                                    "height_px": result_image.height
+                                    "height_px": result_image.height,
                                 },
-                                "note": "基本デバッグ情報のみ（旧バージョンのprocess_image関数使用中）"
+                                "note": "基本デバッグ情報のみ（旧バージョンのprocess_image関数使用中）",
                             }
-                        
+
                         # CAD風表示が有効で、CAD表示モジュールが利用可能な場合
                         if cad_style and cad_display_available and floorplan_mode:
                             # 通常の結果画像を表示
-                            st.image(result_image, use_column_width=True, caption="標準表示")
-                            
+                            st.image(
+                                result_image, use_column_width=True, caption="標準表示"
+                            )
+
                             # CAD風の間取り図を表示
                             st.subheader("CAD風間取り図")
                             display_cad_floorplan(
-                                result_image, 
-                                debug_info, 
-                                show_dimensions=show_dimensions, 
-                                show_furniture=show_furniture
+                                result_image,
+                                debug_info,
+                                show_dimensions=show_dimensions,
+                                show_furniture=show_furniture,
                             )
-                            
+
                             # 間取り詳細情報を表示
                             display_floorplan_details(debug_info)
-                            
+
                             # ダウンロードオプションを表示
                             display_download_options(result_image, debug_info)
                         else:
                             # 通常の結果画像を表示
                             st.image(result_image, use_column_width=True)
-                            
+
                             # 通常のダウンロードボタン
                             buf = io.BytesIO()
                             result_image.save(buf, format="PNG")
@@ -495,87 +592,143 @@ def main():
                                 label="結果をダウンロード",
                                 data=buf.getvalue(),
                                 file_name="result.png",
-                                mime="image/png"
+                                mime="image/png",
                             )
-                        
+
                         # デバッグ情報のセクション
-                        
+
                         # ──────────────────────────────────────────────
                         # デバッグ情報の安全な取得 (NoneTypeエラー対策)
                         # ──────────────────────────────────────────────
                         # debug_infoがNone、またはgrid_statsキーがない場合に備える
                         grid_stats = {}
                         cells_drawn = "不明"
-                        
+
                         if debug_info is not None:
                             grid_stats = debug_info.get("grid_stats", {}) or {}
                             cells_drawn = grid_stats.get("cells_drawn", "不明")
-                        
+
                         # 間取りモードの場合は間取り情報を表示（CAD風表示が無効の場合のみ）
-                        if floorplan_mode and debug_info is not None and not (cad_style and cad_display_available):
+                        if (
+                            floorplan_mode
+                            and debug_info is not None
+                            and not (cad_style and cad_display_available)
+                        ):
                             madori_info = debug_info.get("madori_info", {})
                             if madori_info:
                                 st.subheader("間取り情報")
                                 madori_descriptions = {
-                                    'E': '玄関',
-                                    'L': 'リビング',
-                                    'D': 'ダイニング',
-                                    'K': 'キッチン',
-                                    'B': 'バスルーム',
-                                    'T': 'トイレ',
-                                    'UT': '脱衣所',
+                                    "E": "玄関",
+                                    "L": "リビング",
+                                    "D": "ダイニング",
+                                    "K": "キッチン",
+                                    "B": "バスルーム",
+                                    "T": "トイレ",
+                                    "UT": "脱衣所",
                                 }
-                                
+
                                 # 間取りデータをテーブル形式で表示
                                 madori_data = []
                                 for madori_name, info in madori_info.items():
-                                    description = madori_descriptions.get(madori_name, '')
-                                    width = info.get('width', 0)
-                                    height = info.get('height', 0)
-                                    area = width * height * 0.91 * 0.91  # 1グリッド = 0.91m x 0.91m
-                                    madori_data.append({
-                                        "記号": madori_name,
-                                        "名称": description,
-                                        "幅": f"{width}マス",
-                                        "高さ": f"{height}マス",
-                                        "床面積": f"{area:.2f}㎡"
-                                    })
-                                
+                                    description = madori_descriptions.get(
+                                        madori_name, ""
+                                    )
+                                    width = info.get("width", 0)
+                                    height = info.get("height", 0)
+                                    area = (
+                                        width * height * 0.91 * 0.91
+                                    )  # 1グリッド = 0.91m x 0.91m
+                                    madori_data.append(
+                                        {
+                                            "記号": madori_name,
+                                            "名称": description,
+                                            "幅": f"{width}マス",
+                                            "高さ": f"{height}マス",
+                                            "床面積": f"{area:.2f}㎡",
+                                        }
+                                    )
+
                                 # DataFrameに変換して表示
                                 if madori_data:
                                     import pandas as pd
+
                                     df = pd.DataFrame(madori_data)
                                     st.dataframe(df)
-                        
+
+                                # FreeCAD APIとの連携
+                                st.subheader("CADモデル生成")
+                                if st.button("3Dモデルを生成"):
+                                    with st.spinner("3Dモデルを生成中..."):
+                                        # グリッドデータを準備
+                                        grid_data = {
+                                            "grid": grid_data,
+                                            "madori_info": madori_info,
+                                            "params": debug_info.get("params", {}),
+                                        }
+
+                                        # FreeCAD APIに送信
+                                        cad_model_url = send_to_freecad_api(grid_data)
+
+                                        if cad_model_url:
+                                            st.success("3Dモデルの生成に成功しました")
+                                            st.info(f"モデルURL: {cad_model_url}")
+
+                                            # 2D図面の生成
+                                            if st.button("2D図面を生成"):
+                                                with st.spinner("2D図面を生成中..."):
+                                                    # TODO: FreeCADファイルをダウンロードして2D図面に変換
+                                                    # 現在はダミーの処理
+                                                    st.info(
+                                                        "2D図面の生成機能は準備中です"
+                                                    )
+                                        else:
+                                            st.error("3Dモデルの生成に失敗しました")
+
                         # 詳細デバッグ情報（エキスパートモード）
                         with st.expander("詳細デバッグ情報"):
                             st.json(debug_info)
-                            
+
                             # 処理パラメータ
                             st.subheader("処理パラメータ")
                             params = debug_info.get("params", {})
-                            st.write(f"- 道路近接領域オフセット: {params.get('road_setback_mm', '不明')}mm")
-                            st.write(f"- その他領域オフセット: {params.get('global_setback_mm', '不明')}mm")
-                            st.write(f"- グリッド間隔: {params.get('grid_mm', '不明')}mm")
-                            st.write(f"- 間取りモード: {'有効' if params.get('floorplan_mode', False) else '無効'}")
-                            
+                            st.write(
+                                f"- 道路近接領域オフセット: {params.get('road_setback_mm', '不明')}mm"
+                            )
+                            st.write(
+                                f"- その他領域オフセット: {params.get('global_setback_mm', '不明')}mm"
+                            )
+                            st.write(
+                                f"- グリッド間隔: {params.get('grid_mm', '不明')}mm"
+                            )
+                            st.write(
+                                f"- 間取りモード: {'有効' if params.get('floorplan_mode', False) else '無効'}"
+                            )
+
                             # 画像サイズ情報
                             st.subheader("画像サイズ情報")
                             original_size = debug_info.get("original_size", {})
                             image_size = debug_info.get("image_size", {})
-                            st.write(f"- 元画像: {original_size.get('width_px', '不明')}px × {original_size.get('height_px', '不明')}px")
-                            st.write(f"- 処理画像: {image_size.get('width_px', '不明')}px × {image_size.get('height_px', '不明')}px")
-                            
+                            st.write(
+                                f"- 元画像: {original_size.get('width_px', '不明')}px × {original_size.get('height_px', '不明')}px"
+                            )
+                            st.write(
+                                f"- 処理画像: {image_size.get('width_px', '不明')}px × {image_size.get('height_px', '不明')}px"
+                            )
+
                             # グリッド情報
                             st.subheader("グリッド情報")
                             st.write(f"- 描画セル数: {cells_drawn}")
-                            st.write(f"- スキップセル数: {grid_stats.get('cells_skipped', '不明')}")
-                            st.write(f"- マスク外理由: {grid_stats.get('reason_not_in_mask', '不明')}")
-                            
+                            st.write(
+                                f"- スキップセル数: {grid_stats.get('cells_skipped', '不明')}"
+                            )
+                            st.write(
+                                f"- マスク外理由: {grid_stats.get('reason_not_in_mask', '不明')}"
+                            )
+
                 except Exception as e:
                     st.error(f"画像処理中にエラーが発生しました: {str(e)}")
                     logger.exception(f"画像処理エラー: {e}")
-                    
+
         # フッター
         st.markdown(
             """
@@ -583,7 +736,7 @@ def main():
                 © 2025 U-DAKE - 土地画像から間取りを生成するAIツール
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
 
