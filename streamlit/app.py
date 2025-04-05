@@ -14,15 +14,26 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import requests
+from ultralytics import YOLO
 
 import streamlit as st
+from src.cloud.storage import CloudStorage
 
 # ロギング設定を最初に行う
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("streamlit-app")
+
+__all__ = [
+    "process_image",
+    "load_yolo_model",
+    "generate_grid",
+    "send_to_freecad_api",
+    "convert_to_2d_drawing",
+]
 
 # アプリの設定（必ず最初のStreamlitコマンドにする）
 st.set_page_config(
@@ -304,110 +315,142 @@ except ImportError as e:
     import_errors.append(error_msg)
 
 
-def load_yolo_model() -> None:
-    """YOLOモデルをロード・初期化"""
-    if "model" not in st.session_state or st.session_state.model is None:
-        # 環境変数からモデルパスをチェック
-        model_path = os.environ.get("YOLO_MODEL_PATH")
-
-        if model_path and os.path.exists(model_path):
-            from ultralytics import YOLO
-
-            st.session_state.model = YOLO(model_path)
-            st.success(f"ローカルモデルをロードしました: {model_path}")
-        else:
-            # Google Cloud Storageからモデルをダウンロード
-            try:
-                model_path = download_model_from_gcs(
-                    bucket_name="yolo-v11-training",
-                    blob_name="runs/segment/train_20250311-143512/weights/best.pt",
-                )
-
-                if model_path and os.path.exists(model_path):
-                    from ultralytics import YOLO
-
-                    st.session_state.model = YOLO(model_path)
-                    st.success(
-                        f"クラウドからモデルをダウンロードしました: {model_path}"
-                    )
-                else:
-                    st.error("モデルのダウンロードに失敗しました。")
-            except Exception as e:
-                st.error(f"モデルのダウンロード中にエラーが発生しました: {str(e)}")
-                logger.error(f"モデルダウンロードエラー: {e}")
-
-
-# FreeCAD APIとの連携機能
-def send_to_freecad_api(grid_data: Dict[str, Any]) -> Optional[str]:
-    """
-    グリッドデータをFreeCAD APIに送信し、CADモデルを生成する
+def load_yolo_model(model_path: Optional[str] = None) -> YOLO:
+    """YOLOモデルを読み込む
 
     Args:
-        grid_data: グリッドデータ
+        model_path (Optional[str]): モデルファイルのパス。Noneの場合はCloud Storageからダウンロード
 
     Returns:
-        Optional[str]: 生成されたCADモデルのURL、エラー時はNone
+        YOLO: 読み込まれたYOLOモデル
+    """
+    if model_path is None:
+        storage = CloudStorage()
+        model_path = storage.download_model()
+
+    return YOLO(model_path)
+
+
+def process_image(model: YOLO, image_path: str) -> List[Dict[str, Any]]:
+    """画像を処理して建物を検出する
+
+    Args:
+        model (YOLO): YOLOモデル
+        image_path (str): 画像ファイルのパス
+
+    Returns:
+        List[Dict[str, Any]]: 検出された建物のリスト
+    """
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"画像ファイルが見つかりません: {image_path}")
+
+    results = model.predict(image_path, conf=0.25)
+    buildings = []
+
+    for result in results:
+        for box in result.boxes.data:
+            x1, y1, x2, y2, conf, cls = box.tolist()
+            buildings.append(
+                {"bbox": [x1, y1, x2, y2], "confidence": conf, "class": int(cls)}
+            )
+
+    return buildings
+
+
+def generate_grid(buildings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """建物データからグリッドを生成する
+
+    Args:
+        buildings (List[Dict[str, Any]]): 検出された建物のリスト
+
+    Returns:
+        Dict[str, Any]: 生成されたグリッドデータ
+    """
+    grid = {"rooms": [], "walls": []}
+
+    for i, building in enumerate(buildings):
+        bbox = building["bbox"]
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+
+        # 部屋を追加
+        room = {
+            "id": i + 1,
+            "dimensions": [width, height],
+            "position": [bbox[0], bbox[1]],
+            "label": f"Room {i + 1}",
+        }
+        grid["rooms"].append(room)
+
+        # 壁を追加
+        walls = [
+            {
+                "start": [bbox[0], bbox[1]],
+                "end": [bbox[2], bbox[1]],
+                "height": 2.5,
+            },  # 上壁
+            {
+                "start": [bbox[2], bbox[1]],
+                "end": [bbox[2], bbox[3]],
+                "height": 2.5,
+            },  # 右壁
+            {
+                "start": [bbox[2], bbox[3]],
+                "end": [bbox[0], bbox[3]],
+                "height": 2.5,
+            },  # 下壁
+            {
+                "start": [bbox[0], bbox[3]],
+                "end": [bbox[0], bbox[1]],
+                "height": 2.5,
+            },  # 左壁
+        ]
+        grid["walls"].extend(walls)
+
+    return grid
+
+
+def send_to_freecad_api(grid_data: Dict[str, Any]) -> Optional[str]:
+    """グリッドデータをFreeCAD APIに送信する
+
+    Args:
+        grid_data (Dict[str, Any]): グリッドデータ
+
+    Returns:
+        Optional[str]: 生成されたモデルのURL、エラー時はNone
     """
     try:
-        # FreeCAD APIのエンドポイント
-        api_url = os.environ.get("FREECAD_API_URL", "http://freecad-api:8000")
-
-        # グリッドデータをJSON形式に変換
-        grid_json = json.dumps(grid_data)
-
-        # 一時ファイルとして保存
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
-            temp_file.write(grid_json.encode())
-            temp_file_path = temp_file.name
-
-        # FreeCAD APIにリクエスト送信
-        with open(temp_file_path, "rb") as f:
-            files = {"file": ("grid_data.json", f, "application/json")}
-            response = requests.post(f"{api_url}/process/grid", files=files)
-
-        # 一時ファイルを削除
-        os.unlink(temp_file_path)
-
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(f"FreeCAD API response: {result}")
-            return result.get("file_url")
-        else:
-            logger.error(f"FreeCAD API error: {response.text}")
-            return None
+        response = requests.post("http://freecad-api:8000/process/grid", json=grid_data)
+        response.raise_for_status()
+        return response.json()["url"]
     except Exception as e:
-        logger.error(f"FreeCAD API request error: {str(e)}")
+        logger.error(f"FreeCAD APIへの送信に失敗: {e}")
         return None
 
 
 def convert_to_2d_drawing(fcstd_file_path: str) -> Optional[str]:
-    """
-    FreeCADファイルを2D図面に変換する
+    """FreeCADファイルを2D図面に変換する
 
     Args:
-        fcstd_file_path: FreeCADファイルのパス
+        fcstd_file_path (str): FreeCADファイルのパス
 
     Returns:
         Optional[str]: 生成された2D図面のURL、エラー時はNone
     """
     try:
-        # FreeCAD APIのエンドポイント
-        api_url = os.environ.get("FREECAD_API_URL", "http://freecad-api:8000")
-
-        # FreeCAD APIにリクエスト送信
         with open(fcstd_file_path, "rb") as f:
-            files = {"file": ("model.fcstd", f, "application/octet-stream")}
-            response = requests.post(f"{api_url}/convert/2d", files=files)
-
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(f"FreeCAD API 2D conversion response: {result}")
-            return result.get("public_url")
-        else:
-            logger.error(f"FreeCAD API 2D conversion error: {response.text}")
-            return None
+            files = {
+                "file": (
+                    os.path.basename(fcstd_file_path),
+                    f,
+                    "application/octet-stream",
+                )
+            }
+            response = requests.post("http://freecad-api:8000/convert/2d", files=files)
+            response.raise_for_status()
+            return response.json()["url"]
     except Exception as e:
-        logger.error(f"FreeCAD API 2D conversion request error: {str(e)}")
+        logger.error(f"2D図面の生成に失敗: {e}")
         return None
 
 
