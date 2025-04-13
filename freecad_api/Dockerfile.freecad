@@ -5,11 +5,8 @@ WORKDIR /app
 # システム依存関係のインストール
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-  software-properties-common \
   python3-pip \
   python3-dev \
-  && add-apt-repository ppa:freecad-maintainers/freecad-stable \
-  && apt-get update && apt-get install -y \
   freecad \
   libgl1-mesa-glx \
   && rm -rf /var/lib/apt/lists/*
