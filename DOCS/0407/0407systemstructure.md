@@ -89,9 +89,26 @@ graph TB
 - **機能**: WebUI提供、ユーザー入力処理、結果表示
 
 ### 4. FreeCAD サーバーコンテナ
-- **ベースイメージ**: Ubuntu
-- **主要コンポーネント**: FreeCAD, Python API
+- **ベースイメージ**: Ubuntu 22.04
+- **主要コンポーネント**: 
+  - FreeCAD
+  - Python API
+  - libgl1-mesa-glx
 - **機能**: CAD図面生成
+- **デプロイメント**:
+  - Google Cloud Artifact Registryに保存
+  - イメージ名: `asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api`
+  - タグ: `latest`
+- **ビルド手順**:
+  ```bash
+  cd freecad_api
+  docker build -t asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest -f Dockerfile.freecad .
+  docker push asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest
+  ```
+- **環境変数**:
+  - `PYTHONPATH`: `/usr/lib/freecad/lib`
+  - `QT_QPA_PLATFORM`: `offscreen`
+- **エントリーポイント**: `FreeCADCmd /app/run_freecad.py`
 
 ## データフロー
 

@@ -14,15 +14,15 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Python依存関係のインストール
-COPY freecad_api/requirements-freecad-api.txt .
-RUN pip3 install --no-cache-dir -r requirements-freecad-api.txt
+COPY ./requirements-freecad-api.txt /app/
+RUN pip3 install --no-cache-dir -r /app/requirements-freecad-api.txt
 
 # FreeCADのPythonパスを環境変数に設定
-ENV PYTHONPATH="${PYTHONPATH}:/usr/lib/freecad/lib"
+ENV PYTHONPATH=/usr/lib/freecad/lib
 ENV QT_QPA_PLATFORM=offscreen
 
 # APIコードとスクリプトをコピー
-COPY freecad_api/scripts/run_freecad.py /app/run_freecad.py
+COPY ./scripts/run_freecad.py /app/
 
 # 実行権限を設定
 RUN chmod +x /app/run_freecad.py

@@ -137,7 +137,21 @@
 1. ✅ FreeCAD Python APIを使用した処理モジュール開発
 2. ✅ FastAPIベースのRESTfulエンドポイント実装
 3. ✅ Dockerイメージのビルドとテスト
+   ```bash
+   # FreeCAD APIイメージのビルド
+   cd freecad_api
+   docker build -t asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest -f Dockerfile.freecad .
+   
+   # Artifact Registryへのプッシュ
+   docker push asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest
+   ```
 4. ✅ Cloud Runへのデプロイ
+   - メモリ: 2GB
+   - CPU: 2
+   - タイムアウト: 300秒
+   - 環境変数:
+     - `PYTHONPATH`: `/usr/lib/freecad/lib`
+     - `QT_QPA_PLATFORM`: `offscreen`
 
 ### フェーズ3: Streamlitアプリの拡張とクラウド対応（✅ 完了）
 
