@@ -2,7 +2,7 @@
 
 ## システム概要
 
-土地図をアップロードするだけで一軒家のCAD図を自動的に生成するシステム。YOLO11ベースの土地・道路分析からFreeCADを活用したCAD図面生成までを一貫して行う。
+土地図をアップロードするだけで一軒家のCAD図を自動的に生成するシステム。YOLOv11ベースの土地・道路分析からFreeCADを活用したCAD図面生成までを一貫して行う。将来的にはYOLOv12への移行も計画されている。
 
 ## システムアーキテクチャ
 
@@ -15,7 +15,7 @@ graph TB
     end
 
     subgraph "分析処理層"
-        E[YOLO11 推論エンジン] --> F[土地・道路セグメンテーション]
+        E[YOLOv11 推論エンジン] --> F[土地・道路セグメンテーション]
         F --> G[建築可能領域計算]
         G --> H[建物配置最適化]
         H --> I[間取り自動生成]
@@ -58,27 +58,27 @@ graph TB
 
 ## Google Cloudリソース構成
 
-| リソース                               | 用途                  | 詳細設定                    |
-|------------------------------------|-----------------------|-----------------------------|
-| **Vertex AI**                      | YOLO11モデルのトレーニングと推論 | カスタムコンテナ、GPUインスタンス          |
-| **Cloud Storage**                  | データ・モデル・CAD図の保存    | 階層化ストレージ、適切なアクセス制御   |
-| **Cloud Run**                      | Streamlitアプリのホスティング   | オートスケール、メモリ最適化           |
-| **GKE (Google Kubernetes Engine)** | FreeCADサーバーの実行      | 必要に応じたスケーリング、永続ボリューム   |
-| **Cloud Build**                    | CI/CDパイプライン           | ソースコード変更時の自動ビルド・デプロイ   |
-| **Firebase Authentication**        | ユーザー認証              | メール認証、必要に応じてGoogle連携 |
-| **Cloud Firestore**                | ユーザーデータ・生成結果の保存 | NoSQLデータベース                 |
-| **Secret Manager**                 | API鍵などの機密情報管理  | 適切なアクセス制御               |
-| **Cloud Monitoring**               | システム監視              | アラート設定、ダッシュボード            |
-| **Cloud Logging**                  | ログ収集・分析           | 集中管理、フィルタリング            |
+| リソース                               | 用途                   | 詳細設定                    |
+|------------------------------------|------------------------|-----------------------------|
+| **Vertex AI**                      | YOLOv11モデルのトレーニングと推論 | カスタムコンテナ、GPUインスタンス          |
+| **Cloud Storage**                  | データ・モデル・CAD図の保存     | 階層化ストレージ、適切なアクセス制御   |
+| **Cloud Run**                      | Streamlitアプリのホスティング    | オートスケール、メモリ最適化           |
+| **GKE (Google Kubernetes Engine)** | FreeCADサーバーの実行       | 必要に応じたスケーリング、永続ボリューム   |
+| **Cloud Build**                    | CI/CDパイプライン            | ソースコード変更時の自動ビルド・デプロイ   |
+| **Firebase Authentication**        | ユーザー認証               | メール認証、必要に応じてGoogle連携 |
+| **Cloud Firestore**                | ユーザーデータ・生成結果の保存  | NoSQLデータベース                 |
+| **Secret Manager**                 | API鍵などの機密情報管理   | 適切なアクセス制御               |
+| **Cloud Monitoring**               | システム監視               | アラート設定、ダッシュボード            |
+| **Cloud Logging**                  | ログ収集・分析            | 集中管理、フィルタリング            |
 
 ## コンテナ構成
 
-### 1. YOLO11 トレーニングコンテナ
+### 1. YOLOv11 トレーニングコンテナ
 - **ベースイメージ**: NVIDIA CUDA + Python
 - **主要コンポーネント**: ultralytics, OpenCV, Google Cloud SDK
 - **機能**: セグメンテーションモデルのトレーニング
 
-### 2. YOLO11 推論コンテナ
+### 2. YOLOv11 推論コンテナ
 - **ベースイメージ**: Python Slim
 - **主要コンポーネント**: ultralytics, OpenCV, NumPy
 - **機能**: 土地・道路のセグメンテーション、建築可能領域計算
@@ -101,7 +101,7 @@ graph TB
    - 処理パラメータ設定
 
 2. **分析処理**:
-   - YOLO11推論エンジンが土地・道路をセグメンテーション
+   - YOLOv11推論エンジンが土地・道路をセグメンテーション
    - 建築可能領域を計算（法規制も考慮）
    - 最適な建物配置と間取りを自動生成
 
@@ -127,47 +127,53 @@ house-design-ai/
 │   ├── network.tf          # ネットワーク構成
 │   └── iam.tf              # 権限設定
 │
-├── deployment/             # デプロイメント関連
+├── deploy/                 # デプロイメント関連
 │   ├── dockerfiles/        # コンテナ定義
-│   │   ├── yolo-train/     # YOLOトレーニングコンテナ
-│   │   ├── yolo-inference/ # YOLO推論コンテナ
-│   │   ├── streamlit-app/  # Streamlit UIコンテナ
-│   │   └── freecad-server/ # FreeCADサーバーコンテナ
 │   ├── k8s/                # Kubernetes構成
 │   └── cloud-build/        # CI/CD設定
 │
 ├── src/                    # ソースコード
-│   ├── yolo/               # YOLO関連コード
-│   │   ├── train.py        # トレーニングスクリプト
-│   │   ├── inference.py    # 推論処理
-│   │   └── processing/     # 画像・マスク処理
-│   ├── design/             # 建物設計関連
-│   │   ├── optimizer.py    # 建物配置最適化
-│   │   ├── floorplan.py    # 間取り生成
-│   │   └── constraints.py  # 制約条件処理
-│   ├── cad/                # CAD関連
-│   │   ├── freecad_client.py  # FreeCAD連携
-│   │   ├── script_generator.py # スクリプト生成
-│   │   └── templates/      # FreeCADスクリプトテンプレート
-│   └── api/                # APIレイヤー
-│       ├── routes.py       # エンドポイント定義
-│       └── storage.py      # ストレージ連携
+│   ├── cloud/              # クラウド連携 (Vertex AI)
+│   ├── processing/         # 画像処理ロジック
+│   ├── utils/              # ユーティリティ関数
+│   ├── visualization/      # 可視化ツール
+│   ├── cli.py              # コマンドラインインターフェース
+│   ├── train.py            # モデルトレーニングロジック
+│   └── inference.py        # 推論ロジック
 │
-├── streamlit/              # Streamlitアプリ
+├── house_design_app/       # Streamlitアプリケーション
 │   ├── app.py              # メインアプリケーション
 │   ├── pages/              # 追加ページ
 │   └── components/         # UIコンポーネント
 │
-├── configs/                # 設定ファイル
-│   ├── yolo_config.yaml    # YOLOモデル設定
-│   ├── building_params.yaml # 建物パラメータ設定
-│   └── cad_templates.yaml  # CADテンプレート設定
+├── freecad_api/            # FreeCAD連携API
+│   ├── server.py           # FreeCADサーバー
+│   ├── client.py           # FreeCADクライアント
+│   └── templates/          # FreeCADスクリプトテンプレート
+│
+├── config/                 # 設定ファイル
+│   ├── data.yaml           # データ設定
+│   └── service_account.json # サービスアカウント認証情報
 │
 ├── tests/                  # テストコード
 │   ├── unit/               # ユニットテスト
 │   └── integration/        # 統合テスト
 │
-└── docs/                   # ドキュメント
+├── notebooks/              # Jupyter notebooks
+│
+├── datasets/               # データセットディレクトリ
+│
+├── scripts/                # ユーティリティスクリプト
+│
+├── DOCS/                   # ドキュメント
+│   └── 0407/               # 2024年4月7日のドキュメント
+│
+├── requirements.txt        # 依存関係
+├── requirements-dev.txt    # 開発用依存関係
+├── Dockerfile              # Dockerイメージ定義
+├── run.sh                  # 実行スクリプト
+├── ROADMAP.md              # ロードマップ
+└── CLOUD_DEPLOYMENT_PLAN.md # クラウドデプロイメント計画
 ```
 
 ## デプロイメントフロー
@@ -181,7 +187,7 @@ house-design-ai/
    - Artifact Registryへのプッシュ
 
 3. **サービスデプロイメント**:
-   - YOLOモデルのVertex AIへのデプロイ
+   - YOLOv11モデルのVertex AIへのデプロイ
    - FreeCADサーバーのGKEへのデプロイ
    - StreamlitアプリのCloud Runへのデプロイ
 
