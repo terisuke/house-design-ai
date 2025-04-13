@@ -59,3 +59,29 @@ module "artifact_registry" {
   location      = var.region
   repository_id = "house-design-ai"
 }
+
+module "gke_cluster" {
+  source = "../../modules/gke"
+
+  project_id        = var.project_id
+  region            = var.region
+  cluster_name      = "freecad-gke-cluster"
+  enable_autopilot  = true
+  network           = "default"
+}
+
+module "freecad_job" {
+  source = "../../modules/cloud-run-job"
+
+  project_id          = var.project_id
+  region              = var.region
+  job_name            = "freecad-job"
+  image               = var.freecad_api_image
+  memory              = "2Gi"
+  cpu                 = "2"
+  timeout_seconds     = 900  # 15分
+  max_retries         = 0
+  environment_variables = {
+    BUCKET_NAME = module.storage.bucket_name
+  }
+}
