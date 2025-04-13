@@ -1,6 +1,6 @@
 # House Design AI
 
-建物のセグメンテーションとグリッド生成のためのYOLO11ベースのAIソリューション。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
+建物のセグメンテーションとグリッド生成のためのYOLOv8ベースのAIソリューション。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
 
 ## 機能
 
@@ -18,8 +18,10 @@
 - Python 3.9以上
 - Google Cloud Platform アカウント (Vertex AI使用時のみ)
 - FreeCAD 0.20以上 (CAD図面生成時のみ)
+- Docker (コンテナ化時のみ)
+- Terraform (クラウドデプロイ時のみ)
 
-### 環境構築
+### ローカル環境のセットアップ
 
 1. リポジトリをクローン:
 
@@ -32,7 +34,8 @@
 
    ```bash
    python -m venv venv
-   source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
+   source venv/bin/activate  # Linuxの場合
+   .\venv\Scripts\activate  # Windowsの場合
    ```
 
 3. 依存関係をインストール:
@@ -44,6 +47,19 @@
 4. GCPサービスアカウント設定 (Vertex AI使用時のみ):
    - サービスアカウントキーを `config/service_account.json` に配置
    - または環境変数 `GOOGLE_APPLICATION_CREDENTIALS` を設定
+
+### クラウド環境のセットアップ
+
+詳細なクラウド環境のセットアップ手順は [GCP_DEPLOYMENT_GUIDE.md](GCP_DEPLOYMENT_GUIDE.md) を参照してください。
+
+主な手順は以下の通りです：
+
+1. GCPプロジェクトの設定
+2. 必要なAPIの有効化
+3. サービスアカウントの設定
+4. Artifact Registryの設定
+5. Dockerイメージのビルドとプッシュ
+6. Cloud Runへのデプロイ
 
 ## 使用方法
 
@@ -93,7 +109,7 @@ uvicorn main:app --reload
 ### Vertex AIでのトレーニング
 
 ```bash
-python -m src.cli vertex --model yolo11l-seg.pt --epochs 100
+python -m src.cli vertex --model yolov8l-seg.pt --epochs 100
 ```
 
 詳細なオプションは以下で確認できます:
@@ -105,13 +121,13 @@ python -m src.cli vertex --help
 ### ローカルでのモデルトレーニング
 
 ```bash
-python -m src.cli train --data config/data.yaml --model yolo11l-seg.pt --epochs 50
+python -m src.cli train --data config/data.yaml --model yolov8l-seg.pt --epochs 50
 ```
 
 ### 推論実行
 
 ```bash
-python -m src.cli inference --model_path yolo11l-seg.pt --image_path path/to/image.jpg
+python -m src.cli inference --model_path yolov8l-seg.pt --image_path path/to/image.jpg
 ```
 
 ### 可視化ツール
@@ -175,7 +191,7 @@ house-design-ai/
 
 ### 主要な依存関係
 
-- **ultralytics**: YOLO11モデルの実装
+- **ultralytics**: YOLOv8モデルの実装
 - **google-cloud-aiplatform**: Vertex AI連携
 - **streamlit**: ウェブインターフェース
 - **opencv-python**: 画像処理
@@ -189,13 +205,19 @@ house-design-ai/
 pytest tests/
 ```
 
+## ドキュメント
+
+- [GCP_DEPLOYMENT_GUIDE.md](GCP_DEPLOYMENT_GUIDE.md): Google Cloud Platformへのデプロイ手順
+- [FreeCAD.md](FreeCAD.md): FreeCADの統合と使用方法
+- [ROADMAP.md](ROADMAP.md): 開発ロードマップと今後の計画
+
 ## ライセンス
 
 [MIT License](LICENSE)
 
 ## 謝辞
 
-- YOLO11: [Ultralytics](https://github.com/ultralytics/ultralytics)
+- YOLOv8: [Ultralytics](https://github.com/ultralytics/ultralytics)
 - Streamlit: [Streamlit](https://streamlit.io/)
 - Google Cloud Platform: [GCP](https://cloud.google.com/)
 - FreeCAD: [FreeCAD](https://www.freecadweb.org/)

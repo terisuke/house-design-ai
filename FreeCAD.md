@@ -1,4 +1,139 @@
-FreeCADのDocker化とGKE・Cloud Runへのデプロイ手順
+# FreeCAD Docker化とクラウドデプロイメントガイド
+
+## 1. 概要
+
+このガイドでは、FreeCADをDockerコンテナ化し、Google Cloud Platform（GCP）上で実行する方法について説明します。
+
+## 2. 前提条件
+
+- Docker Desktop
+- Google Cloud SDK
+- GCPプロジェクト
+- 必要なGCP APIの有効化
+- サービスアカウントの設定
+
+## 3. Dockerfileの作成
+
+```dockerfile
+# ベースイメージとしてUbuntu 22.04を使用
+FROM ubuntu:22.04
+
+# 必要なパッケージのインストール
+RUN apt-get update && apt-get install -y \
+    freecad \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 作業ディレクトリの設定
+WORKDIR /app
+
+# 必要なPythonパッケージのインストール
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
+
+# アプリケーションコードのコピー
+COPY . .
+
+# 環境変数の設定
+ENV PYTHONPATH=/app
+ENV FREECAD_PATH=/usr/lib/freecad/lib
+
+# コマンドの実行
+CMD ["python3", "src/cli.py"]
+```
+
+## 4. ビルドとプッシュ
+
+### 4.1 イメージのビルド
+```bash
+docker build -t asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 .
+```
+
+### 4.2 イメージのプッシュ
+```bash
+docker push asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0
+```
+
+## 5. Cloud Runへのデプロイ
+
+### 5.1 サービスの作成
+```bash
+gcloud run deploy house-design-ai \
+    --image asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 \
+    --platform managed \
+    --region asia-northeast1 \
+    --memory 2Gi \
+    --cpu 2 \
+    --min-instances 0 \
+    --max-instances 10
+```
+
+### 5.2 環境変数の設定
+```bash
+gcloud run services update house-design-ai \
+    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/workspace/service-account-key.json"
+```
+
+## 6. 実行方法
+
+### 6.1 ローカルでの実行
+```bash
+docker run -it --rm \
+    -v $(pwd):/app \
+    asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0
+```
+
+### 6.2 Cloud Runでの実行
+```bash
+curl -X POST https://house-design-ai-[HASH].a.run.app/process \
+    -H "Content-Type: application/json" \
+    -d '{"input_file": "path/to/input.stl"}'
+```
+
+## 7. トラブルシューティング
+
+### 7.1 一般的な問題
+- FreeCADのバージョンの互換性
+- メモリ不足
+- GPUアクセラレーションの制限
+
+### 7.2 ログの確認
+```bash
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=house-design-ai" --limit 50
+```
+
+## 8. ベストプラクティス
+
+### 8.1 パフォーマンス最適化
+- 適切なメモリとCPUの設定
+- キャッシュの活用
+- バッチ処理の実装
+
+### 8.2 セキュリティ
+- 最小権限の原則
+- セキュアな環境変数の管理
+- 定期的なセキュリティアップデート
+
+### 8.3 コスト最適化
+- インスタンス数の適切な設定
+- リソース使用量の監視
+- 不要なリソースの削除
+
+## 9. 制限事項
+
+- GUIモードはサポートされていません
+- 一部のFreeCAD機能は制限される可能性があります
+- ストレージの制限があります
+
+## 10. 今後の改善点
+
+- GPUサポートの追加
+- パフォーマンスの最適化
+- エラーハンドリングの強化
+- モニタリングの改善
+
+# FreeCADのDocker化とGKE・Cloud Runへのデプロイ手順
 
 FreeCADをコマンドライン（CLI）で実行して自動CAD図面を生成するシステムを構築するために、FreeCADをDockerコンテナ化し、それを Google Kubernetes Engine (GKE) と Cloud Run 上で動かす方法を解説します。以下では、それぞれの環境での手順（Dockerイメージ作成、ビルド＆プッシュ、GKE/Cloud Runへのデプロイ、FreeCADスクリプトの実行方法）、必要なIAM権限やAPI、制限事項（タイムアウトやメモリなど）、および各アプローチの利点・課題について、初心者にも分かりやすいように詳しく説明します。
 
@@ -260,9 +395,388 @@ Cloud Runジョブの場合はHTTPではなくコマンド実行なので、ジ�
 
 という特徴があります。両者はコンテナイメージを共通化できるため、まず開発はDockerコンテナで行い、軽量なジョブはCloud Runで、本格運用や特殊要件が出てきたらGKEに移行、といったハイブリッドな運用も可能です ￼ ￼。プロジェクトの要件に合わせて適切な方法を選択してください。各ステップで触れたIAMや設定も、Terraformでコード化しておくことで再現性高く管理できます。ぜひ本ガイドを参考に、自動CAD図面生成システムの構築を進めてみてください。
 
-参考資料:
-	•	GKEクラスタとTerraformに関する公式ドキュメント ￼ ￼
-	•	Cloud Runへのコンテナデプロイ手順（公式） ￼ ￼
-	•	Cloud Runのタイムアウト設定に関する説明 ￼
-	•	Cloud Runジョブの利用に関するドキュメント ￼
-	•	FreeCADのコマンドライン利用（freecadcmdに関するUbuntu Manpage） ￼
+# 参考資料
+
+- GKEクラスタとTerraformに関する公式ドキュメント
+- Cloud Runへのコンテナデプロイ手順（公式）
+- Cloud Runのタイムアウト設定に関する説明
+- Cloud Runジョブの利用に関するドキュメント
+- FreeCADのコマンドライン利用（freecadcmdに関するUbuntu Manpage）
+
+# FreeCAD統合ガイド
+
+## 概要
+
+このドキュメントでは、House Design AIプロジェクトにおけるFreeCADの統合について説明します。FreeCADは、建物の3DモデリングとCAD図面の生成に使用されます。
+
+## 1. ローカル環境のセットアップ
+
+### 1.1 前提条件
+
+- Python 3.9+
+- FreeCAD 0.20+
+- pip
+- virtualenv
+
+### 1.2 環境構築
+
+```bash
+# 仮想環境の作成
+python -m venv venv
+
+# 仮想環境の有効化
+source venv/bin/activate  # Linux/macOS
+.\venv\Scripts\activate   # Windows
+
+# 依存関係のインストール
+pip install -r requirements.txt
+```
+
+### 1.3 FreeCADのインストール
+
+#### Linux (Ubuntu/Debian)
+```bash
+sudo apt-get update
+sudo apt-get install freecad
+```
+
+#### macOS
+```bash
+brew install freecad
+```
+
+#### Windows
+1. [FreeCAD公式サイト](https://www.freecadweb.org/downloads.php)からインストーラーをダウンロード
+2. インストーラーを実行
+
+## 2. クラウド環境のセットアップ
+
+### 2.1 GCPプロジェクトのセットアップ
+
+```bash
+# プロジェクトの作成
+gcloud projects create house-design-ai --name="House Design AI"
+
+# プロジェクトの設定
+gcloud config set project house-design-ai
+
+# 必要なAPIの有効化
+gcloud services enable \
+  artifactregistry.googleapis.com \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  iam.googleapis.com
+```
+
+### 2.2 サービスアカウントの設定
+
+```bash
+# サービスアカウントの作成
+gcloud iam service-accounts create house-design-ai-sa \
+  --display-name="House Design AI Service Account"
+
+# 必要な権限の付与
+gcloud projects add-iam-policy-binding house-design-ai \
+  --member="serviceAccount:house-design-ai-sa@house-design-ai.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer"
+
+gcloud projects add-iam-policy-binding house-design-ai \
+  --member="serviceAccount:house-design-ai-sa@house-design-ai.iam.gserviceaccount.com" \
+  --role="roles/run.admin"
+```
+
+### 2.3 Artifact Registryの設定
+
+```bash
+# Dockerリポジトリの作成
+gcloud artifacts repositories create house-design-ai \
+  --repository-format=docker \
+  --location=asia-northeast1 \
+  --description="Docker repository for House Design AI"
+
+# 認証の設定
+gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+```
+
+## 3. Dockerイメージの作成
+
+### 3.1 Dockerfile
+
+```dockerfile
+# FreeCADのベースイメージを使用
+FROM freecad/freecad:latest
+
+# 作業ディレクトリの設定
+WORKDIR /app
+
+# 必要なパッケージのインストール
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 依存関係のコピーとインストール
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# アプリケーションコードのコピー
+COPY . .
+
+# 環境変数の設定
+ENV PYTHONPATH=/usr/lib/freecad-python3/lib:$PYTHONPATH
+ENV FREECAD_LIB=/usr/lib/freecad-python3/lib
+
+# 実行コマンド
+CMD ["python3", "freecad_api/main.py"]
+```
+
+### 3.2 イメージのビルドと実行
+
+```bash
+# イメージのビルド
+docker build -t house-design-ai-freecad -f freecad_api/Dockerfile.freecad .
+
+# コンテナの実行
+docker run -it --rm \
+    -v $(pwd)/data:/workspace/data \
+    -v $(pwd)/models:/workspace/models \
+    house-design-ai-freecad
+```
+
+## 4. FreeCAD APIの使用
+
+### 4.1 基本的な使用方法
+
+```python
+import FreeCAD
+import Part
+import Mesh
+
+def create_building_model(segmentation_data):
+    """
+    セグメンテーションデータから建物モデルを作成する
+    
+    Args:
+        segmentation_data (dict): セグメンテーション結果
+        
+    Returns:
+        FreeCAD.Document: 作成された建物モデル
+    """
+    # 新しいドキュメントの作成
+    doc = FreeCAD.newDocument("BuildingModel")
+    
+    # 建物の作成
+    for building in segmentation_data['buildings']:
+        # 建物の形状を作成
+        shape = Part.makeBox(building['width'], building['length'], building['height'])
+        
+        # 建物オブジェクトの作成
+        building_obj = doc.addObject("Part::Feature", "Building")
+        building_obj.Shape = shape
+        
+        # 位置の設定
+        building_obj.Placement.Base = FreeCAD.Vector(building['x'], building['y'], 0)
+    
+    # ドキュメントの再計算
+    doc.recompute()
+    
+    return doc
+```
+
+### 4.2 グリッド生成
+
+```python
+def create_grid(building_model, grid_size):
+    """
+    建物モデルにグリッドを適用する
+    
+    Args:
+        building_model (FreeCAD.Document): 建物モデル
+        grid_size (float): グリッドのサイズ
+        
+    Returns:
+        FreeCAD.Document: グリッドが適用されたモデル
+    """
+    # グリッドの作成
+    for building in building_model.Objects:
+        if building.Name.startswith("Building"):
+            # 建物の境界ボックスを取得
+            bbox = building.Shape.BoundBox
+            
+            # グリッドラインの作成
+            for x in range(int(bbox.XLength / grid_size) + 1):
+                line = Part.makeLine(
+                    FreeCAD.Vector(bbox.XMin + x * grid_size, bbox.YMin, 0),
+                    FreeCAD.Vector(bbox.XMin + x * grid_size, bbox.YMax, 0)
+                )
+                grid_line = building_model.addObject("Part::Feature", "GridLine")
+                grid_line.Shape = line
+            
+            for y in range(int(bbox.YLength / grid_size) + 1):
+                line = Part.makeLine(
+                    FreeCAD.Vector(bbox.XMin, bbox.YMin + y * grid_size, 0),
+                    FreeCAD.Vector(bbox.XMax, bbox.YMin + y * grid_size, 0)
+                )
+                grid_line = building_model.addObject("Part::Feature", "GridLine")
+                grid_line.Shape = line
+    
+    # ドキュメントの再計算
+    building_model.recompute()
+    
+    return building_model
+```
+
+### 4.3 モデルのエクスポート
+
+```python
+def export_model(model, format='stl'):
+    """
+    モデルを指定された形式でエクスポートする
+    
+    Args:
+        model (FreeCAD.Document): エクスポートするモデル
+        format (str): エクスポート形式（'stl', 'step', 'iges'）
+        
+    Returns:
+        str: エクスポートされたファイルのパス
+    """
+    export_path = f"output/model.{format}"
+    
+    if format == 'stl':
+        Mesh.export(model.Objects, export_path)
+    elif format in ['step', 'iges']:
+        Part.export(model.Objects, export_path)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    return export_path
+```
+
+## 5. クラウド環境での実行
+
+### 5.1 Cloud Runでの実行
+
+```bash
+# サービスのデプロイ
+gcloud run deploy house-design-ai-freecad \
+    --image asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 \
+    --platform managed \
+    --region asia-northeast1 \
+    --memory 2Gi \
+    --cpu 2 \
+    --min-instances 0 \
+    --max-instances 10
+```
+
+### 5.2 APIエンドポイントの使用
+
+```python
+import requests
+
+def process_building_design(image_path):
+    """
+    建物設計を処理する
+    
+    Args:
+        image_path (str): 入力画像のパス
+        
+    Returns:
+        dict: 処理結果
+    """
+    # APIエンドポイントの設定
+    api_url = "https://house-design-ai-freecad-[HASH].a.run.app/process"
+    
+    # 画像のアップロード
+    with open(image_path, 'rb') as f:
+        files = {'image': f}
+        response = requests.post(api_url, files=files)
+    
+    # レスポンスの確認
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"API request failed: {response.text}")
+```
+
+## 6. トラブルシューティング
+
+### 6.1 一般的な問題
+
+1. **FreeCADのインポートエラー**
+   - PYTHONPATHの設定を確認
+   - FreeCADのインストールパスを確認
+
+2. **メモリ不足**
+   - 大きなモデルの処理時はメモリ制限を調整
+   - バッチ処理の実装を検討
+
+3. **パフォーマンスの問題**
+   - モデルの最適化
+   - キャッシングの活用
+
+### 6.2 デバッグ方法
+
+```python
+# デバッグログの有効化
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# FreeCADのバージョン確認
+print(FreeCAD.Version())
+
+# 利用可能なモジュールの確認
+print(FreeCAD.listModules())
+```
+
+## 7. ベストプラクティス
+
+1. **モデル管理**
+   - 定期的なバックアップ
+   - バージョン管理の活用
+   - メタデータの保持
+
+2. **パフォーマンス最適化**
+   - 効率的なアルゴリズムの使用
+   - メモリ使用量の最適化
+   - 並列処理の活用
+
+3. **エラー処理**
+   - 適切な例外処理
+   - ログ記録
+   - リカバリー手順の実装
+
+## 8. 制限事項
+
+1. **GUIの制限**
+   - ヘッドレス環境での実行
+   - バッチ処理の必要性
+
+2. **リソース制限**
+   - メモリ使用量
+   - CPU使用量
+   - ストレージ容量
+
+3. **互換性**
+   - FreeCADバージョンの互換性
+   - プラットフォーム依存の問題
+
+## 9. 今後の改善
+
+1. **GPUサポート**
+   - CUDA対応
+   - 並列処理の最適化
+
+2. **パフォーマンス最適化**
+   - アルゴリズムの改善
+   - キャッシングの強化
+
+3. **機能拡張**
+   - 新しいフォーマットのサポート
+   - 高度な分析機能の追加
+
+## 10. 参考リンク
+
+- [FreeCAD公式ドキュメント](https://wiki.freecadweb.org/)
+- [FreeCAD Python API](https://wiki.freecadweb.org/Power_users_hub/ja)
+- [Cloud Runドキュメント](https://cloud.google.com/run/docs)
+- [Dockerドキュメント](https://docs.docker.com/)
