@@ -7,6 +7,7 @@
 - 📸 **セグメンテーション**: 画像内の建物と道路を検出・セグメンテーション
 - 🏠 **建物解析**: 住居と道路の関係性を考慮した処理
 - 📊 **グリッド生成**: 建物領域に規則的なグリッドを適用
+- 🛠️ **FreeCAD統合**: グリッドデータからCAD図面を自動生成
 - ☁️ **クラウド統合**: Vertex AIでのモデルトレーニングに対応
 - 🖥️ **ユーザーインターフェース**: Streamlitベースの直感的なUI
 
@@ -16,6 +17,7 @@
 
 - Python 3.9以上
 - Google Cloud Platform アカウント (Vertex AI使用時のみ)
+- FreeCAD 0.20以上 (CAD図面生成時のみ)
 
 ### 環境構築
 
@@ -52,6 +54,41 @@ python -m src.cli app
 ```
 
 これにより、ブラウザでStreamlitアプリが開きます（デフォルトは <http://localhost:8501> ）。
+
+### FreeCAD APIの起動
+
+```bash
+cd freecad_api
+uvicorn main:app --reload
+```
+
+これにより、FreeCAD APIサーバーが起動します（デフォルトは <http://localhost:8000> ）。
+
+### APIエンドポイント
+
+- `POST /process/grid`: グリッドデータからFreeCADモデルを生成
+  ```json
+  {
+    "rooms": [
+      {
+        "id": 1,
+        "dimensions": [4.0, 3.0],
+        "position": [0.0, 0.0],
+        "label": "リビング"
+      }
+    ],
+    "walls": [
+      {
+        "start": [0.0, 0.0],
+        "end": [4.0, 0.0],
+        "height": 2.5
+      }
+    ]
+  }
+  ```
+
+- `POST /convert/2d`: FreeCADモデルを2D図面に変換
+  - マルチパートフォームデータで`.fcstd`ファイルをアップロード
 
 ### Vertex AIでのトレーニング
 
@@ -93,50 +130,11 @@ docker build -t house-design-ai .
 
 # コンテナの実行（Streamlitアプリ）
 docker run -p 8501:8501 house-design-ai
+
+# FreeCAD APIの実行
+docker build -t freecad-api -f freecad_api/Dockerfile.freecad freecad_api/
+docker run -p 8000:8000 freecad-api
 ```
-
-### 可視化ツール
-
-```bash
-# 推論結果の可視化
-python -m src.cli visualize --result_path path/to/results --output_dir path/to/output
-
-# データセットの可視化
-python -m src.visualization.dataset --data_yaml=config/data.yaml --num_samples=5 --output_dir=visualization_results
-
-# Dockerパスとローカルパスが異なる場合、オーバーライドオプションを使用
-python -m src.visualization.dataset --data_yaml=config/data.yaml --override_train_path=datasets/house/train
-```
-
-オプション:
-- `--data_yaml`: データセット設定ファイルへのパス
-- `--num_samples`: 視覚化するサンプル数（デフォルト: 5）
-- `--output_dir`: 出力ディレクトリ（デフォルト: visualization_results）
-- `--override_train_path`: data.yamlのtrainパスを上書き（Docker/クラウド用のパスをローカル環境用に変更する場合に使用）
-
-## トラブルシューティング
-
-### OpenCVの依存関係エラー
-
-Docker環境で以下のようなエラーが発生した場合：
-
-```
-ImportError: libGL.so.1: cannot open shared object file: No such file or directory
-```
-
-これはOpenCVに必要なシステムライブラリが不足していることを示しています。Dockerfileに以下のライブラリを追加してください：
-
-```dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  libgl1 \
-  libglx0 \
-  libglvnd0 \
-  libsm6 \
-  libxext6 \
-  libxrender1
-```
-
-その後、再度Dockerイメージをビルドしてください。
 
 ## プロジェクト構造
 
@@ -148,6 +146,9 @@ house-design-ai/
 ├── config/                   # 設定ファイル
 ├── datasets/                 # データセットディレクトリ
 ├── deploy/                   # デプロイ関連ファイル
+├── freecad_api/             # FreeCAD APIサービス
+│   ├── main.py              # APIエンドポイント
+│   └── Dockerfile.freecad   # FreeCAD用Dockerfile
 ├── notebooks/                # Jupyter notebooks
 ├── scripts/                  # ユーティリティスクリプト
 ├── src/                      # ソースコード
@@ -179,6 +180,8 @@ house-design-ai/
 - **streamlit**: ウェブインターフェース
 - **opencv-python**: 画像処理
 - **pydantic**: データ検証
+- **fastapi**: FreeCAD API
+- **uvicorn**: ASGIサーバー
 
 ### テスト実行
 
@@ -195,3 +198,4 @@ pytest tests/
 - YOLO11: [Ultralytics](https://github.com/ultralytics/ultralytics)
 - Streamlit: [Streamlit](https://streamlit.io/)
 - Google Cloud Platform: [GCP](https://cloud.google.com/)
+- FreeCAD: [FreeCAD](https://www.freecadweb.org/)

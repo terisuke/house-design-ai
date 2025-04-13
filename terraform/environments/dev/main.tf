@@ -14,17 +14,18 @@ provider "google" {
 }
 
 # Cloud Run サービス
-module "streamlit_service" {
-  source = "../../modules/cloud-run"
-
-  project_id            = var.project_id
-  region                = var.region
-  service_name          = "streamlit-web"
-  image                 = var.streamlit_image
-  memory                = "1Gi"
-  cpu                   = "1"
-  allow_unauthenticated = true
-}
+# Streamlitサービスのデプロイはスキップ
+# module "streamlit_service" {
+#   source = "../../modules/cloud-run"
+#
+#   project_id            = var.project_id
+#   region                = var.region
+#   service_name          = "streamlit-web"
+#   image                 = var.streamlit_image
+#   memory                = "1Gi"
+#   cpu                   = "1"
+#   allow_unauthenticated = true
+# }
 
 # FreeCAD API サービス
 module "freecad_api_service" {
@@ -63,24 +64,24 @@ module "artifact_registry" {
 module "gke_cluster" {
   source = "../../modules/gke"
 
-  project_id        = var.project_id
-  region            = var.region
-  cluster_name      = "freecad-gke-cluster"
-  enable_autopilot  = true
-  network           = "default"
+  project_id       = var.project_id
+  region           = var.region
+  cluster_name     = "freecad-gke-cluster"
+  enable_autopilot = true
+  network          = "default"
 }
 
 module "freecad_job" {
   source = "../../modules/cloud-run-job"
 
-  project_id          = var.project_id
-  region              = var.region
-  job_name            = "freecad-job"
-  image               = var.freecad_api_image
-  memory              = "2Gi"
-  cpu                 = "2"
-  timeout_seconds     = 900  # 15分
-  max_retries         = 0
+  project_id      = var.project_id
+  region          = var.region
+  job_name        = "freecad-job"
+  image           = var.freecad_api_image
+  memory          = "2Gi"
+  cpu             = "2"
+  timeout_seconds = 900 # 15分
+  max_retries     = 0
   environment_variables = {
     BUCKET_NAME = module.storage.bucket_name
   }

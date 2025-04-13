@@ -65,7 +65,8 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
 
 # プロジェクトファイルをコピー
 COPY src/ /app/src/
-COPY streamlit/ /app/streamlit/
+# streamlitディレクトリが存在しないため、コピーを削除
+# COPY streamlit/ /app/streamlit/
 COPY scripts/ /app/scripts/
 COPY pyproject.toml /app/
 COPY app.py /app/app.py

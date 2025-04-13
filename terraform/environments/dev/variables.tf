@@ -1,22 +1,20 @@
 variable "project_id" {
-  description = "Google Cloud Project ID"
+  description = "GCPプロジェクトID"
   type        = string
 }
 
 variable "region" {
-  description = "Google Cloud Region"
+  description = "GCPリージョン"
   type        = string
-  default     = "asia-northeast1"
 }
 
-variable "streamlit_image" {
-  description = "Streamlit container image"
-  type        = string
-  default     = "asia-northeast1-docker.pkg.dev/house-design-ai/house-design-ai/streamlit:latest"
-}
+# Streamlit関連の変数はコメントアウト
+# variable "streamlit_image" {
+#   description = "Streamlitイメージのフルパス"
+#   type        = string
+# }
 
 variable "freecad_api_image" {
-  description = "FreeCAD API container image"
+  description = "FreeCAD APIイメージのフルパス"
   type        = string
-  default     = "asia-northeast1-docker.pkg.dev/house-design-ai/house-design-ai/freecad-api:latest"
 }
