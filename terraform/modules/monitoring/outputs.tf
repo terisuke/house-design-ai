@@ -16,4 +16,4 @@ output "latency_alert_id" {
 output "memory_usage_alert_id" {
   description = "メモリ使用率アラートポリシーのID"
   value       = google_monitoring_alert_policy.memory_usage.id
-} 
+}
