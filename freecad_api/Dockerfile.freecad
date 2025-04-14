@@ -27,5 +27,5 @@ COPY ./scripts/run_freecad.py /app/
 # 実行権限を設定
 RUN chmod +x /app/run_freecad.py
 
-# FreeCADCmdを使ってスクリプトを実行
-ENTRYPOINT ["FreeCADCmd", "/app/run_freecad.py"]
+# FastAPIアプリケーションを実行
+CMD ["python3", "/app/run_freecad.py"]

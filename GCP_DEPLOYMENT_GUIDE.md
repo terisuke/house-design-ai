@@ -1,208 +1,223 @@
 # Google Cloud Platform デプロイメントガイド
 
-このガイドでは、House Design AIをGoogle Cloud Platform (GCP)にデプロイする手順を説明します。
+このガイドでは、House Design AIプロジェクトをGoogle Cloud Platformにデプロイする手順を説明します。
 
 ## 前提条件
 
 - Google Cloud Platformアカウント
-- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)がインストールされていること
-- Dockerがインストールされていること
-- プロジェクトのソースコードがローカルにクローンされていること
+- Google Cloud SDKのインストール
+- Dockerのインストール
+- Terraformのインストール（インフラストラクチャのデプロイに使用）
 
-## 1. GCPプロジェクトの設定
+## 1. プロジェクトのセットアップ
 
-### プロジェクトの作成
+### 1.1 GCPプロジェクトの設定
 
 ```bash
-# プロジェクトの作成
-gcloud projects create [PROJECT_ID] --name="House Design AI"
-
 # プロジェクトの設定
-gcloud config set project [PROJECT_ID]
-
-# リージョンの設定
-gcloud config set compute/region asia-northeast1
+gcloud config set project yolov8environment
 ```
 
-### 必要なAPIの有効化
+### 1.2 必要なAPIの有効化
 
 ```bash
 # 必要なAPIの有効化
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-gcloud services enable storage.googleapis.com
-gcloud services enable iam.googleapis.com
-gcloud services enable aiplatform.googleapis.com
+gcloud services enable run.googleapis.com \
+    artifactregistry.googleapis.com \
+    cloudbuild.googleapis.com \
+    aiplatform.googleapis.com \
+    storage.googleapis.com
 ```
 
-## 2. サービスアカウントの設定
+### 1.3 サービスアカウントの設定
 
-### サービスアカウントの作成と権限設定
+このプロジェクトでは、以下の既存のサービスアカウントを使用します：
+```
+yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com
+```
+
+このサービスアカウントには既に以下の必要な権限が付与されています：
+- Artifact Registry 管理者
+- Cloud Run 管理者
+- Service Usage 管理者
+- Storage オブジェクト関連の権限
+- Vertex AI 管理者
+- その他必要な権限
+
+サービスアカウントキーが必要な場合は、以下のコマンドで取得できます：
 
 ```bash
-# サービスアカウントの作成
-gcloud iam service-accounts create house-design-ai-sa
-
-# 必要な権限の付与
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-    --member="serviceAccount:house-design-ai-sa@[PROJECT_ID].iam.gserviceaccount.com" \
-    --role="roles/run.admin"
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-    --member="serviceAccount:house-design-ai-sa@[PROJECT_ID].iam.gserviceaccount.com" \
-    --role="roles/storage.admin"
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-    --member="serviceAccount:house-design-ai-sa@[PROJECT_ID].iam.gserviceaccount.com" \
-    --role="roles/aiplatform.user"
-
-# キーファイルの生成
+# サービスアカウントキーのダウンロード（必要な場合のみ）
 gcloud iam service-accounts keys create config/service_account.json \
-    --iam-account=house-design-ai-sa@[PROJECT_ID].iam.gserviceaccount.com
+    --iam-account=yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com
 ```
 
-## 3. Artifact Registryの設定
+## 2. インフラストラクチャのデプロイ
 
-### Dockerリポジトリの作成
+### 2.1 Terraformの初期化
 
 ```bash
-# Dockerリポジトリの作成
-gcloud artifacts repositories create house-design-ai \
+cd deploy/terraform
+terraform init
+```
+
+### 2.2 インフラストラクチャの計画
+
+```bash
+terraform plan
+```
+
+### 2.3 インフラストラクチャのデプロイ
+
+```bash
+terraform apply
+```
+
+## 3. FreeCAD APIのデプロイ
+
+### 3.1 イメージのビルドとプッシュ
+
+```bash
+# Artifact Registryリポジトリの作成（存在しない場合）
+gcloud artifacts repositories create freecad-api \
     --repository-format=docker \
     --location=asia-northeast1 \
-    --description="Docker repository for House Design AI"
-```
+    --description="FreeCAD API Docker repository" \
+    --project=yolov8environment
 
-### 認証の設定
-
-```bash
 # Artifact Registryの認証設定
 gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+
+# イメージのビルド（重要: Cloud Run用にAMD64アーキテクチャを指定）
+docker build --platform linux/amd64 \
+    -t asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
+    -f freecad_api/Dockerfile.freecad freecad_api/
+
+# イメージのプッシュ
+docker push asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest
 ```
 
-## 4. Dockerイメージのビルドとプッシュ
-
-### イメージのビルド
+### 3.2 Cloud Runへのデプロイ
 
 ```bash
-# FreeCAD APIのイメージをビルド
-docker build -t asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 -f freecad_api/Dockerfile.freecad freecad_api/
-```
-
-### イメージのプッシュ
-
-```bash
-# イメージをArtifact Registryにプッシュ
-docker push asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0
-```
-
-## 5. Cloud Runへのデプロイ
-
-### サービスの作成
-
-```bash
-# FreeCAD APIサービスのデプロイ
-gcloud run deploy house-design-ai-freecad \
-    --image asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 \
+# サービスのデプロイ
+gcloud run deploy freecad-api \
+    --image asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
     --platform managed \
     --region asia-northeast1 \
     --memory 2Gi \
     --cpu 2 \
-    --min-instances 0 \
-    --max-instances 10 \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/workspace/service_account.json" \
-    --service-account=house-design-ai-sa@[PROJECT_ID].iam.gserviceaccount.com
-```
+    --timeout 300s \
+    --allow-unauthenticated \
+    --project=yolov8environment
 
-### 環境変数の設定
-
-```bash
 # 環境変数の設定
-gcloud run services update house-design-ai-freecad \
-    --set-env-vars="MODEL_PATH=/workspace/models/yolov8l-seg.pt,DATA_PATH=/workspace/data"
+gcloud run services update freecad-api \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=yolov8environment" \
+    --region asia-northeast1 \
+    --project=yolov8environment
 ```
 
-## 6. メンテナンス
+## 4. デプロイ済みサービス
 
-### バージョン管理
+### 4.1 FreeCAD API
+- URL: https://freecad-api-513507930971.asia-northeast1.run.app
+- 設定:
+  - メモリ: 2GB
+  - CPU: 2
+  - タイムアウト: 300秒
+  - プロジェクト: yolov8environment
+  - リージョン: asia-northeast1
+  - 認証: 不要（パブリックアクセス可能）
 
-- イメージのタグ付けは `v1.0.0` のような形式で行う
-- メジャーバージョン（1.0.0）: 大きな変更がある場合
-- マイナーバージョン（1.1.0）: 機能追加がある場合
-- パッチバージョン（1.0.1）: バグ修正がある場合
+### 4.2 注意事項
+- Cloud RunはAMD64/Linuxアーキテクチャのコンテナのみをサポートしています。
+- Apple Silicon (M1/M2) Macでビルドする場合は、必ず`--platform linux/amd64`フラグを指定してください。
+- デプロイ後、サービスが安定するまで数分かかる場合があります。
 
-### モニタリング
+## 5. モニタリングとログ
+
+### 5.1 Cloud Loggingの設定
 
 ```bash
-# ログの確認
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=house-design-ai-freecad" --limit 50
-
-# メトリクスの確認
-gcloud run services describe house-design-ai-freecad --region asia-northeast1
+# ログシンクの作成
+gcloud logging sinks create house-design-ai-logs \
+    storage.googleapis.com/yolov8environment-logs \
+    --log-filter="resource.type=cloud_run_revision AND resource.labels.service_name=freecad-api" \
+    --project=yolov8environment
 ```
 
-### バックアップ
-
-- 定期的にモデルとデータのバックアップを取る
-- Cloud Storageを使用してバックアップを保存
+### 5.2 Cloud Monitoringの設定
 
 ```bash
-# バックアップの作成
-gsutil cp -r /path/to/backup gs://[PROJECT_ID]-backup/
+# アラートポリシーの作成
+gcloud monitoring channels create \
+    --display-name="House Design AI Alerts" \
+    --type=email \
+    --email-address=your-email@example.com \
+    --project=yolov8environment
+
+gcloud monitoring alert-policies create \
+    --display-name="FreeCAD API Error Rate" \
+    --condition-display-name="Error Rate > 5%" \
+    --condition-filter="resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"freecad-api\" AND metric.type = \"run.googleapis.com/request_count\" AND metric.labels.response_code_class = \"5xx\"" \
+    --condition-threshold-value=0.05 \
+    --condition-threshold-duration=300s \
+    --notification-channels=projects/yolov8environment/monitoringChannels/your-channel-id \
+    --project=yolov8environment
 ```
 
-## トラブルシューティング
-
-### 一般的な問題
-
-1. **認証エラー**
-   - サービスアカウントのキーが正しく設定されているか確認
-   - 必要な権限が付与されているか確認
-
-2. **メモリ不足**
-   - Cloud Runのメモリ設定を増やす
-   - バッチサイズを調整する
-
-3. **タイムアウト**
-   - Cloud Runのタイムアウト設定を調整
-   - 処理を最適化する
-
-### ログの確認
+### 5.3 ログの確認
 
 ```bash
-# リアルタイムログの確認
-gcloud beta run services logs tail house-design-ai-freecad --region asia-northeast1
+# FreeCAD APIのログを確認
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=freecad-api" \
+    --limit 50 \
+    --project=yolov8environment
 ```
 
-## セキュリティ考慮事項
+## 6. セキュリティ考慮事項
 
 1. **認証情報の管理**
-   - サービスアカウントキーを安全に管理
-   - 環境変数を使用して機密情報を管理
+   - サービスアカウントキーを安全に保管
+   - 環境変数での機密情報の管理
+   - Secret Managerの使用を検討
 
 2. **ネットワークセキュリティ**
-   - VPCコネクタの使用を検討
-   - 適切なファイアウォールルールを設定
+   - VPCの設定
+   - ファイアウォールルールの適切な設定
+   - Cloud Armorの設定を検討
 
 3. **アクセス制御**
+   - IAMポリシーの適切な設定
    - 最小権限の原則に従う
-   - IAMポリシーを定期的にレビュー
+   - 定期的なアクセス権限のレビュー
 
-## コスト最適化
+## 7. コスト最適化
 
-1. **リソース設定**
-   - 適切なインスタンスサイズを選択
-   - オートスケーリングの設定を最適化
+1. **リソースの最適化**
+   - 適切なインスタンスサイズの選択
+   - オートスケーリングの設定
+   - 未使用リソースの削除
 
-2. **使用量の監視**
-   - 定期的にコストを確認
-   - 未使用のリソースを削除
+2. **モニタリング**
+   - コスト分析の設定
+   - 予算アラートの設定
+   - 定期的なコストレビュー
 
-3. **予算の設定**
-   - 予算アラートを設定
-   - コスト超過を防止
+## 8. 今後の計画
 
-## 次のステップ
+1. **スケーリング**
+   - マルチリージョンデプロイ
+   - グローバルロードバランシング
+   - CDNの統合
 
-1. [FreeCAD.md](FreeCAD.md)を参照してFreeCADの統合を設定
-2. [ROADMAP.md](ROADMAP.md)を確認して今後の開発計画を確認
-3. モニタリングとログ分析の設定を行う
-4. バックアップ戦略を実装する 
+2. **監視の強化**
+   - カスタムメトリクスの追加
+   - アラートの細分化
+   - ダッシュボードの作成
+
+3. **セキュリティの強化**
+   - WAFの導入
+   - セキュリティスキャンの自動化
+   - コンプライアンスチェックの追加 

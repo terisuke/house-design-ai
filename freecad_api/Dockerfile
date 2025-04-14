@@ -1,26 +1,34 @@
 FROM ubuntu:20.04
 
-WORKDIR /app
+# タイムゾーン設定
+ENV TZ=Asia/Tokyo
+ENV PYTHONPATH=/usr/lib/freecad-python3/lib
 
 # システム依存関係のインストール
 RUN apt-get update && apt-get install -y \
+  tzdata \
+  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+  && echo $TZ > /etc/timezone \
+  && apt-get install -y \
   software-properties-common \
   python3-pip \
   python3-dev \
+  python3-minimal \
+  python3-setuptools \
+  python3-wheel \
   freecad \
   libgl1-mesa-glx \
+  xserver-xorg-video-all \
   && rm -rf /var/lib/apt/lists/*
 
-# Python依存関係のインストール
-COPY requirements-freecad-api.txt .
-RUN pip3 install --no-cache-dir -r requirements-freecad-api.txt
+# 作業ディレクトリの設定
+WORKDIR /app
 
-# FreeCADのPythonパスを環境変数に設定
-ENV PYTHONPATH="${PYTHONPATH}:/usr/lib/freecad/lib"
-ENV PORT=8000
+# アプリケーションのコピー
+COPY . .
 
-# APIコードをコピー
-COPY . /app/
+# 依存関係のインストール
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# FastAPIサーバー起動
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# 実行コマンド
+CMD ["python3", "app.py"] 
