@@ -1,204 +1,227 @@
-# 土地図から一軒家CAD図自動生成システム - プロジェクト構成
+# 土地図からの一軒家CAD図自動生成システム システム構造図
 
-## システム概要
-
-土地図をアップロードするだけで一軒家のCAD図を自動的に生成するシステム。YOLOv8ベースの土地・道路分析からFreeCADを活用したCAD図面生成までを一貫して行う。
-
-## システムアーキテクチャ
+## システム全体構成
 
 ```mermaid
 graph TB
-    subgraph "ユーザーインターフェース"
-        A[Streamlit Web UI] --> B[画像アップロード]
-        B --> C[設計パラメータ設定]
-        C --> D[結果表示・ダウンロード]
+    subgraph "ユーザーインターフェース層"
+        A[Streamlit Webアプリケーション]
+        B[Google Forms]
+        C[Google Drive]
     end
 
     subgraph "分析処理層"
-        E[YOLOv8 推論エンジン] --> F[土地・道路セグメンテーション]
-        F --> G[建築可能領域計算]
-        G --> H[建物配置最適化]
-        H --> I[間取り自動生成]
+        D[YOLOv8 セグメンテーション]
+        E[建物形状解析]
+        F[間取り生成]
+        G[建築基準法チェック]
     end
 
     subgraph "CAD生成層"
-        I --> J[FreeCAD スクリプト生成]
-        J --> K[FreeCAD エンジン]
-        K --> L[CAD図面出力]
-        L --> M[DXF/DWG変換]
+        H[FreeCAD API]
+        I[図面生成エンジン]
+        J[建具記号ライブラリ]
     end
 
-    subgraph "データストレージ"
-        N[Cloud Storage] --> O[入力画像]
-        N --> P[生成CAD図面]
-        N --> Q[トレーニングデータ]
-        N --> R[モデル重み]
+    subgraph "データストレージ層"
+        K[Google Cloud Storage]
+        L[Vertex AI]
+        M[Cloud SQL]
     end
 
-    subgraph "管理・監視"
-        S[Google IAM] --> T[認証・権限]
-        U[Cloud Monitoring] --> V[システム監視]
-        W[Cloud Logging] --> X[ログ管理]
+    subgraph "管理・監視層"
+        N[Cloud Monitoring]
+        O[Cloud Logging]
+        P[Cloud Trace]
     end
 
-    B --> E
-    D --> P
-    E --> N
-    K --> N
-    S --> A
-    S --> E
-    S --> K
-    U --> A
-    U --> E
-    U --> K
-    W --> A
-    W --> E
-    W --> K
+    A --> D
+    B --> A
+    C --> A
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    D --> L
+    E --> L
+    F --> L
+    G --> L
+    H --> K
+    I --> K
+    J --> K
+    A --> N
+    D --> O
+    E --> O
+    F --> O
+    G --> O
+    H --> P
+    I --> P
 ```
 
-## Google Cloudリソース構成
+## コンポーネント詳細
 
-| リソース                  | 用途                  | 詳細設定                    |
-|-----------------------|-----------------------|-----------------------------|
-| **Vertex AI**         | YOLOv8モデルのトレーニングと推論 | カスタムコンテナ、GPUインスタンス          |
-| **Cloud Storage**     | データ・モデル・CAD図の保存    | 階層化ストレージ、適切なアクセス制御   |
-| **Cloud Run**         | FreeCAD APIのホスティング    | メモリ2GB、CPU 2コア、タイムアウト300秒  |
-| **Artifact Registry** | コンテナイメージの保存         | FreeCAD APIイメージの管理        |
-| **Cloud Build**       | CI/CDパイプライン           | ソースコード変更時の自動ビルド・デプロイ   |
-| **Cloud Monitoring**  | システム監視              | エラー率、レイテンシー、メモリ使用量の監視 |
-| **Cloud Logging**     | ログ収集・分析           | 集中管理、フィルタリング            |
+### 1. ユーザーインターフェース層
+- **Streamlit Webアプリケーション**
+  - Cloud Run上で動作
+  - ユーザー認証・認可
+  - インタラクティブなUI
+  - リアルタイムフィードバック
+- **Google Forms/Drive連携**
+  - データ入力フォーム
+  - ファイル管理
+  - 自動データ同期
 
-## コンテナ構成
+### 2. 分析処理層
+- **YOLOv8 セグメンテーション**
+  - Vertex AI上で動作
+  - 高精度な建物検出
+  - リアルタイム処理
+- **建物形状解析**
+  - 建築可能エリアの特定
+  - 形状最適化
+  - 制約条件の適用
+- **間取り生成**
+  - 自動レイアウト生成
+  - 最適化アルゴリズム
+  - カスタマイズオプション
+- **建築基準法チェック**
+  - 建蔽率・容積率チェック
+  - 日影規制チェック
+  - 高さ制限チェック
 
-### 1. YOLOv8 トレーニングコンテナ
-- **ベースイメージ**: NVIDIA CUDA + Python
-- **主要コンポーネント**: ultralytics, OpenCV, Google Cloud SDK
-- **機能**: セグメンテーションモデルのトレーニング
+### 3. CAD生成層
+- **FreeCAD API**
+  - Cloud Run上で動作
+  - ヘッドレスモード
+  - 高性能な3D処理
+- **図面生成エンジン**
+  - 自動図面生成
+  - レイヤー管理
+  - 寸法線生成
+- **建具記号ライブラリ**
+  - 標準記号セット
+  - カスタム記号対応
+  - バージョン管理
 
-### 2. YOLOv8 推論コンテナ
-- **ベースイメージ**: Python Slim
-- **主要コンポーネント**: ultralytics, OpenCV, NumPy
-- **機能**: 土地・道路のセグメンテーション、建築可能領域計算
+### 4. データストレージ層
+- **Google Cloud Storage**
+  - モデルファイル
+  - 生成された図面
+  - 一時データ
+- **Vertex AI**
+  - モデルトレーニング
+  - 推論エンドポイント
+  - モデル管理
+- **Cloud SQL**
+  - ユーザーデータ
+  - プロジェクト管理
+  - 設定情報
 
-### 3. Streamlit アプリコンテナ
-- **ベースイメージ**: Python
-- **主要コンポーネント**: Streamlit, Google Cloud クライアントライブラリ
-- **機能**: WebUI提供、ユーザー入力処理、結果表示
-
-### 4. FreeCAD サーバーコンテナ
-- **ベースイメージ**: Ubuntu 22.04
-- **主要コンポーネント**: 
-  - FreeCAD
-  - Python API
-  - libgl1-mesa-glx
-- **機能**: CAD図面生成
-- **デプロイメント**:
-  - Google Cloud Artifact Registryに保存
-  - イメージ名: `asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api`
-  - タグ: `latest`
-- **ビルド手順**:
-  ```bash
-  cd freecad_api
-  docker build --platform linux/amd64 \
-      -t asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
-      -f Dockerfile.freecad .
-  docker push asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest
-  ```
-- **環境変数**:
-  - `PYTHONPATH`: `/usr/lib/freecad/lib`
-  - `QT_QPA_PLATFORM`: `offscreen`
-- **エントリーポイント**: `FreeCADCmd /app/run_freecad.py`
+### 5. 管理・監視層
+- **Cloud Monitoring**
+  - システムメトリクス
+  - アラート設定
+  - ダッシュボード
+- **Cloud Logging**
+  - アプリケーションログ
+  - エラートレース
+  - 監査ログ
+- **Cloud Trace**
+  - パフォーマンス分析
+  - ボトルネック特定
+  - 分散トレース
 
 ## データフロー
 
-1. **入力処理**:
-   - ユーザーがStreamlit UIから土地図をアップロード
-   - 画像はCloud Storageに保存
-   - 処理パラメータ設定
+```mermaid
+sequenceDiagram
+    participant User as ユーザー
+    participant UI as Streamlit UI
+    participant Forms as Google Forms
+    participant Drive as Google Drive
+    participant AI as Vertex AI
+    participant CAD as FreeCAD API
+    participant Storage as Cloud Storage
+    participant DB as Cloud SQL
 
-2. **分析処理**:
-   - YOLOv8推論エンジンが土地・道路をセグメンテーション
-   - 建築可能領域を計算（法規制も考慮）
-   - 最適な建物配置と間取りを自動生成
-
-3. **CAD生成**:
-   - 最適化された建物データからFreeCADスクリプトを生成
-   - FreeCADエンジンでスクリプトを実行
-   - CAD図面を生成しCloud Storageに保存
-
-4. **出力処理**:
-   - 生成されたCAD図面をStreamlit UIに表示
-   - ユーザーがDXF/DWG形式でダウンロード
-
-## ディレクトリ構造
-
-```
-house-design-ai/
-├── terraform/               # インフラストラクチャコード
-│   ├── environments/        # 環境別の設定
-│   │   ├── dev/            # 開発環境
-│   │   └── prod/           # 本番環境
-│   └── modules/            # 再利用可能なモジュール
-│       ├── monitoring/     # モニタリング設定
-│       └── storage/        # ストレージ設定
-│
-├── deploy/                 # デプロイメント関連
-│   ├── dockerfiles/        # コンテナ定義
-│   └── cloud-build/        # CI/CD設定
-│
-├── src/                    # ソースコード
-│   ├── cloud/              # クラウド連携 (Vertex AI)
-│   ├── processing/         # 画像処理ロジック
-│   ├── utils/              # ユーティリティ関数
-│   ├── visualization/      # 可視化ツール
-│   ├── cli.py              # コマンドラインインターフェース
-│   ├── train.py            # モデルトレーニングロジック
-│   └── inference.py        # 推論ロジック
-│
-├── streamlit/             # Streamlitアプリケーション
-│   ├── app.py             # メインアプリケーション
-│   └── pages/             # 追加ページ
-│
-├── freecad_api/           # FreeCAD連携API
-│   ├── server.py          # FreeCADサーバー
-│   ├── client.py          # FreeCADクライアント
-│   └── templates/         # FreeCADスクリプトテンプレート
-│
-├── config/                # 設定ファイル
-│   ├── data.yaml          # データ設定
-│   └── service_account.json # サービスアカウント認証情報
-│
-├── tests/                 # テストコード
-│   ├── unit/              # ユニットテスト
-│   └── integration/       # 統合テスト
-│
-├── notebooks/             # Jupyter notebooks
-├── datasets/              # データセットディレクトリ
-├── scripts/               # ユーティリティスクリプト
-├── DOCS/                  # ドキュメント
-├── requirements.txt       # 依存関係
-├── requirements-dev.txt   # 開発用依存関係
-└── README.md             # プロジェクト説明
+    User->>Forms: 土地図アップロード
+    Forms->>Drive: データ保存
+    Drive->>UI: データ同期
+    UI->>AI: セグメンテーション要求
+    AI->>Storage: モデル読み込み
+    AI->>UI: セグメンテーション結果
+    UI->>AI: 形状解析要求
+    AI->>UI: 解析結果
+    UI->>CAD: CAD生成要求
+    CAD->>Storage: テンプレート読み込み
+    CAD->>UI: 生成された図面
+    UI->>Storage: 図面保存
+    UI->>DB: プロジェクト情報保存
+    UI->>User: 結果表示
 ```
 
-## デプロイメントフロー
+## セキュリティ構成
 
-1. **インフラストラクチャプロビジョニング**:
-   - Terraformによる基盤リソースの作成
-   - ネットワーク・IAM・ストレージの設定
-   - モニタリング・アラートの設定
+```mermaid
+graph TB
+    subgraph "認証・認可"
+        A1[Cloud IAM]
+        A2[Firebase Auth]
+        A3[API Key]
+    end
 
-2. **コンテナイメージのビルドとプッシュ**:
-   - Cloud Buildによる自動ビルド
-   - Artifact Registryへのプッシュ
-   - イメージのタグ付けと管理
+    subgraph "データ保護"
+        B1[Cloud KMS]
+        B2[Secret Manager]
+        B3[VPC]
+    end
 
-3. **アプリケーションのデプロイ**:
-   - Cloud Runへのデプロイ
-   - 環境変数の設定
-   - スケーリング設定
+    subgraph "監視・ログ"
+        C1[Cloud Audit]
+        C2[Security Command Center]
+        C3[Cloud Armor]
+    end
 
-4. **モニタリングの設定**:
-   - アラートポリシーの設定
-   - ダッシュボードの作成
-   - ログの収集と分析
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    B1 --> B2
+    B2 --> B3
+    B3 --> C1
+    C1 --> C2
+    C2 --> C3
+```
+
+## スケーリング構成
+
+```mermaid
+graph TB
+    subgraph "自動スケーリング"
+        D1[Cloud Run]
+        D2[Vertex AI]
+        D3[Cloud SQL]
+    end
+
+    subgraph "負荷分散"
+        E1[Cloud Load Balancing]
+        E2[CDN]
+        E3[Cloud Storage]
+    end
+
+    subgraph "キャッシュ"
+        F1[Memorystore]
+        F2[Cloud CDN]
+        F3[Cloud Storage]
+    end
+
+    D1 --> E1
+    D2 --> E1
+    D3 --> E1
+    E1 --> E2
+    E2 --> E3
+    E3 --> F1
+    F1 --> F2
+    F2 --> F3
+```
