@@ -2,7 +2,7 @@
 
 ## システム概要
 
-土地図をアップロードするだけで一軒家のCAD図を自動的に生成するシステム。YOLOv11ベースの土地・道路分析からFreeCADを活用したCAD図面生成までを一貫して行う。将来的にはYOLOv12への移行も計画されている。
+土地図をアップロードするだけで一軒家のCAD図を自動的に生成するシステム。YOLOv8ベースの土地・道路分析からFreeCADを活用したCAD図面生成までを一貫して行う。
 
 ## システムアーキテクチャ
 
@@ -15,7 +15,7 @@ graph TB
     end
 
     subgraph "分析処理層"
-        E[YOLOv11 推論エンジン] --> F[土地・道路セグメンテーション]
+        E[YOLOv8 推論エンジン] --> F[土地・道路セグメンテーション]
         F --> G[建築可能領域計算]
         G --> H[建物配置最適化]
         H --> I[間取り自動生成]
@@ -58,27 +58,24 @@ graph TB
 
 ## Google Cloudリソース構成
 
-| リソース                               | 用途                   | 詳細設定                    |
-|------------------------------------|------------------------|-----------------------------|
-| **Vertex AI**                      | YOLOv11モデルのトレーニングと推論 | カスタムコンテナ、GPUインスタンス          |
-| **Cloud Storage**                  | データ・モデル・CAD図の保存     | 階層化ストレージ、適切なアクセス制御   |
-| **Cloud Run**                      | Streamlitアプリのホスティング    | オートスケール、メモリ最適化           |
-| **GKE (Google Kubernetes Engine)** | FreeCADサーバーの実行       | 必要に応じたスケーリング、永続ボリューム   |
-| **Cloud Build**                    | CI/CDパイプライン            | ソースコード変更時の自動ビルド・デプロイ   |
-| **Firebase Authentication**        | ユーザー認証               | メール認証、必要に応じてGoogle連携 |
-| **Cloud Firestore**                | ユーザーデータ・生成結果の保存  | NoSQLデータベース                 |
-| **Secret Manager**                 | API鍵などの機密情報管理   | 適切なアクセス制御               |
-| **Cloud Monitoring**               | システム監視               | アラート設定、ダッシュボード            |
-| **Cloud Logging**                  | ログ収集・分析            | 集中管理、フィルタリング            |
+| リソース                  | 用途                  | 詳細設定                    |
+|-----------------------|-----------------------|-----------------------------|
+| **Vertex AI**         | YOLOv8モデルのトレーニングと推論 | カスタムコンテナ、GPUインスタンス          |
+| **Cloud Storage**     | データ・モデル・CAD図の保存    | 階層化ストレージ、適切なアクセス制御   |
+| **Cloud Run**         | FreeCAD APIのホスティング    | メモリ2GB、CPU 2コア、タイムアウト300秒  |
+| **Artifact Registry** | コンテナイメージの保存         | FreeCAD APIイメージの管理        |
+| **Cloud Build**       | CI/CDパイプライン           | ソースコード変更時の自動ビルド・デプロイ   |
+| **Cloud Monitoring**  | システム監視              | エラー率、レイテンシー、メモリ使用量の監視 |
+| **Cloud Logging**     | ログ収集・分析           | 集中管理、フィルタリング            |
 
 ## コンテナ構成
 
-### 1. YOLOv11 トレーニングコンテナ
+### 1. YOLOv8 トレーニングコンテナ
 - **ベースイメージ**: NVIDIA CUDA + Python
 - **主要コンポーネント**: ultralytics, OpenCV, Google Cloud SDK
 - **機能**: セグメンテーションモデルのトレーニング
 
-### 2. YOLOv11 推論コンテナ
+### 2. YOLOv8 推論コンテナ
 - **ベースイメージ**: Python Slim
 - **主要コンポーネント**: ultralytics, OpenCV, NumPy
 - **機能**: 土地・道路のセグメンテーション、建築可能領域計算
@@ -97,13 +94,15 @@ graph TB
 - **機能**: CAD図面生成
 - **デプロイメント**:
   - Google Cloud Artifact Registryに保存
-  - イメージ名: `asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api`
+  - イメージ名: `asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api`
   - タグ: `latest`
 - **ビルド手順**:
   ```bash
   cd freecad_api
-  docker build -t asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest -f Dockerfile.freecad .
-  docker push asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/freecad-api:latest
+  docker build --platform linux/amd64 \
+      -t asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
+      -f Dockerfile.freecad .
+  docker push asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest
   ```
 - **環境変数**:
   - `PYTHONPATH`: `/usr/lib/freecad/lib`
@@ -118,7 +117,7 @@ graph TB
    - 処理パラメータ設定
 
 2. **分析処理**:
-   - YOLOv11推論エンジンが土地・道路をセグメンテーション
+   - YOLOv8推論エンジンが土地・道路をセグメンテーション
    - 建築可能領域を計算（法規制も考慮）
    - 最適な建物配置と間取りを自動生成
 
@@ -136,17 +135,15 @@ graph TB
 ```
 house-design-ai/
 ├── terraform/               # インフラストラクチャコード
-│   ├── main.tf             # メインTerraform構成
-│   ├── variables.tf        # 変数定義
-│   ├── outputs.tf          # 出力定義
-│   ├── storage.tf          # Storageリソース
-│   ├── compute.tf          # 計算リソース(Vertex AI, GKE)
-│   ├── network.tf          # ネットワーク構成
-│   └── iam.tf              # 権限設定
+│   ├── environments/        # 環境別の設定
+│   │   ├── dev/            # 開発環境
+│   │   └── prod/           # 本番環境
+│   └── modules/            # 再利用可能なモジュール
+│       ├── monitoring/     # モニタリング設定
+│       └── storage/        # ストレージ設定
 │
 ├── deploy/                 # デプロイメント関連
 │   ├── dockerfiles/        # コンテナ定義
-│   ├── k8s/                # Kubernetes構成
 │   └── cloud-build/        # CI/CD設定
 │
 ├── src/                    # ソースコード
@@ -158,39 +155,30 @@ house-design-ai/
 │   ├── train.py            # モデルトレーニングロジック
 │   └── inference.py        # 推論ロジック
 │
-├── house_design_app/       # Streamlitアプリケーション
-│   ├── app.py              # メインアプリケーション
-│   ├── pages/              # 追加ページ
-│   └── components/         # UIコンポーネント
+├── streamlit/             # Streamlitアプリケーション
+│   ├── app.py             # メインアプリケーション
+│   └── pages/             # 追加ページ
 │
-├── freecad_api/            # FreeCAD連携API
-│   ├── server.py           # FreeCADサーバー
-│   ├── client.py           # FreeCADクライアント
-│   └── templates/          # FreeCADスクリプトテンプレート
+├── freecad_api/           # FreeCAD連携API
+│   ├── server.py          # FreeCADサーバー
+│   ├── client.py          # FreeCADクライアント
+│   └── templates/         # FreeCADスクリプトテンプレート
 │
-├── config/                 # 設定ファイル
-│   ├── data.yaml           # データ設定
+├── config/                # 設定ファイル
+│   ├── data.yaml          # データ設定
 │   └── service_account.json # サービスアカウント認証情報
 │
-├── tests/                  # テストコード
-│   ├── unit/               # ユニットテスト
-│   └── integration/        # 統合テスト
+├── tests/                 # テストコード
+│   ├── unit/              # ユニットテスト
+│   └── integration/       # 統合テスト
 │
-├── notebooks/              # Jupyter notebooks
-│
-├── datasets/               # データセットディレクトリ
-│
-├── scripts/                # ユーティリティスクリプト
-│
-├── DOCS/                   # ドキュメント
-│   └── 0407/               # 2024年4月7日のドキュメント
-│
-├── requirements.txt        # 依存関係
-├── requirements-dev.txt    # 開発用依存関係
-├── Dockerfile              # Dockerイメージ定義
-├── run.sh                  # 実行スクリプト
-├── ROADMAP.md              # ロードマップ
-└── CLOUD_DEPLOYMENT_PLAN.md # クラウドデプロイメント計画
+├── notebooks/             # Jupyter notebooks
+├── datasets/              # データセットディレクトリ
+├── scripts/               # ユーティリティスクリプト
+├── DOCS/                  # ドキュメント
+├── requirements.txt       # 依存関係
+├── requirements-dev.txt   # 開発用依存関係
+└── README.md             # プロジェクト説明
 ```
 
 ## デプロイメントフロー
@@ -198,27 +186,19 @@ house-design-ai/
 1. **インフラストラクチャプロビジョニング**:
    - Terraformによる基盤リソースの作成
    - ネットワーク・IAM・ストレージの設定
+   - モニタリング・アラートの設定
 
-2. **コンテナビルド**:
-   - Cloud BuildによるDockerイメージのビルド
+2. **コンテナイメージのビルドとプッシュ**:
+   - Cloud Buildによる自動ビルド
    - Artifact Registryへのプッシュ
+   - イメージのタグ付けと管理
 
-3. **サービスデプロイメント**:
-   - YOLOv11モデルのVertex AIへのデプロイ
-   - FreeCADサーバーのGKEへのデプロイ
-   - StreamlitアプリのCloud Runへのデプロイ
+3. **アプリケーションのデプロイ**:
+   - Cloud Runへのデプロイ
+   - 環境変数の設定
+   - スケーリング設定
 
-4. **監視・運用設定**:
-   - Cloud Monitoringダッシュボードの設定
-   - アラート設定
-   - ロギング構成
-
-## 拡張性と将来計画
-
-- **3Dモデル生成**: 平面CAD図から3Dモデルへの拡張
-- **詳細建築プラン**: 構造計算や設備計画の自動化
-- **AI改善サイクル**: ユーザーフィードバックに基づくモデル改善
-- **API提供**: 他システムとの連携のためのAPIエンドポイント
-- **拡張現実(AR)連携**: 現地での建物可視化
-
-以上の構成は、土地図から一軒家CAD図を自動生成するシステムの基盤となります。Google Cloudを活用し、Terraformで一元管理することで、スケーラブルで保守性の高いシステムを実現します。
+4. **モニタリングの設定**:
+   - アラートポリシーの設定
+   - ダッシュボードの作成
+   - ログの収集と分析
