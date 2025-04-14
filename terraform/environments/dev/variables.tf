@@ -8,11 +8,11 @@ variable "region" {
   type        = string
 }
 
-# Streamlit関連の変数はコメントアウト
-# variable "streamlit_image" {
-#   description = "Streamlitイメージのフルパス"
-#   type        = string
-# }
+# Streamlit関連の変数
+variable "streamlit_image" {
+  description = "Streamlitイメージのフルパス"
+  type        = string
+}
 
 variable "freecad_api_image" {
   description = "FreeCAD APIイメージのフルパス"

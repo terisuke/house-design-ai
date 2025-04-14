@@ -14,18 +14,22 @@ provider "google" {
 }
 
 # Cloud Run サービス
-# Streamlitサービスのデプロイはスキップ
-# module "streamlit_service" {
-#   source = "../../modules/cloud-run"
-#
-#   project_id            = var.project_id
-#   region                = var.region
-#   service_name          = "streamlit-web"
-#   image                 = var.streamlit_image
-#   memory                = "1Gi"
-#   cpu                   = "1"
-#   allow_unauthenticated = true
-# }
+# Streamlitサービスのデプロイ
+module "streamlit_service" {
+  source = "../../modules/cloud-run"
+
+  project_id            = var.project_id
+  region                = var.region
+  service_name          = "streamlit-web"
+  image                 = var.streamlit_image
+  memory                = "1Gi"
+  cpu                   = "1"
+  allow_unauthenticated = true
+  environment_variables = {
+    BUCKET_NAME     = module.storage.bucket_name
+    FREECAD_API_URL = "https://freecad-api-service-xxxxx-xx.a.run.app" # デプロイ後に実際のURLに置き換える
+  }
+}
 
 # FreeCAD API サービス
 module "freecad_api_service" {

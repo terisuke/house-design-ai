@@ -331,9 +331,11 @@ def load_yolo_model(model_path: Optional[str] = None) -> YOLO:
     """
     if model_path is None:
         from src.cloud.storage import download_model_from_gcs
+
         model_path = download_model_from_gcs()
 
     from ultralytics import YOLO
+
     model = YOLO(model_path)
     return model
 
@@ -352,15 +354,13 @@ def process_image(model: YOLO, image_path: str) -> List[Dict[str, Any]]:
         raise FileNotFoundError(f"Image not found: {image_path}")
 
     results = model.predict(image_path)
-    
+
     buildings = []
     for detection in results[0].boxes.data:
         x1, y1, x2, y2, conf, cls = detection.tolist()
-        buildings.append({
-            "bbox": [x1, y1, x2, y2],
-            "confidence": conf,
-            "class": int(cls)
-        })
+        buildings.append(
+            {"bbox": [x1, y1, x2, y2], "confidence": conf, "class": int(cls)}
+        )
     return buildings
 
 
@@ -426,12 +426,73 @@ def send_to_freecad_api(grid_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: APIレスポンス
     """
-    return {"success": True, "data": {"url": "http://example.com"}}
+    try:
+        # FreeCAD APIのエンドポイントを取得
+        freecad_api_url = os.environ.get(
+            "FREECAD_API_URL", "http://freecad-api-service:8080"
+        )
 
+        # グリッドデータをFreeCAD APIの形式に変換
+        rooms = []
+        walls = []
+
+        # グリッドデータから部屋情報を抽出
+        if "madori_info" in grid_data:
+            for i, (room_name, room_info) in enumerate(
+                grid_data["madori_info"].items()
+            ):
+                width = room_info.get("width", 0)
+                height = room_info.get("height", 0)
+                position = room_info.get("position", [0, 0])
+
+                # 寸法をメートル単位に変換（1グリッド = 0.91m）
+                width_m = width * 0.91
+                height_m = height * 0.91
+
+                rooms.append(
+                    {
+                        "id": i,
+                        "dimensions": [width_m, height_m],
+                        "position": position,
+                        "label": room_name,
+                    }
+                )
+
+        # 壁の情報を抽出（簡易的な実装）
+        if "grid" in grid_data and "grid_stats" in grid_data:
+            grid_stats = grid_data.get("grid_stats", {})
+            if "boundaries" in grid_stats:
+                for boundary in grid_stats["boundaries"]:
+                    walls.append(
+                        {
+                            "start": boundary.get("start", [0, 0]),
+                            "end": boundary.get("end", [0, 0]),
+                            "height": 2.5,
+                        }
+                    )
+
+        # APIリクエスト用のデータを作成
+        api_data = {"rooms": rooms, "walls": walls}
+
+        # APIにリクエストを送信
+        response = requests.post(
+            f"{freecad_api_url}/process/grid", json=api_data, timeout=60
+        )
+
+        # レスポンスを確認
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"FreeCAD APIエラー: {response.status_code} - {response.text}")
+            return {"success": False, "error": f"APIエラー: {response.status_code}"}
+
+    except Exception as e:
+        logger.error(f"FreeCAD API呼び出しエラー: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def convert_to_2d_drawing(grid_data: Dict[str, Any]) -> Dict[str, Any]:
-    """グリッドデータを2D図面に変換する
+    """2D図面を生成する
 
     Args:
         grid_data (Dict[str, Any]): グリッドデータ
@@ -439,8 +500,58 @@ def convert_to_2d_drawing(grid_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: APIレスポンス
     """
-    return {"success": True, "data": {"url": "http://example.com"}}
+    try:
+        # FreeCAD APIのエンドポイントを取得
+        freecad_api_url = os.environ.get(
+            "FREECAD_API_URL", "http://freecad-api-service:8080"
+        )
 
+        # 一時ファイルを作成
+        with tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False) as temp_file:
+            temp_file_path = temp_file.name
+
+            # モデルファイルをダウンロード
+            if "url" in grid_data:
+                model_url = grid_data["url"]
+
+                # Cloud Storageからファイルをダウンロード
+                bucket_name = os.environ.get("BUCKET_NAME", "house-design-ai-data")
+                file_name = model_url.split("/")[-1]
+
+                # Google Cloud Storageからダウンロード
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(f"models/{file_name}")
+                blob.download_to_filename(temp_file_path)
+
+                # ファイルをアップロードして2D変換をリクエスト
+                with open(temp_file_path, "rb") as f:
+                    files = {"file": (file_name, f, "application/octet-stream")}
+                    response = requests.post(
+                        f"{freecad_api_url}/convert/2d", files=files, timeout=60
+                    )
+
+                # 一時ファイルを削除
+                os.unlink(temp_file_path)
+
+                # レスポンスを確認
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.error(
+                        f"FreeCAD APIエラー: {response.status_code} - {response.text}"
+                    )
+                    return {
+                        "success": False,
+                        "error": f"APIエラー: {response.status_code}",
+                    }
+            else:
+                logger.error("モデルURLが指定されていません")
+                return {"success": False, "error": "モデルURLが指定されていません"}
+
+    except Exception as e:
+        logger.error(f"2D図面生成エラー: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def main():
