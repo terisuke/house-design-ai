@@ -1,10 +1,10 @@
 # House Design AI
 
-建物のセグメンテーションとグリッド生成のためのYOLOv8ベースのAIソリューション
+建物のセグメンテーションとグリッド生成のためのYOLOシリーズベースのAIソリューション
 
 ## 概要
 
-House Design AIは、建物のセグメンテーションとグリッド生成を自動化するAIソリューションです。YOLOv8を使用した物体検出とセグメンテーション、Google Cloud Platform (Vertex AI)を活用したトレーニング、Streamlitを使用した使いやすいインターフェースを提供します。
+House Design AIは、建物のセグメンテーションとグリッド生成を自動化するAIソリューションです。YOLOシリーズを使用した物体検出とセグメンテーション、Google Cloud Platform (Vertex AI)を活用したトレーニング、Streamlitを使用した使いやすいインターフェースを提供します。
 
 ## 主な機能
 
@@ -41,6 +41,21 @@ house-design-ai/
 ├── config/                   # 設定ファイル (data.yaml, service_account.json)
 ├── datasets/                 # データセットディレクトリ
 ├── deploy/                   # デプロイ関連ファイル
+├── DOCS/                     # ドキュメント
+│   └── 0407/                 # 2024年4月7日のドキュメント
+├── freecad_api/              # FreeCAD API関連
+│   ├── Dockerfile            # FreeCAD API用Dockerfile
+│   ├── Dockerfile.freecad    # FreeCAD用Dockerfile
+│   ├── examples/             # サンプルコード
+│   ├── main.py               # FreeCAD APIのメインコード
+│   ├── requirements-freecad-api.txt # FreeCAD API用依存関係
+│   ├── scripts/              # FreeCAD用スクリプト
+│   └── test_data.json        # テストデータ
+├── house_design_app/         # Streamlitアプリケーション
+│   ├── main.py               # メインアプリケーション
+│   ├── pages/                # マルチページアプリのサブページ
+│   ├── requirements-streamlit.txt # Streamlit用依存関係
+│   └── logo.png              # アプリロゴ
 ├── notebooks/                # Jupyter notebooks
 ├── scripts/                  # ユーティリティスクリプト
 ├── src/                      # ソースコード
@@ -51,10 +66,17 @@ house-design-ai/
 │   ├── cli.py                # コマンドラインインターフェース
 │   ├── train.py              # モデルトレーニングロジック
 │   └── inference.py          # 推論ロジック
-├── streamlit/                # Streamlitアプリ
-│   ├── pages/                # マルチページアプリのサブページ
-│   └── app.py                # メインアプリケーション
-└── tests/                    # テストコード
+├── terraform/                # Terraformインフラストラクチャコード
+├── tests/                    # テストコード
+├── Dockerfile                # メインDockerfile
+├── requirements.txt          # 依存関係
+├── requirements-dev.txt      # 開発用依存関係
+├── FreeCAD.md                # FreeCAD統合ガイド
+├── GCP_DEPLOYMENT_GUIDE.md   # GCPデプロイメントガイド
+├── CLOUD_DEPLOYMENT_PLAN.md  # クラウドデプロイメント計画
+├── CONTRIBUTING.md           # 貢献ガイド
+├── ROADMAP.md                # 開発ロードマップ
+└── README.md                 # プロジェクト説明
 ```
 
 ## セットアップ
@@ -88,10 +110,9 @@ source venv/bin/activate  # Linuxの場合
 pip install -r requirements.txt
 ```
 
-4. 環境変数の設定:
+4. 開発用依存関係のインストール（開発者の場合）:
 ```bash
-cp .env.example .env
-# .envファイルを編集して必要な設定を行う
+pip install -r requirements-dev.txt
 ```
 
 ## 使用方法
@@ -100,8 +121,8 @@ cp .env.example .env
 
 1. Streamlitアプリの起動:
 ```bash
-cd streamlit
-streamlit run app.py
+cd house_design_app
+streamlit run main.py
 ```
 
 2. モデルのトレーニング:
@@ -112,6 +133,21 @@ python src/train.py --config config/train_config.yaml
 3. 推論の実行:
 ```bash
 python src/inference.py --image path/to/image.jpg
+```
+
+### FreeCAD APIの使用
+
+1. FreeCAD APIの起動:
+```bash
+cd freecad_api
+python main.py
+```
+
+2. Dockerを使用した起動:
+```bash
+cd freecad_api
+docker build -t freecad-api -f Dockerfile.freecad .
+docker run -p 8000:8000 freecad-api
 ```
 
 ### クラウドデプロイ
@@ -130,7 +166,7 @@ gcloud services enable cloudbuild.googleapis.com
 
 3. Terraformによるインフラストラクチャのデプロイ:
 ```bash
-cd deploy/terraform
+cd terraform
 terraform init
 terraform plan
 terraform apply
@@ -178,6 +214,8 @@ terraform apply
 3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
 4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
 5. プルリクエストを作成
+
+詳細な貢献ガイドについては、[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
 
 ## 連絡先
 

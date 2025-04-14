@@ -7,10 +7,11 @@
 - あなたは建物セグメンテーションと建物解析の分野で認められており、特にYOLOv8を使用した物体検出とセグメンテーションモデルの開発と展開に関する実績があります。
 - あなたはGoogle Cloud Platform、特にVertex AIでのMLモデルのトレーニングと展開に精通しています。
 - 優れたデータサイエンティストとして、データ分析、可視化、複雑なデータセットからの実用的な洞察の導出に優れています。
+- あなたはFreeCAD APIの統合と活用に関する専門知識を持っています。
 
 # プロジェクト概要
 
-House Design AIは、建物のセグメンテーションとグリッド生成のためのYOLOv8ベースのAIソリューションです。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
+House Design AIは、建物のセグメンテーションとグリッド生成のためのYOLOv8ベースのAIソリューションです。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。また、FreeCAD APIを統合して3Dモデル生成機能も提供します。
 
 ## 主な機能
 - 建物と道路の検出・セグメンテーション
@@ -18,6 +19,7 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - 建物領域への規則的なグリッド適用
 - Vertex AIでのモデルトレーニング
 - Streamlitベースの直感的なUIの提供
+- FreeCAD APIによる3Dモデル生成
 
 # 技術スタック
 
@@ -36,6 +38,8 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - **データ処理:** PyYAML, numpy
 - **データ検証:** pydantic
 - **バージョン管理:** git
+- **3Dモデリング:** FreeCAD API
+- **インフラストラクチャコード:** Terraform
 
 # プロジェクト構造
 
@@ -44,6 +48,21 @@ house-design-ai/
 ├── config/                   # 設定ファイル (data.yaml, service_account.json)
 ├── datasets/                 # データセットディレクトリ
 ├── deploy/                   # デプロイ関連ファイル
+├── DOCS/                     # ドキュメント
+│   └── 0407/                 # 2024年4月7日のドキュメント
+├── freecad_api/              # FreeCAD API関連
+│   ├── Dockerfile            # FreeCAD API用Dockerfile
+│   ├── Dockerfile.freecad    # FreeCAD用Dockerfile
+│   ├── examples/             # サンプルコード
+│   ├── main.py               # FreeCAD APIのメインコード
+│   ├── requirements-freecad-api.txt # FreeCAD API用依存関係
+│   ├── scripts/              # FreeCAD用スクリプト
+│   └── test_data.json        # テストデータ
+├── house_design_app/         # Streamlitアプリケーション
+│   ├── main.py               # メインアプリケーション
+│   ├── pages/                # マルチページアプリのサブページ
+│   ├── requirements-streamlit.txt # Streamlit用依存関係
+│   └── logo.png              # アプリロゴ
 ├── notebooks/                # Jupyter notebooks
 ├── scripts/                  # ユーティリティスクリプト
 ├── src/                      # ソースコード
@@ -54,10 +73,17 @@ house-design-ai/
 │   ├── cli.py                # コマンドラインインターフェース
 │   ├── train.py              # モデルトレーニングロジック
 │   └── inference.py          # 推論ロジック
-├── streamlit/                # Streamlitアプリ
-│   ├── pages/                # マルチページアプリのサブページ
-│   └── app.py                # メインアプリケーション
-└── tests/                    # テストコード
+├── terraform/                # Terraformインフラストラクチャコード
+├── tests/                    # テストコード
+├── Dockerfile                # メインDockerfile
+├── requirements.txt          # 依存関係
+├── requirements-dev.txt      # 開発用依存関係
+├── FreeCAD.md                # FreeCAD統合ガイド
+├── GCP_DEPLOYMENT_GUIDE.md   # GCPデプロイメントガイド
+├── CLOUD_DEPLOYMENT_PLAN.md  # クラウドデプロイメント計画
+├── CONTRIBUTING.md           # 貢献ガイド
+├── ROADMAP.md                # 開発ロードマップ
+└── README.md                 # プロジェクト説明
 ```
 
 # コーディングガイドライン
@@ -115,6 +141,14 @@ house-design-ai/
 - **エラー処理:** ユーザーフレンドリーなエラーメッセージを表示し、障害から適切に回復する。
 - **マルチページ設計:** `pages/`ディレクトリを活用して整理された機能別ページを提供する。
 
+## 8. FreeCAD API統合
+
+- **API設計:** FastAPIを使用して堅牢で効率的なAPIを設計する。
+- **エラーハンドリング:** FreeCAD処理中のエラーを適切に捕捉し、ユーザーに分かりやすいエラーメッセージを返す。
+- **非同期処理:** 長時間実行される処理は非同期で実行し、進行状況を返す。
+- **コンテナ化:** FreeCADをDockerコンテナで実行し、環境の一貫性を確保する。
+- **Cloud Run統合:** FreeCAD APIをCloud Runにデプロイし、スケーラブルな運用を実現する。
+
 # コード例の要件
 
 - すべての関数には型アノテーションを含める。
@@ -139,3 +173,4 @@ house-design-ai/
 - **建物セグメンテーションとグリッド生成のベストプラクティスを積極的に適用および推進する。**
 - **ローカル開発とクラウドデプロイメントの両方をサポートするように設計する。**
 - **データ処理とモデル推論のパイプラインを最適化し、エンドツーエンドのソリューションを構築する。**
+- **FreeCAD APIとの統合を考慮し、3Dモデル生成のための堅牢なインターフェースを提供する。**
