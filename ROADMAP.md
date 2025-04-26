@@ -104,7 +104,7 @@
 ## 現在のフェーズ（2024年Q2）
 
 ### 完了した項目
-- ✅ YOLOv8ベースの建物セグメンテーションモデルの開発
+- ✅ YOLOv11ベースの建物セグメンテーションモデルの開発
 - ✅ FreeCAD統合の基本実装
 - ✅ Google Cloud Platform環境の構築
 - ✅ Dockerコンテナ化の実装
@@ -270,4 +270,4 @@
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/) 
+- [Streamlit Documentation](https://docs.streamlit.io/)  

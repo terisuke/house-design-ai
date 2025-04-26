@@ -11,7 +11,7 @@ graph TB
     end
 
     subgraph "分析処理層"
-        D[YOLOv8 セグメンテーション]
+        D[YOLOv11 セグメンテーション]
         E[建物形状解析]
         F[間取り生成]
         G[建築基準法チェック]

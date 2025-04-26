@@ -16,7 +16,7 @@ app = FastAPI(
     # FreeCAD API for House Design AI
 
     このAPIは、建物の3Dモデルを自動生成するためのサービスを提供します。
-    YOLOv8による建物セグメンテーションの結果を基に、FreeCADを使用して3Dモデルを生成します。
+    YOLOv11による建物セグメンテーションの結果を基に、FreeCADを使用して3Dモデルを生成します。
 
     ## 主な機能
     - 建物の基本形状の3Dモデル生成

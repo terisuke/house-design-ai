@@ -16,7 +16,7 @@
 - **UI/UX:** Streamlitコンポーネント
 
 ## バックエンド
-- **コンピュータビジョン:** ultralytics (YOLO v8)
+- **コンピュータビジョン:** ultralytics (YOLO v11)
 - **画像処理:** OpenCV, PIL, numpy, matplotlib
 - **データ処理:** PyYAML, numpy
 - **データ検証:** pydantic
