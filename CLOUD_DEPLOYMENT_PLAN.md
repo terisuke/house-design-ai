@@ -46,7 +46,7 @@
 |-------------------------|--------------|----------------------------------------|--------|
 | **Streamlit WebUI**     | ユーザーインターフェース | Cloud Run, Streamlit, Python           | ✅ 実装済み |
 | **FreeCAD API Service** | CAD処理機能  | Cloud Run, FreeCAD Python API, FastAPI | ✅ 実装済み |
-| **ML Model Service**    | YOLO推論処理 | Vertex AI, YOLOv8                      | 🟡 進行中 |
+| **ML Model Service**    | YOLO推論処理 | Vertex AI, YOLOv11                     | 🟡 進行中 |
 
 ### 2.2 データストレージ
 
@@ -238,4 +238,4 @@
 
 4. **開発効率の向上** 🟡
    - CI/CDパイプラインの自動化
-   - 迅速なフィードバックループ 
+   - 迅速なフィードバックループ  

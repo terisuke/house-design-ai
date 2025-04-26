@@ -26,7 +26,7 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - **環境管理:** venv
 - **コンテナ化:** docker
 - **デモフレームワーク:** streamlit
-- **コンピュータビジョン:** ultralytics (YOLO v8)
+- **コンピュータビジョン:** ultralytics (YOLO v11)
 - **画像処理:** OpenCV, PIL, numpy, matplotlib
 - **クラウドインフラ:** Google Cloud Platform (Vertex AI, Cloud Storage)
 - **データ処理:** PyYAML, numpy

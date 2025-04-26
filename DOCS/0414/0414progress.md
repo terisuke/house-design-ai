@@ -122,4 +122,4 @@
 
 ### 7.2 重要なリンク
 - GCPプロジェクト: yolov8environment
-- Artifact Registry: asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai 
+- Artifact Registry: asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai                  

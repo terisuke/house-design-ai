@@ -220,4 +220,4 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 3. **セキュリティの強化**
    - WAFの導入
    - セキュリティスキャンの自動化
-   - コンプライアンスチェックの追加 
+   - コンプライアンスチェックの追加              
