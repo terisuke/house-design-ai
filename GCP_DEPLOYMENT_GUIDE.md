@@ -15,7 +15,7 @@
 
 ```bash
 # プロジェクトの設定
-gcloud config set project yolov11environment
+gcloud config set project yolov8environment
 ```
 
 ### 1.2 必要なAPIの有効化
@@ -33,7 +33,7 @@ gcloud services enable run.googleapis.com \
 
 このプロジェクトでは、以下の既存のサービスアカウントを使用します：
 ```
-yolo-v11-enviroment@yolov11environment.iam.gserviceaccount.com
+yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com
 ```
 
 このサービスアカウントには既に以下の必要な権限が付与されています：
@@ -49,7 +49,7 @@ yolo-v11-enviroment@yolov11environment.iam.gserviceaccount.com
 ```bash
 # サービスアカウントキーのダウンロード（必要な場合のみ）
 gcloud iam service-accounts keys create config/service_account.json \
-    --iam-account=yolo-v11-enviroment@yolov11environment.iam.gserviceaccount.com
+    --iam-account=yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com
 ```
 
 ## 2. インフラストラクチャのデプロイ
@@ -83,18 +83,18 @@ gcloud artifacts repositories create freecad-api \
     --repository-format=docker \
     --location=asia-northeast1 \
     --description="FreeCAD API Docker repository" \
-    --project=yolov11environment
+    --project=yolov8environment
 
 # Artifact Registryの認証設定
 gcloud auth configure-docker asia-northeast1-docker.pkg.dev
 
 # イメージのビルド（重要: Cloud Run用にAMD64アーキテクチャを指定）
 docker build --platform linux/amd64 \
-    -t asia-northeast1-docker.pkg.dev/yolov11environment/freecad-api/freecad-api:latest \
+    -t asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
     -f freecad_api/Dockerfile.freecad freecad_api/
 
 # イメージのプッシュ
-docker push asia-northeast1-docker.pkg.dev/yolov11environment/freecad-api/freecad-api:latest
+docker push asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest
 ```
 
 ### 3.2 Cloud Runへのデプロイ
@@ -102,20 +102,20 @@ docker push asia-northeast1-docker.pkg.dev/yolov11environment/freecad-api/freeca
 ```bash
 # サービスのデプロイ
 gcloud run deploy freecad-api \
-    --image asia-northeast1-docker.pkg.dev/yolov11environment/freecad-api/freecad-api:latest \
+    --image asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:latest \
     --platform managed \
     --region asia-northeast1 \
     --memory 2Gi \
     --cpu 2 \
     --timeout 300s \
     --allow-unauthenticated \
-    --project=yolov11environment
+    --project=yolov8environment
 
 # 環境変数の設定
 gcloud run services update freecad-api \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=yolov11environment" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=yolov8environment" \
     --region asia-northeast1 \
-    --project=yolov11environment
+    --project=yolov8environment
 ```
 
 ## 4. デプロイ済みサービス
@@ -126,7 +126,7 @@ gcloud run services update freecad-api \
   - メモリ: 2GB
   - CPU: 2
   - タイムアウト: 300秒
-  - プロジェクト: yolov11environment
+  - プロジェクト: yolov8environment
   - リージョン: asia-northeast1
   - 認証: 不要（パブリックアクセス可能）
 
@@ -142,9 +142,9 @@ gcloud run services update freecad-api \
 ```bash
 # ログシンクの作成
 gcloud logging sinks create house-design-ai-logs \
-    storage.googleapis.com/yolov11environment-logs \
+    storage.googleapis.com/yolov8environment-logs \
     --log-filter="resource.type=cloud_run_revision AND resource.labels.service_name=freecad-api" \
-    --project=yolov11environment
+    --project=yolov8environment
 ```
 
 ### 5.2 Cloud Monitoringの設定
@@ -155,7 +155,7 @@ gcloud monitoring channels create \
     --display-name="House Design AI Alerts" \
     --type=email \
     --email-address=your-email@example.com \
-    --project=yolov11environment
+    --project=yolov8environment
 
 gcloud monitoring alert-policies create \
     --display-name="FreeCAD API Error Rate" \
@@ -163,8 +163,8 @@ gcloud monitoring alert-policies create \
     --condition-filter="resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"freecad-api\" AND metric.type = \"run.googleapis.com/request_count\" AND metric.labels.response_code_class = \"5xx\"" \
     --condition-threshold-value=0.05 \
     --condition-threshold-duration=300s \
-    --notification-channels=projects/yolov11environment/monitoringChannels/your-channel-id \
-    --project=yolov11environment
+    --notification-channels=projects/yolov8environment/monitoringChannels/your-channel-id \
+    --project=yolov8environment
 ```
 
 ### 5.3 ログの確認
@@ -173,7 +173,7 @@ gcloud monitoring alert-policies create \
 # FreeCAD APIのログを確認
 gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=freecad-api" \
     --limit 50 \
-    --project=yolov11environment
+    --project=yolov8environment
 ```
 
 ## 6. セキュリティ考慮事項
@@ -220,4 +220,4 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 3. **セキュリティの強化**
    - WAFの導入
    - セキュリティスキャンの自動化
-   - コンプライアンスチェックの追加        
+   - コンプライアンスチェックの追加              

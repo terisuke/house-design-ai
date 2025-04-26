@@ -17,16 +17,16 @@
 - イメージのプッシュ完了
   - バージョンタグ付きイメージ：
     ```
-    asia-northeast1-docker.pkg.dev/yolov11environment/house-design-ai/streamlit:v1.0.0
+    asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/streamlit:v1.0.0
     ```
   - 最新版イメージ：
     ```
-    asia-northeast1-docker.pkg.dev/yolov11environment/house-design-ai/streamlit:latest
+    asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai/streamlit:latest
     ```
 
 ### 1.3 認証とセキュリティ
 - サービスアカウントの設定
-  - アカウント: `yolo-v11-enviroment@yolov11environment.iam.gserviceaccount.com`
+  - アカウント: `yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com`
   - 権限: Artifact Registry管理者
 - Dockerの認証設定
 - セキュリティベストプラクティスの適用
@@ -121,5 +121,5 @@
 - [ロードマップ](0414roadmap.md)
 
 ### 7.2 重要なリンク
-- GCPプロジェクト: yolov11environment
-- Artifact Registry: asia-northeast1-docker.pkg.dev/yolov11environment/house-design-ai         
+- GCPプロジェクト: yolov8environment
+- Artifact Registry: asia-northeast1-docker.pkg.dev/yolov8environment/house-design-ai                  
