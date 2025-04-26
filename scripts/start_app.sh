@@ -46,4 +46,4 @@ export STREAMLIT_SERVER_ADDRESS=localhost
 
 # Streamlitアプリの起動
 echo "Streamlitアプリを起動しています..."
-streamlit run "$PROJECT_ROOT/streamlit/app.py" 
+streamlit run "$PROJECT_ROOT/house_design_app/main.py"  
