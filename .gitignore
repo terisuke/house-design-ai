@@ -142,3 +142,16 @@ freecad_api/logs/
 README.md.bak
 LICENSE.bak.cursor/
 .cursor/
+
+# Terraform関連
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
