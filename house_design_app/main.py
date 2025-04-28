@@ -4,6 +4,7 @@
 (2025-03-12 修正版: A3横向き換算でマス目描画)
 (2025-03-27 修正版: FreeCADを使用したCAD風間取り図の生成機能を追加)
 (2025-04-05 修正版: FreeCAD APIとの連携機能を追加)
+(2025-04-28 修正版: PyTorchとStreamlitの互換性問題を解決)
 """
 
 import base64
@@ -19,7 +20,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import requests
 import streamlit as st
-from ultralytics import YOLO
+from PIL import Image  # PILのImageクラスは直接インポートしても問題ない
+
+# from ultralytics import YOLO
 
 from src.cloud.storage import (
     download_dataset,
@@ -320,7 +323,7 @@ except ImportError as e:
     import_errors.append(error_msg)
 
 
-def load_yolo_model(model_path: Optional[str] = None) -> YOLO:
+def load_yolo_model(model_path: Optional[str] = None):
     """YOLOモデルを読み込む
 
     Args:
@@ -334,34 +337,46 @@ def load_yolo_model(model_path: Optional[str] = None) -> YOLO:
 
         model_path = download_model_from_gcs()
 
-    from ultralytics import YOLO
+    try:
+        from ultralytics import YOLO
+        model = YOLO(model_path)
+        return model
+    except Exception as e:
+        logger.error(f"YOLOモデルのロード中にエラーが発生しました: {e}")
+        return None
 
-    model = YOLO(model_path)
-    return model
 
-
-def process_image(model: YOLO, image_path: str) -> List[Dict[str, Any]]:
-    """画像を処理して建物を検出する
-
-    Args:
-        model (YOLO): YOLOモデル
-        image_path (str): 画像ファイルのパス
-
-    Returns:
-        List[Dict[str, Any]]: 検出された建物のリスト
+def process_image(
+    model,
+    image_file,
+    global_setback_mm: float = 5.0,
+    road_setback_mm: float = 50.0,
+    grid_mm: float = 9.1,
+    near_offset_px: Optional[int] = None,
+    far_offset_px: Optional[int] = None,
+    floorplan_mode: bool = False
+) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"Image not found: {image_path}")
-
-    results = model.predict(image_path)
-
-    buildings = []
-    for detection in results[0].boxes.data:
-        x1, y1, x2, y2, conf, cls = detection.tolist()
-        buildings.append(
-            {"bbox": [x1, y1, x2, y2], "confidence": conf, "class": int(cls)}
+    画像を推論し、マスク処理・レイアウト生成を行う。
+    
+    注意: この関数はsrc.processing.mask.process_imageの呼び出しに転送するだけのスタブです。
+    PyTorchとStreamlitの互換性問題を解決するために、直接インポートではなく遅延インポートを使用します。
+    """
+    try:
+        from src.processing.mask import process_image as process_image_impl
+        return process_image_impl(
+            model=model,
+            image_file=image_file,
+            global_setback_mm=global_setback_mm,
+            road_setback_mm=road_setback_mm,
+            grid_mm=grid_mm,
+            near_offset_px=near_offset_px,
+            far_offset_px=far_offset_px,
+            floorplan_mode=floorplan_mode
         )
-    return buildings
+    except Exception as e:
+        logger.exception(f"画像処理中にエラーが発生しました: {e}")
+        return None
 
 
 def generate_grid(buildings: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -491,15 +506,18 @@ def send_to_freecad_api(grid_data: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def convert_to_2d_drawing(grid_data: Dict[str, Any]) -> Dict[str, Any]:
+def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, Any]:
     """2D図面を生成する
 
     Args:
-        grid_data (Dict[str, Any]): グリッドデータ
+        grid_data (Union[Dict[str, Any], str]): グリッドデータまたはFreeCADファイルのパス
 
     Returns:
         Dict[str, Any]: APIレスポンス
     """
+    if isinstance(grid_data, str) and os.path.exists(grid_data):
+        file_path = grid_data
+        grid_data = {"file_path": file_path}
     try:
         # FreeCAD APIのエンドポイントを取得
         freecad_api_url = os.environ.get(
@@ -511,7 +529,7 @@ def convert_to_2d_drawing(grid_data: Dict[str, Any]) -> Dict[str, Any]:
             temp_file_path = temp_file.name
 
             # モデルファイルをダウンロード
-            if "url" in grid_data:
+            if isinstance(grid_data, dict) and "url" in grid_data:
                 model_url = grid_data["url"]
 
                 # Cloud Storageからファイルをダウンロード
@@ -519,9 +537,14 @@ def convert_to_2d_drawing(grid_data: Dict[str, Any]) -> Dict[str, Any]:
                 file_name = model_url.split("/")[-1]
 
                 # Google Cloud Storageからダウンロード
-                storage_client = storage.Client()
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(f"models/{file_name}")
+                try:
+                    import google.cloud.storage as gcs_storage
+                    storage_client = gcs_storage.Client()
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(f"models/{file_name}")
+                except ImportError:
+                    logger.error("Google Cloud Storageライブラリのインポートに失敗しました")
+                    return {"success": False, "error": "Google Cloud Storageライブラリのインポートに失敗しました"}
                 blob.download_to_filename(temp_file_path)
 
                 # ファイルをアップロードして2D変換をリクエスト
@@ -803,14 +826,14 @@ def main():
                                 if st.button("3Dモデルを生成"):
                                     with st.spinner("3Dモデルを生成中..."):
                                         # グリッドデータを準備
-                                        grid_data = {
-                                            "grid": grid_data,
+                                        grid_data_obj = {
+                                            "grid": debug_info.get("grid", {}),  # result_gridの代わりにdebug_infoから取得
                                             "madori_info": madori_info,
                                             "params": debug_info.get("params", {}),
                                         }
 
                                         # FreeCAD APIに送信
-                                        cad_model_url = send_to_freecad_api(grid_data)
+                                        cad_model_url = send_to_freecad_api(grid_data_obj)
 
                                         if cad_model_url:
                                             st.success("3Dモデルの生成に成功しました")
@@ -826,9 +849,10 @@ def main():
                                                         "BUCKET_NAME",
                                                         "house-design-ai-data",
                                                     )
-                                                    file_name = cad_model_url.split(
-                                                        "/"
-                                                    )[-1]
+                                                    if isinstance(cad_model_url, str):
+                                                        file_name = cad_model_url.split("/")[-1]
+                                                    else:
+                                                        file_name = str(cad_model_url)
 
                                                     # 一時ファイルとして保存
                                                     with tempfile.NamedTemporaryFile(
@@ -837,9 +861,12 @@ def main():
                                                         temp_file_path = temp_file.name
 
                                                     # Google Cloud Storageからダウンロード
-                                                    from google.cloud import storage
-
-                                                    storage_client = storage.Client()
+                                                    try:
+                                                        import google.cloud.storage as gcs_storage
+                                                        storage_client = gcs_storage.Client()
+                                                    except ImportError:
+                                                        st.error("Google Cloud Storageライブラリのインポートに失敗しました")
+                                                        return None
                                                     bucket = storage_client.bucket(
                                                         bucket_name
                                                     )
