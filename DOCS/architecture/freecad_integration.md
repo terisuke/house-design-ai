@@ -133,6 +133,56 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 - エラーハンドリングの強化
 - モニタリングの改善
 
+## 11. 実装状況 (2025-04-28更新)
+
+FreeCAD APIのCloud Run実装は成功しています。以下のテスト結果が確認されています：
+
+```
+PYTHONPATH=. streamlit run house_design_app/main.py
+```
+でstreamlitの実行成功を確認しました。また、
+
+```
+python scripts/test_freecad_api.py
+```
+
+のテスト結果：
+```
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "<gs://house-design-ai-data/models/model.FCStd>"
+}
+```
+
+FreeCADをCloud Runでデプロイし、FCStdモデルでのストレージ保存まで完了しています。
+
+### 11.1 FreeCAD API仕様
+
+APIエンドポイント: https://freecad-api-513507930971.asia-northeast1.run.app
+
+リクエスト形式:
+```json
+{
+  "width": 10.0,
+  "length": 15.0,
+  "height": 3.0,
+  "parameters": {"wall_thickness": 0.2, "window_size": 1.5}
+}
+```
+
+レスポンス形式:
+```json
+{
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "<gs://house-design-ai-data/models/model.FCStd>"
+}
+```
+
 # FreeCADのDocker化とGKE・Cloud Runへのデプロイ手順
 
 FreeCADをコマンドライン（CLI）で実行して自動CAD図面を生成するシステムを構築するために、FreeCADをDockerコンテナ化し、それを Google Kubernetes Engine (GKE) と Cloud Run 上で動かす方法を解説します。以下では、それぞれの環境での手順（Dockerイメージ作成、ビルド＆プッシュ、GKE/Cloud Runへのデプロイ、FreeCADスクリプトの実行方法）、必要なIAM権限やAPI、制限事項（タイムアウトやメモリなど）、および各アプローチの利点・課題について、初心者にも分かりやすいように詳しく説明します。
