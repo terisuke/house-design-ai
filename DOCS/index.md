@@ -1,0 +1,62 @@
+# House Design AI ドキュメント
+
+## 最終更新日: 2025年4月28日
+
+## ドキュメント構造
+
+### [アーキテクチャ](architecture/)
+- [FreeCAD統合ガイド](architecture/freecad_integration.md): FreeCADの統合方法と実装状況
+
+### [デプロイメント](deployment/)
+- [クラウドデプロイメント計画](deployment/cloud_deployment_plan.md): GCPへのデプロイメント計画
+- [GCPデプロイメントガイド](deployment/gcp_deployment_guide.md): GCPへのデプロイ手順
+
+### [開発](development/)
+- [貢献ガイド](development/contributing.md): プロジェクトへの貢献方法
+- [実装計画](development/implementation_plan.md): システム実装計画
+
+### [ロードマップ](roadmap/)
+- [プロジェクトロードマップ](roadmap/roadmap.md): 短期・中期・長期の開発計画
+- [詳細ロードマップ](roadmap/detailed_roadmap.md): より詳細な開発ロードマップ
+
+## 実装状況 (2025-04-28更新)
+
+- ✅ FreeCAD APIのCloud Runデプロイ成功
+- ✅ Streamlitアプリケーションの実行確認
+- ✅ Cloud StorageでのFCStdモデル保存
+- ✅ PyTorchとStreamlitの互換性問題の解決
+
+## FreeCAD API実装の詳細
+
+FreeCAD APIは以下のエンドポイントで利用可能です：
+```
+https://freecad-api-513507930971.asia-northeast1.run.app
+```
+
+APIテスト結果：
+```
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "<gs://house-design-ai-data/models/model.FCStd>"
+}
+```
+
+## Streamlit実行方法
+
+Streamlitアプリケーションは以下のコマンドで実行できます：
+```bash
+PYTHONPATH=. streamlit run house_design_app/main.py
+```
+
+## 今後の開発計画
+
+- StreamlitアプリケーションのCloud Runデプロイ
+- FreeCAD APIの完全実装
+- Vertex AI統合の実装
+- セグメンテーション精度の向上
+- 建築基準法チェック機能の実装
+
+詳細については、[プロジェクトロードマップ](roadmap/roadmap.md)を参照してください。
