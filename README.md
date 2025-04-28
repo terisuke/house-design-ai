@@ -42,7 +42,10 @@ house-design-ai/
 ├── datasets/                 # データセットディレクトリ
 ├── deploy/                   # デプロイ関連ファイル
 ├── DOCS/                     # ドキュメント
-│   └── 0407/                 # 2024年4月7日のドキュメント
+│   ├── architecture/         # アーキテクチャ関連ドキュメント
+│   ├── deployment/           # デプロイメント関連ドキュメント
+│   ├── development/          # 開発関連ドキュメント
+│   └── roadmap/              # ロードマップ関連ドキュメント
 ├── freecad_api/              # FreeCAD API関連
 │   ├── Dockerfile            # FreeCAD API用Dockerfile
 │   ├── Dockerfile.freecad    # FreeCAD用Dockerfile
@@ -71,12 +74,9 @@ house-design-ai/
 ├── Dockerfile                # メインDockerfile
 ├── requirements.txt          # 依存関係
 ├── requirements-dev.txt      # 開発用依存関係
-├── FreeCAD.md                # FreeCAD統合ガイド
-├── GCP_DEPLOYMENT_GUIDE.md   # GCPデプロイメントガイド
-├── CLOUD_DEPLOYMENT_PLAN.md  # クラウドデプロイメント計画
-├── CONTRIBUTING.md           # 貢献ガイド
-├── ROADMAP.md                # 開発ロードマップ
-└── README.md                 # プロジェクト説明
+├── README.md                 # プロジェクト説明
+├── directorystructure.md     # ディレクトリ構造
+└── technologystack.md        # 技術スタック
 ```
 
 ## セットアップ
@@ -215,7 +215,7 @@ terraform apply
 4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
 5. プルリクエストを作成
 
-詳細な貢献ガイドについては、[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+詳細な貢献ガイドについては、[CONTRIBUTING.md](DOCS/development/contributing.md)を参照してください。
 
 ## 連絡先
 
