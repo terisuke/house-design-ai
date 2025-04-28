@@ -66,6 +66,30 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
 # プロジェクトファイルをコピー
 COPY . /app/
 
+# ロゴファイルとsecretsファイルの設定
+RUN mkdir -p /app/house_design_app/ /app/.streamlit/
+
+# ロゴファイルの処理
+# 1. public/img/logo.pngが存在する場合はコピー
+# 2. 存在しない場合は空のダミーファイルを作成
+RUN if [ -f /app/public/img/logo.png ]; then \
+    cp /app/public/img/logo.png /app/house_design_app/logo.png && \
+    echo "Logo file copied from public/img/logo.png"; \
+    else \
+    echo "Logo file not found at /app/public/img/logo.png, creating empty placeholder"; \
+    touch /app/house_design_app/logo.png; \
+    fi
+
+# secretsファイルの処理
+# 1. .streamlit/secrets.tomlが存在する場合はコピー
+# 2. 存在しない場合は空のダミーファイルを作成
+RUN if [ -f /app/.streamlit/secrets.toml ]; then \
+    echo "Secrets file already exists"; \
+    else \
+    echo "Creating empty secrets.toml file"; \
+    echo "# Empty secrets file created during build" > /app/.streamlit/secrets.toml; \
+    fi
+
 # ポートを公開
 EXPOSE 8080
 
