@@ -41,7 +41,7 @@ module "freecad_api_service" {
   image                 = var.freecad_api_image
   memory                = "2Gi"
   cpu                   = "2"
-  allow_unauthenticated = false
+  allow_unauthenticated = true
   environment_variables = {
     BUCKET_NAME = module.storage.bucket_name
   }

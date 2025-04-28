@@ -13,7 +13,9 @@ def test_freecad_api() -> Dict[str, Any]:
         Dict[str, Any]: APIレスポンス
     """
     # Cloud RunのエンドポイントURLを環境変数から取得
-    api_url = os.getenv("FREECAD_API_URL", "http://localhost:8080")
+    api_url = os.getenv(
+        "FREECAD_API_URL", "https://freecad-api-513507930971.asia-northeast1.run.app"
+    )
 
     # テスト用の入力データ
     test_data = {
