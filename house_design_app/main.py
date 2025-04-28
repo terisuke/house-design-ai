@@ -20,9 +20,11 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import requests
 import streamlit as st
-from PIL import Image  # PILのImageクラスは直接インポートしても問題ない
 
-# from ultralytics import YOLO
+# PyTorchのクラスパス問題を解決
+import torch
+from PIL import Image  # PILのImageクラスは直接インポートしても問題ない
+from ultralytics import YOLO  # YOLOのインポートを有効化
 
 from src.cloud.storage import (
     download_dataset,
@@ -30,6 +32,11 @@ from src.cloud.storage import (
     initialize_gcs_client,
     upload_to_gcs,
 )
+
+# from ultralytics import YOLO
+
+
+torch.classes.__path__ = []
 
 # ロギング設定を最初に行う
 logging.basicConfig(level=logging.INFO)
@@ -339,7 +346,10 @@ def load_yolo_model(model_path: Optional[str] = None):
 
     try:
         from ultralytics import YOLO
+
         model = YOLO(model_path)
+        # モデルをセッションステートに保存
+        st.session_state.model = model
         return model
     except Exception as e:
         logger.error(f"YOLOモデルのロード中にエラーが発生しました: {e}")
@@ -354,16 +364,17 @@ def process_image(
     grid_mm: float = 9.1,
     near_offset_px: Optional[int] = None,
     far_offset_px: Optional[int] = None,
-    floorplan_mode: bool = False
+    floorplan_mode: bool = False,
 ) -> Optional[Tuple[Image.Image, Dict[str, Any]]]:
     """
     画像を推論し、マスク処理・レイアウト生成を行う。
-    
+
     注意: この関数はsrc.processing.mask.process_imageの呼び出しに転送するだけのスタブです。
     PyTorchとStreamlitの互換性問題を解決するために、直接インポートではなく遅延インポートを使用します。
     """
     try:
         from src.processing.mask import process_image as process_image_impl
+
         return process_image_impl(
             model=model,
             image_file=image_file,
@@ -372,7 +383,7 @@ def process_image(
             grid_mm=grid_mm,
             near_offset_px=near_offset_px,
             far_offset_px=far_offset_px,
-            floorplan_mode=floorplan_mode
+            floorplan_mode=floorplan_mode,
         )
     except Exception as e:
         logger.exception(f"画像処理中にエラーが発生しました: {e}")
@@ -539,12 +550,18 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
                 # Google Cloud Storageからダウンロード
                 try:
                     import google.cloud.storage as gcs_storage
+
                     storage_client = gcs_storage.Client()
                     bucket = storage_client.bucket(bucket_name)
                     blob = bucket.blob(f"models/{file_name}")
                 except ImportError:
-                    logger.error("Google Cloud Storageライブラリのインポートに失敗しました")
-                    return {"success": False, "error": "Google Cloud Storageライブラリのインポートに失敗しました"}
+                    logger.error(
+                        "Google Cloud Storageライブラリのインポートに失敗しました"
+                    )
+                    return {
+                        "success": False,
+                        "error": "Google Cloud Storageライブラリのインポートに失敗しました",
+                    }
                 blob.download_to_filename(temp_file_path)
 
                 # ファイルをアップロードして2D変換をリクエスト
@@ -827,13 +844,17 @@ def main():
                                     with st.spinner("3Dモデルを生成中..."):
                                         # グリッドデータを準備
                                         grid_data_obj = {
-                                            "grid": debug_info.get("grid", {}),  # result_gridの代わりにdebug_infoから取得
+                                            "grid": debug_info.get(
+                                                "grid", {}
+                                            ),  # result_gridの代わりにdebug_infoから取得
                                             "madori_info": madori_info,
                                             "params": debug_info.get("params", {}),
                                         }
 
                                         # FreeCAD APIに送信
-                                        cad_model_url = send_to_freecad_api(grid_data_obj)
+                                        cad_model_url = send_to_freecad_api(
+                                            grid_data_obj
+                                        )
 
                                         if cad_model_url:
                                             st.success("3Dモデルの生成に成功しました")
@@ -850,7 +871,9 @@ def main():
                                                         "house-design-ai-data",
                                                     )
                                                     if isinstance(cad_model_url, str):
-                                                        file_name = cad_model_url.split("/")[-1]
+                                                        file_name = cad_model_url.split(
+                                                            "/"
+                                                        )[-1]
                                                     else:
                                                         file_name = str(cad_model_url)
 
@@ -863,9 +886,14 @@ def main():
                                                     # Google Cloud Storageからダウンロード
                                                     try:
                                                         import google.cloud.storage as gcs_storage
-                                                        storage_client = gcs_storage.Client()
+
+                                                        storage_client = (
+                                                            gcs_storage.Client()
+                                                        )
                                                     except ImportError:
-                                                        st.error("Google Cloud Storageライブラリのインポートに失敗しました")
+                                                        st.error(
+                                                            "Google Cloud Storageライブラリのインポートに失敗しました"
+                                                        )
                                                         return None
                                                     bucket = storage_client.bucket(
                                                         bucket_name

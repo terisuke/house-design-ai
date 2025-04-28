@@ -114,11 +114,12 @@ def download_model_from_gcs(
                 f"モデルをダウンロード中: gs://{bucket_name}/{blob_name} → {tmp.name}"
             )
             blob.download_to_filename(tmp.name)
+            logger.info(f"モデルのダウンロードが完了しました: {tmp.name}")
             return tmp.name
 
     except Exception as e:
         logger.error(f"モデルダウンロードエラー: {e}")
-        return "downloaded_model.pt"
+        return None  # エラー時はNoneを返す
 
 
 def download_dataset(
