@@ -1,6 +1,7 @@
 import random
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import List, Dict, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -179,7 +180,7 @@ def create_madori_odict(L_size=(4, 3), D_size=(3, 2), K_size=(2, 2), UT_size=(2,
     )
 
 
-def arrange_rooms_in_rows(grid, site, order: list[str]):
+def arrange_rooms_in_rows(grid, site, order: List[str]):
     """
     左上から順に部屋を並べる簡易配置。
     """
@@ -355,7 +356,7 @@ madori_odict = OrderedDict(
 )
 
 
-def arrange_rooms_with_constraints(grid, site, order: list[str], valid_mask=None):
+def arrange_rooms_with_constraints(grid, site, order: List[str], valid_mask=None):
     """
     建築学的な制約を考慮して部屋を配置する。
     """
