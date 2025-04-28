@@ -680,11 +680,18 @@ def main():
         """
         )
 
-    # モデルロード
-    with st.spinner("モデルをロード中..."):
-        load_yolo_model()
+    model_loaded = "model" in st.session_state
 
-    if "model" not in st.session_state or st.session_state.model is None:
+    # 画像アップロード
+    uploaded_file = st.file_uploader(
+        "建物・道路が写った画像を選択", type=["jpg", "jpeg", "png"]
+    )
+
+    if uploaded_file and not model_loaded:
+        with st.spinner("モデルをロード中..."):
+            load_yolo_model()
+
+    if uploaded_file and ("model" not in st.session_state or st.session_state.model is None):
         st.error("モデルのロードに失敗しました。アプリを再起動してください。")
         return
 

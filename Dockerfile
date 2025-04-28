@@ -1,5 +1,5 @@
-# ベースイメージを指定 (NVIDIA CUDAを含むイメージ)
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+# ベースイメージを指定 (CUDAなしの軽量イメージ)
+FROM python:3.10-slim
 
 # 作業ディレクトリを設定
 WORKDIR /app
