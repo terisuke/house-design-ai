@@ -90,6 +90,17 @@ RUN if [ -f /app/.streamlit/secrets.toml ]; then \
     echo "# Empty secrets file created during build" > /app/.streamlit/secrets.toml; \
     fi
 
+# サービスアカウントファイルの処理
+# 1. config/service_account.jsonが存在する場合はそのまま使用
+# 2. 存在しない場合はディレクトリとダミーファイルを作成
+RUN mkdir -p /app/config/ && \
+    if [ -f /app/config/service_account.json ]; then \
+    echo "Service account file already exists"; \
+    else \
+    echo "Creating empty service_account.json file"; \
+    echo "{}" > /app/config/service_account.json; \
+    fi
+
 # ポートを公開
 EXPOSE 8080
 
