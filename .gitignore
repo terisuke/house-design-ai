@@ -34,8 +34,6 @@ htmlcov/
 .venv
 venv/
 ENV/
-venv-py311/
-venv-py39/
 .python-version
 
 # IDE関連

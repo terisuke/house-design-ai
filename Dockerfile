@@ -64,24 +64,10 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
   ls -la /root/.config/ultralytics/models/
 
 # プロジェクトファイルをコピー
-COPY src/ /app/src/
-# streamlitディレクトリが存在しないため、コピーを削除
-# COPY streamlit/ /app/streamlit/
-COPY scripts/ /app/scripts/
-COPY pyproject.toml /app/
-COPY app.py /app/app.py
+COPY . /app/
 
-# app.pyに実行権限を付与
-RUN chmod +x /app/app.py
-
-# configディレクトリを作成
-RUN mkdir -p /app/config/
-RUN mkdir -p /app/house/train /app/house/val
-
-# サービスアカウントキーをコピー
-COPY config/service_account.json /app/config/service_account.json
-# data.yamlをコピー
-COPY config/data.yaml /app/config/data.yaml
+# ポートを公開
+EXPOSE 8080
 
 # 環境変数を設定
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json
@@ -91,5 +77,5 @@ ENV PATH="/usr/local/bin:${PATH}"
 # gsutilのキャッシュを無効化（トラブルシューティング用）
 ENV CLOUDSDK_PYTHON_SITEPACKAGES=1
 
-# エントリーポイントを設定
-ENTRYPOINT ["python3", "-m", "src.cli"]
+# Streamlitを起動
+CMD ["streamlit", "run", "house_design_app/main.py", "--server.port=8080", "--server.address=0.0.0.0"]
