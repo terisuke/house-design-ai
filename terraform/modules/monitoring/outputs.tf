@@ -13,7 +13,7 @@ output "latency_alert_id" {
   value       = google_monitoring_alert_policy.latency.id
 }
 
-output "memory_usage_alert_id" {
-  description = "メモリ使用率アラートポリシーのID"
-  value       = google_monitoring_alert_policy.memory_usage.id
-}
+# output "memory_usage_alert_id" {
+#   description = "メモリ使用率アラートポリシーのID"
+#   value       = google_monitoring_alert_policy.memory_usage.id
+# }
