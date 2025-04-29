@@ -29,14 +29,23 @@ steps:
 
   - name: 'gcr.io/cloud-builders/docker'
     args: [
+      'buildx',
+      'create',
+      '--use'
+    ]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'buildx',
       'build',
-      '--platform', 'linux/amd64',
+      '--platform', 'linux/amd64,linux/arm64',
+      '--push',
       '-t', '${_IMAGE_NAME}',
       '.'
     ]
 
 substitutions:
-  _IMAGE_NAME: 'gcr.io/${PROJECT_ID}/house-design-ai-streamlit'
+  _IMAGE_NAME: 'asia-northeast1-docker.pkg.dev/${PROJECT_ID}/house-design-ai/streamlit:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

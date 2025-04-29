@@ -46,5 +46,5 @@ variable "logo_file_path" {
 variable "cloud_run_service_account" {
   description = "Cloud Runのサービスアカウント"
   type        = string
-  default     = "yolo-v8-environment@yolov8environment.iam.gserviceaccount.com"
+  default     = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
 }
