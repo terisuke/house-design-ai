@@ -23,3 +23,9 @@ pydantic==2.5.3
 
 setuptools>=65.5.0
 wheel
+
+# CAD関連の依存関係
+pythreejs>=2.4.2
+numpy-stl>=3.0.1
+shapely>=2.0.2
+numpy>=1.24.0

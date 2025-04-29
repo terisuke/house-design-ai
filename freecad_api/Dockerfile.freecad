@@ -1,0 +1,31 @@
+FROM ubuntu:22.04
+
+WORKDIR /app
+
+# システム依存関係のインストール
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+  python3-pip \
+  python3-dev \
+  wget \
+  && apt-get update && apt-get install -y \
+  freecad \
+  libgl1-mesa-glx \
+  && rm -rf /var/lib/apt/lists/*
+
+# Python依存関係のインストール
+COPY ./requirements-freecad-api.txt /app/
+RUN pip3 install --no-cache-dir -r /app/requirements-freecad-api.txt
+
+# FreeCADのPythonパスを環境変数に設定
+ENV PYTHONPATH=/usr/lib/freecad/lib
+ENV QT_QPA_PLATFORM=offscreen
+
+# APIコードとスクリプトをコピー
+COPY ./scripts/run_freecad.py /app/
+
+# 実行権限を設定
+RUN chmod +x /app/run_freecad.py
+
+# FastAPIアプリケーションを実行
+CMD ["python3", "/app/run_freecad.py"]

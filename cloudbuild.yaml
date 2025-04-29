@@ -1,0 +1,42 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'fetch-secrets'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p config/
+        gcloud secrets versions access latest --secret=house-design-ai-service-account > config/service_account.json
+        chmod 600 config/service_account.json
+
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'fetch-logo'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p public/img/
+        gsutil cp gs://house-design-ai-data/required-files/logo.png public/img/logo.png
+
+  - name: 'bash'
+    id: 'create-streamlit-secrets'
+    args:
+      - '-c'
+      - |
+        mkdir -p .streamlit
+        echo "[gcp]" > .streamlit/secrets.toml
+        echo "use_gcp_default_credentials = true" >> .streamlit/secrets.toml
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--platform', 'linux/amd64',
+      '-t', '${_IMAGE_NAME}',
+      '.'
+    ]
+
+substitutions:
+  _IMAGE_NAME: 'gcr.io/${PROJECT_ID}/house-design-ai-streamlit'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -25,6 +25,14 @@ from src.processing.arrangement import (
     process_large_corridors,
 )
 
+# FreeCADユーティリティをインポート
+try:
+    from src.visualization.freecad_utils import generate_cad_floorplan
+    FREECAD_UTILS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"FreeCADユーティリティのインポートに失敗しました: {e}")
+    FREECAD_UTILS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # data.yaml を読み込み
@@ -234,135 +242,35 @@ def process_image(
             debug_info["madori_info"] = floorplan_stats.get("madori_info", {})
             debug_info["grid_stats"] = {
                 "cells_drawn": len(floorplan_stats.get("positions", {})),
-                "cell_px": floorplan_stats.get("cell_px"),
-                "bounding_box": floorplan_stats.get("bounding_box"),
-                "grid_cells": floorplan_stats.get("grid_size")
+                "cells_skipped": floorplan_stats.get("cells_skipped", 0),
+                "reason_not_in_mask": floorplan_stats.get("reason_not_in_mask", 0)
             }
-            rgb = cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
-            return Image.fromarray(rgb), debug_info
         else:
-            out_img, grid_stats = draw_grid_on_mask(
-                image=out_bgr,
+            # ランダムアルファベットモード
+            out_img, alphabet_stats = draw_random_alphabet_on_mask(
+                base_image=out_bgr,
                 final_mask=final_house,
                 grid_mm=grid_mm,
                 px_per_mm=px_per_mm
             )
-            debug_info["grid_stats"] = grid_stats
-            debug_info["grid_cells"] = grid_stats.get("grid_cells", {})
-            debug_info["total_cells"] = grid_stats.get("total_cells_in_bbox", 0)
-            if grid_stats.get("bounding_box"):
-                debug_info["bounding_box"] = grid_stats["bounding_box"]
-            if grid_stats.get("cell_px"):
-                debug_info["cell_px"] = grid_stats["cell_px"]
+            debug_info["alphabet_stats"] = alphabet_stats
+            if alphabet_stats.get("bounding_box"):
+                debug_info["bounding_box"] = alphabet_stats["bounding_box"]
+            if alphabet_stats.get("cell_px"):
+                debug_info["cell_px"] = alphabet_stats["cell_px"]
+            debug_info["grid_stats"] = {
+                "cells_drawn": alphabet_stats.get("cells_drawn", 0),
+                "cells_skipped": alphabet_stats.get("cells_skipped", 0),
+                "reason_not_in_mask": alphabet_stats.get("reason_not_in_mask", 0)
+            }
 
-            rgb = cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
-            return Image.fromarray(rgb), debug_info
+        # RGB変換
+        rgb = cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(rgb), debug_info
 
     except Exception as e:
-        logger.error(f"画像処理中にエラー: {e}", exc_info=True)
+        logger.exception(f"Error in process_image: {e}")
         return None
-
-
-def draw_grid_on_mask(
-    image: np.ndarray,
-    final_mask: np.ndarray,
-    grid_mm: float,
-    px_per_mm: float,
-    fill_color=(255, 0, 0),
-    alpha=0.4,
-    line_color=(0, 0, 255),
-    line_thickness=2
-):
-    """
-    「ランダムアルファベット」モード用の描画:
-    マスク内にだけセルを描画し、各セル中心にランダムアルファベットを配置。
-    マスク外にあるグリッドは表示しない。
-    """
-    out = image.copy()
-    grid_stats = {
-        "cell_px": None,
-        "bounding_box": None,
-        "total_cells_in_bbox": 0,
-        "cells_drawn": 0,
-        "cells_skipped": 0,
-        "reason_not_in_mask": 0,
-        "alphabet_counts": {}
-    }
-
-    # マスク輪郭からバウンディングボックス取得
-    contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        grid_stats["error"] = "マスクが空です"
-        return out, grid_stats
-
-    big_contour = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(big_contour)
-    grid_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
-
-    # マスク領域を半透明塗り
-    overlay = out.copy()
-    mask_area = np.zeros_like(out)
-    mask_area[final_mask == 1] = fill_color
-    cv2.addWeighted(mask_area, alpha, out, 1, 0, out)
-
-    # セルサイズ固定(約9.1mm→54px)
-    cell_px = 54
-    grid_stats["cell_px"] = cell_px
-
-    grid_cols = w // cell_px
-    grid_rows = h // cell_px
-    grid_lines_cols = grid_cols + 1
-    grid_lines_rows = grid_rows + 1
-    grid_stats["grid_lines"] = {"rows": grid_lines_rows, "cols": grid_lines_cols}
-    grid_stats["grid_cells"] = {"rows": grid_rows, "cols": grid_cols}
-    total_cells_in_bbox = grid_rows * grid_cols
-    grid_stats["total_cells_in_bbox"] = total_cells_in_bbox
-
-    # アルファベット使用回数を初期化
-    for letter in ALPHABET_LIST:
-        grid_stats["alphabet_counts"][letter] = 0
-
-    # 各セルごとにマスク内かどうかチェックして描画
-    for row in range(grid_rows):
-        cell_y1 = y + row * cell_px
-        cell_y2 = cell_y1 + cell_px
-        for col in range(grid_cols):
-            cell_x1 = x + col * cell_px
-            cell_x2 = cell_x1 + cell_px
-
-            # セルが全てマスク内にあるか確認
-            cell_roi = final_mask[cell_y1:cell_y2, cell_x1:cell_x2]
-            if not np.all(cell_roi == 1):
-                grid_stats["cells_skipped"] += 1
-                grid_stats["reason_not_in_mask"] += 1
-                continue
-
-            # ランダムアルファベット
-            cell_letter = random.choice(ALPHABET_LIST)
-            grid_stats["alphabet_counts"][cell_letter] += 1
-
-            # セル枠線描画
-            cv2.line(out, (cell_x1, cell_y1), (cell_x2, cell_y1), line_color, line_thickness)
-            cv2.line(out, (cell_x1, cell_y2), (cell_x2, cell_y2), line_color, line_thickness)
-            cv2.line(out, (cell_x1, cell_y1), (cell_x1, cell_y2), line_color, line_thickness)
-            cv2.line(out, (cell_x2, cell_y1), (cell_x2, cell_y2), line_color, line_thickness)
-
-            # 中心にテキスト
-            cell_center_x = (cell_x1 + cell_x2) // 2
-            cell_center_y = (cell_y1 + cell_y2) // 2
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 1.0
-            text_color = (0, 0, 0)
-            text_thickness = 2
-            text_size = cv2.getTextSize(cell_letter, font, font_scale, text_thickness)[0]
-            text_x = cell_center_x - text_size[0] // 2
-            text_y = cell_center_y + text_size[1] // 2
-            cv2.putText(out, cell_letter, (text_x, text_y),
-                        font, font_scale, text_color, text_thickness, cv2.LINE_AA)
-
-            grid_stats["cells_drawn"] += 1
-
-    return out, grid_stats
 
 
 def draw_floorplan_on_mask_with_mask(
@@ -461,6 +369,72 @@ def draw_floorplan_on_mask_with_mask(
         min_room_size=4
     )
 
+    # 間取り情報を記録
+    floorplan_stats["positions"] = positions
+    for name, madori in site.madori_info.items():
+        if name in positions:
+            floorplan_stats["madori_info"][name] = {
+                "name": name,
+                "width": madori.width,
+                "height": madori.height,
+                "neighbor": madori.neighbor_name
+            }
+
+    # R部屋(R1,R2...)の情報を追加
+    labeled_corr, n_labels_corr = cv2.connectedComponents((grid_data >= 10).astype(np.uint8))
+    if isinstance(n_labels_corr, np.ndarray):
+        if n_labels_corr.size == 1:
+            n_labels_corr = n_labels_corr.item()
+        else:
+            n_labels_corr = int(np.max(n_labels_corr)) + 1
+    
+    for lbl in range(1, n_labels_corr):
+        region_mask = (labeled_corr == lbl)
+        codes_in_region = grid_data[region_mask]
+        code_vals, counts = np.unique(codes_in_region, return_counts=True)
+        if len(code_vals) == 0:
+            continue
+        r_code = code_vals[np.argmax(counts)]
+        rid = r_code - 10
+        r_name = f"R{rid}"
+
+        ys, xs = np.where(region_mask)
+        miny, maxy = ys.min(), ys.max()
+        minx, maxx = xs.min(), xs.max()
+        w_ = maxx-minx+1
+        h_ = maxy-miny+1
+
+        # 追加部屋情報
+        floorplan_stats["madori_info"][r_name] = {
+            "name": r_name,
+            "width": w_,
+            "height": h_,
+            "neighbor": None
+        }
+
+    # FreeCADユーティリティが利用可能な場合はCAD風の間取り図を生成
+    if FREECAD_UTILS_AVAILABLE:
+        try:
+            # FreeCADを使用してCAD風の間取り図を生成
+            cad_image = generate_cad_floorplan(
+                grid_data=grid_data,
+                positions=positions,
+                madori_info=site.madori_info,
+                cell_px=cell_px,
+                x=x,
+                y=y,
+                base_image=out
+            )
+            
+            # 生成に成功した場合は結果を返す
+            if cad_image is not None:
+                return cad_image, floorplan_stats
+                
+        except Exception as e:
+            logger.error(f"CAD風間取り図の生成に失敗しました: {e}")
+            # エラーが発生した場合は従来の描画方法にフォールバック
+
+    # 従来の描画方法（FreeCADが利用できない場合やエラー時のフォールバック）
     # 部屋ごとに色を割り当て
     color_map = {
         'E': (102, 178, 255),   # 玄関
@@ -569,14 +543,6 @@ def draw_floorplan_on_mask_with_mask(
         w_ = maxx-minx+1
         h_ = maxy-miny+1
 
-        # 追加部屋情報
-        floorplan_stats["madori_info"][r_name] = {
-            "name": r_name,
-            "width": w_,
-            "height": h_,
-            "neighbor": None
-        }
-
         cy = int(np.mean(ys))
         cx = int(np.mean(xs))
         px_x = x + cx*cell_px + cell_px//2
@@ -599,65 +565,117 @@ def draw_floorplan_on_mask_with_mask(
         )
         cv2.rectangle(out,
                       (bg_rect[0], bg_rect[1]),
-                      (bg_rect[0]+bg_rect[2], bg_rect[1]+bg_rect[3]),
+                      (bg_rect[0] + bg_rect[2], bg_rect[1] + bg_rect[3]),
                       (255,255,255),
                       -1)
         cv2.putText(out, r_name, (text_x, text_y), font,
                     font_scale, text_color, text_thickness, cv2.LINE_AA)
 
     floorplan_stats["cells_drawn"] = cells_drawn
-
-    # 間取り情報(positions & R部屋含む)
-    pos_dict = {}
-    for name, pos in positions.items():
-        m = site.madori_info[name]
-        pos_dict[name] = {
-            "x": pos[0],
-            "y": pos[1],
-            "grid_x": x + pos[0]*cell_px,
-            "grid_y": y + pos[1]*cell_px
-        }
-        floorplan_stats["madori_info"][name] = {
-            "name": name,
-            "width": m.width,
-            "height": m.height,
-            "neighbor": m.neighbor_name
-        }
-
-    if isinstance(n_labels_corr, np.ndarray):
-        if n_labels_corr.size == 1:
-            n_labels_corr = n_labels_corr.item()
-        else:
-            n_labels_corr = int(np.max(n_labels_corr)) + 1
-
-    for lbl in range(1, n_labels_corr):
-        region_mask = (labeled_corr == lbl)
-        codes_in_region = grid_data[region_mask]
-        code_vals, counts = np.unique(codes_in_region, return_counts=True)
-        if len(code_vals) == 0:
-            continue
-        r_code = code_vals[np.argmax(counts)]
-        rid = r_code - 10
-        r_name = f"R{rid}"
-
-        ys, xs = np.where(region_mask)
-        miny, maxy = ys.min(), ys.max()
-        minx, maxx = xs.min(), xs.max()
-        w_ = maxx-minx+1
-        h_ = maxy-miny+1
-        floorplan_stats["madori_info"][r_name] = {
-            "name": r_name,
-            "width": w_,
-            "height": h_,
-            "neighbor": None
-        }
-        pos_dict[r_name] = {
-            "x": minx,
-            "y": miny,
-            "grid_x": x + minx*cell_px,
-            "grid_y": y + miny*cell_px
-        }
-
-    floorplan_stats["positions"] = pos_dict
-
     return out, floorplan_stats
+
+
+def draw_random_alphabet_on_mask(
+    base_image: np.ndarray,
+    final_mask: np.ndarray,
+    grid_mm: float,
+    px_per_mm: float
+):
+    """
+    ランダムアルファベット表示モード:
+     1) マスクの範囲だけを有効とする valid_grid_mask を作成
+     2) 各セルにランダムなアルファベットを配置
+     3) valid_grid_mask=0(=マスク外)のセルは描画しない
+    """
+    out = base_image.copy()
+    alphabet_stats = {
+        "cell_px": None,
+        "bounding_box": None,
+        "grid_size": None,
+        "cells_drawn": 0,
+        "cells_skipped": 0,
+        "reason_not_in_mask": 0
+    }
+
+    # マスク輪郭
+    contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        alphabet_stats["error"] = "マスクが空です"
+        return out, alphabet_stats
+
+    # 最大輪郭のバウンディングボックス
+    big_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(big_contour)
+    alphabet_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
+
+    # マスク領域を半透明着色(青)
+    overlay = out.copy()
+    mask_area = np.zeros_like(out)
+    mask_area[final_mask == 1] = (255, 0, 0)
+    cv2.addWeighted(mask_area, 0.4, out, 1, 0, out)
+
+    # セルサイズ (約9.1mm→54px)
+    cell_px = 54
+    alphabet_stats["cell_px"] = cell_px
+
+    grid_cols = w // cell_px
+    grid_rows = h // cell_px
+    alphabet_stats["grid_size"] = {"rows": grid_rows, "cols": grid_cols}
+
+    # マスク内セル(=1)だけを有効にするvalid_grid_mask
+    valid_grid_mask = np.zeros((grid_rows, grid_cols), dtype=np.uint8)
+    for i in range(grid_rows):
+        for j in range(grid_cols):
+            cell_x1 = x + j * cell_px
+            cell_y1 = y + i * cell_px
+            cell_x2 = cell_x1 + cell_px
+            cell_y2 = cell_y1 + cell_px
+
+            subroi = final_mask[cell_y1:cell_y2, cell_x1:cell_x2]
+            if np.all(subroi == 1):
+                valid_grid_mask[i, j] = 1
+            else:
+                alphabet_stats["cells_skipped"] += 1
+                alphabet_stats["reason_not_in_mask"] += 1
+
+    # グリッドを描画(但し valid_grid_mask=1 のセルだけ)
+    cells_drawn = 0
+    for i in range(grid_rows):
+        for j in range(grid_cols):
+            # マスク外=0 のセルは描画しない
+            if valid_grid_mask[i, j] == 0:
+                continue
+
+            cell_x1 = x + j * cell_px
+            cell_y1 = y + i * cell_px
+            cell_x2 = cell_x1 + cell_px
+            cell_y2 = cell_y1 + cell_px
+
+            # ランダムな色
+            r = random.randint(100, 240)
+            g = random.randint(100, 240)
+            b = random.randint(100, 240)
+            c = (b, g, r)  # BGR
+
+            # ランダムなアルファベット
+            alphabet = random.choice(ALPHABET_LIST)
+
+            # 塗りつぶし＋枠線
+            cv2.rectangle(out, (cell_x1, cell_y1), (cell_x2, cell_y2), c, -1)
+            cv2.rectangle(out, (cell_x1, cell_y1), (cell_x2, cell_y2), (100,100,100), 1)
+
+            # アルファベット描画
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.2
+            text_color = (0, 0, 0)
+            text_thickness = 2
+            text_size = cv2.getTextSize(alphabet, font, font_scale, text_thickness)[0]
+            text_x = cell_x1 + (cell_px - text_size[0]) // 2
+            text_y = cell_y1 + (cell_px + text_size[1]) // 2
+
+            cv2.putText(out, alphabet, (text_x, text_y), font,
+                        font_scale, text_color, text_thickness, cv2.LINE_AA)
+            cells_drawn += 1
+
+    alphabet_stats["cells_drawn"] = cells_drawn
+    return out, alphabet_stats
