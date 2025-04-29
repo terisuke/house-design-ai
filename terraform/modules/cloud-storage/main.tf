@@ -21,7 +21,7 @@ resource "google_storage_bucket" "bucket" {
 
 resource "google_storage_bucket_object" "logo" {
   count  = var.upload_logo ? 1 : 0
-  name   = "logo.png"
+  name   = "${var.folder_prefix}logo.png"
   bucket = google_storage_bucket.bucket.name
   source = var.logo_file_path
 }
@@ -31,4 +31,4 @@ resource "google_storage_bucket_iam_member" "public_read" {
   bucket = google_storage_bucket.bucket.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
-}  
+}    

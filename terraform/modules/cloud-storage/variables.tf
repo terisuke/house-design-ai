@@ -47,4 +47,10 @@ variable "logo_file_path" {
   description = "アップロードするロゴファイルのパス"
   type        = string
   default     = "public/img/logo.png"
-}  
+}
+
+variable "folder_prefix" {
+  description = "バケット内のフォルダプレフィックス"
+  type        = string
+  default     = "required-files/"
+} 

@@ -16,7 +16,7 @@ steps:
       - '-c'
       - |
         mkdir -p public/img/
-        gsutil cp gs://house-design-ai-data/logo.png public/img/logo.png
+        gsutil cp gs://house-design-ai-data/required-files/logo.png public/img/logo.png
 
   - name: 'bash'
     id: 'create-streamlit-secrets'

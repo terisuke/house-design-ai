@@ -1,7 +1,7 @@
 resource "google_secret_manager_secret" "service_account_secret" {
   secret_id = var.service_account_secret_id
   replication {
-    auto = true
+    automatic = true
   }
 }
 

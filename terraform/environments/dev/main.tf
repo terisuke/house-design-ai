@@ -28,7 +28,7 @@ module "streamlit_service" {
   allow_unauthenticated = true
   environment_variables = {
     BUCKET_NAME                  = module.storage.bucket_name
-    FREECAD_API_URL              = "https://freecad-api-service-xxxxx-xx.a.run.app" # デプロイ後に実際のURLに置き換える
+    FREECAD_API_URL              = "https://freecad-api-513507930971.asia-northeast1.run.app"
     USE_GCP_DEFAULT_CREDENTIALS  = "true"
     SECRET_MANAGER_SERVICE_ACCOUNT = module.secrets.service_account_secret_name
     LOGO_GCS_PATH                = module.storage.logo_url
@@ -60,6 +60,7 @@ module "storage" {
   location       = var.region
   upload_logo    = fileexists(var.logo_file_path)
   logo_file_path = var.logo_file_path
+  folder_prefix  = "required-files/"
 }
 
 # Artifact Registry リポジトリ
