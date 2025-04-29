@@ -63,46 +63,26 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
   chmod 644 /root/.config/ultralytics/models/yolo11l-seg.pt && \
   ls -la /root/.config/ultralytics/models/
 
-# プロジェクトファイルをコピー
+# 必要なディレクトリを作成
+RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/img/
+
+# 必須ファイルの存在チェック
+# 存在しない場合はビルドを失敗させる
+COPY check_required_files.sh /app/
+RUN chmod +x /app/check_required_files.sh
+
+# 必須ファイルをコピー
+# 存在しない場合はビルドが失敗する
+COPY config/service_account.json /app/config/service_account.json
+COPY public/img/logo.png /app/house_design_app/logo.png
+
+# secrets.tomlにservice_account.jsonの内容をコピー
+COPY config/service_account.json /app/.streamlit/secrets.toml
+
+# その他のプロジェクトファイルをコピー
 COPY . /app/
 
-# ロゴファイルとsecretsファイルの設定
-RUN mkdir -p /app/house_design_app/ /app/.streamlit/
-
-# ロゴファイルの処理
-# 1. public/img/logo.pngが存在する場合はコピー
-# 2. 存在しない場合は空のダミーファイルを作成
-RUN if [ -f /app/public/img/logo.png ]; then \
-    cp /app/public/img/logo.png /app/house_design_app/logo.png && \
-    echo "Logo file copied from public/img/logo.png"; \
-    else \
-    echo "Logo file not found at /app/public/img/logo.png, creating empty placeholder"; \
-    touch /app/house_design_app/logo.png; \
-    fi
-
-# secretsファイルの処理
-# 1. .streamlit/secrets.tomlが存在する場合はコピー
-# 2. 存在しない場合は空のダミーファイルを作成
-RUN if [ -f /app/.streamlit/secrets.toml ]; then \
-    echo "Secrets file already exists"; \
-    else \
-    echo "Creating empty secrets.toml file"; \
-    echo "# Empty secrets file created during build" > /app/.streamlit/secrets.toml; \
-    fi
-
-# サービスアカウントファイルの処理
-# 1. config/service_account.jsonが存在する場合はそのまま使用
-# 2. 存在しない場合はディレクトリとダミーファイルを作成
-RUN mkdir -p /app/config/ && \
-    if [ -f /app/config/service_account.json ]; then \
-    echo "Service account file already exists"; \
-    else \
-    echo "Creating empty service_account.json file"; \
-    echo "{}" > /app/config/service_account.json; \
-    fi
-
 # Cloud Run環境でのGCP認証を設定
-# Cloud Runのデフォルト認証情報を使用するための設定
 ENV USE_GCP_DEFAULT_CREDENTIALS=true
 
 # ポートを公開
@@ -112,8 +92,6 @@ EXPOSE 8080
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json
 ENV PYTHONPATH=/app
 ENV PATH="/usr/local/bin:${PATH}"
-
-# gsutilのキャッシュを無効化（トラブルシューティング用）
 ENV CLOUDSDK_PYTHON_SITEPACKAGES=1
 
 # Streamlitを起動
