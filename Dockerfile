@@ -71,13 +71,12 @@ RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/im
 COPY check_required_files.sh /app/
 RUN chmod +x /app/check_required_files.sh
 
-# 必須ファイルをコピー
-# 存在しない場合はビルドが失敗する
-COPY config/service_account.json /app/config/service_account.json
-COPY public/img/logo.png /app/house_design_app/logo.png
+# 必須ファイルをコピー（存在する場合）
+COPY config/service_account.json /app/config/service_account.json || true
+COPY public/img/logo.png /app/house_design_app/logo.png || true
 
-# secrets.tomlにservice_account.jsonの内容をコピー
-COPY config/service_account.json /app/.streamlit/secrets.toml
+# secrets.tomlにservice_account.jsonの内容をコピー（存在する場合）
+COPY config/service_account.json /app/.streamlit/secrets.toml || true
 
 # その他のプロジェクトファイルをコピー
 COPY . /app/

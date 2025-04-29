@@ -8,7 +8,7 @@ MEMORY="1Gi"
 IMAGE_PATH="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 echo "StreamlitアプリのDockerイメージをビルドしています..."
-gcloud builds submit --tag ${IMAGE_PATH} .
+gcloud builds submit --tag ${IMAGE_PATH} --substitutions=_IS_CLOUD_BUILD=true .
 
 echo "Cloud Runにデプロイしています..."
 gcloud run deploy ${SERVICE_NAME} \
