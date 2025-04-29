@@ -17,7 +17,7 @@ for file in "${REQUIRED_FILES[@]}"; do
 done
 
 if [ -f "config/service_account.json" ]; then
-  file_size=$(stat -c%s "config/service_account.json")
+  file_size=$(wc -c < "config/service_account.json" | tr -d ' ')
   if [ "$file_size" -lt 50 ]; then
     echo "エラー: サービスアカウントファイル 'config/service_account.json' が小さすぎます（${file_size}バイト）。"
     echo "有効なサービスアカウントJSONファイルではない可能性があります。"
