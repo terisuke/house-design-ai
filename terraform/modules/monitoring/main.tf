@@ -95,36 +95,36 @@ resource "google_monitoring_alert_policy" "latency" {
 }
 
 # メモリ使用率アラート（80%を超えた場合）
-resource "google_monitoring_alert_policy" "memory_usage" {
-  project               = var.project_id
-  display_name          = "FreeCAD API Memory Usage > 80%"
-  combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.email.id]
-  user_labels = {
-    severity = "warning"
-  }
-
-  conditions {
-    display_name = "Memory Usage > 80%"
-    condition_threshold {
-      filter          = "metric.type=\"run.googleapis.com/container/memory/utilization\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"freecad-api\""
-      duration        = "300s"
-      comparison      = "COMPARISON_GT"
-      threshold_value = 0.8 # 80% utilization
-
-      aggregations {
-        alignment_period   = "60s"
-        per_series_aligner = "ALIGN_MEAN"
-      }
-
-      trigger {
-        count = 1
-      }
-    }
-  }
-
-  documentation {
-    content   = "FreeCAD APIのメモリ使用率が80%を超えています。"
-    mime_type = "text/markdown"
-  }
-}
+# resource "google_monitoring_alert_policy" "memory_usage" {
+#   project               = var.project_id
+#   display_name          = "FreeCAD API Memory Usage > 80%"
+#   combiner              = "OR"
+#   notification_channels = [google_monitoring_notification_channel.email.id]
+#   user_labels = {
+#     severity = "warning"
+#   }
+#
+#   conditions {
+#     display_name = "Memory Usage > 80%"
+#     condition_threshold {
+#       filter          = "metric.type=\"run.googleapis.com/container/memory/utilization\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"freecad-api\""
+#       duration        = "300s"
+#       comparison      = "COMPARISON_GT"
+#       threshold_value = 0.8 # 80% utilization
+#
+#       aggregations {
+#         alignment_period   = "60s"
+#         per_series_aligner = "ALIGN_MEAN"
+#       }
+#
+#       trigger {
+#         count = 1
+#       }
+#     }
+#   }
+#
+#   documentation {
+#     content   = "FreeCAD APIのメモリ使用率が80%を超えています。"
+#     mime_type = "text/markdown"
+#   }
+# }

@@ -66,18 +66,22 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
 # 必要なディレクトリを作成
 RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/img/
 
-# 必須ファイルの存在チェック
-# 存在しない場合はビルドを失敗させる
+# 必須ディレクトリを作成
+RUN mkdir -p /app/config /app/house_design_app /app/.streamlit /tmp/build
+
+# コピースクリプトをコピー
+COPY copy_files.sh /tmp/
+RUN chmod +x /tmp/copy_files.sh
+
+# ビルドコンテキストをコピー
+COPY . /tmp/build/
+
+# ファイルコピースクリプトを実行
+RUN /tmp/copy_files.sh
+
+# 必須ファイルをコピー（存在する場合）
 COPY check_required_files.sh /app/
 RUN chmod +x /app/check_required_files.sh
-
-# 必須ファイルをコピー
-# 存在しない場合はビルドが失敗する
-COPY config/service_account.json /app/config/service_account.json
-COPY public/img/logo.png /app/house_design_app/logo.png
-
-# secrets.tomlにservice_account.jsonの内容をコピー
-COPY config/service_account.json /app/.streamlit/secrets.toml
 
 # その他のプロジェクトファイルをコピー
 COPY . /app/

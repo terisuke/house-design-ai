@@ -46,5 +46,5 @@ variable "logo_file_path" {
 variable "cloud_run_service_account" {
   description = "Cloud Runのサービスアカウント"
   type        = string
-  default     = "house-design-ai-service-account@yolov8environment.iam.gserviceaccount.com"
+  default     = "yolo-streamlit-app@yolov8environment.iam.gserviceaccount.com"
 }
