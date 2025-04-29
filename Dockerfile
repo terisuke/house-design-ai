@@ -1,5 +1,5 @@
-# ベースイメージを指定 (CUDAなしの軽量イメージ)
-FROM python:3.10-slim
+# ベースイメージを明示的にプラットフォーム指定
+FROM --platform=linux/amd64 python:3.10-slim-bullseye
 
 # 作業ディレクトリを設定
 WORKDIR /app

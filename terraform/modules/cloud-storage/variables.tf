@@ -35,4 +35,22 @@ variable "public_access" {
   description = "Whether to allow public read access to the bucket"
   type        = bool
   default     = false
+}
+
+variable "upload_logo" {
+  description = "ロゴファイルをアップロードするかどうか"
+  type        = bool
+  default     = false
+}
+
+variable "logo_file_path" {
+  description = "アップロードするロゴファイルのパス"
+  type        = string
+  default     = "public/img/logo.png"
+}
+
+variable "folder_prefix" {
+  description = "バケット内のフォルダプレフィックス"
+  type        = string
+  default     = "required-files/"
 } 
