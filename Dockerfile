@@ -1,5 +1,5 @@
-# ベースイメージを明示的にプラットフォーム指定
-FROM --platform=linux/amd64 python:3.10-slim-bullseye
+# ベースイメージを指定 (NVIDIA CUDAを含むイメージ)
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
 # 作業ディレクトリを設定
 WORKDIR /app
@@ -63,40 +63,32 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
   chmod 644 /root/.config/ultralytics/models/yolo11l-seg.pt && \
   ls -la /root/.config/ultralytics/models/
 
-# 必要なディレクトリを作成
-RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/img/
+# プロジェクトファイルをコピー
+COPY src/ /app/src/
+COPY streamlit/ /app/streamlit/
+COPY scripts/ /app/scripts/
+COPY pyproject.toml /app/
+COPY app.py /app/app.py
 
-# 必須ディレクトリを作成
-RUN mkdir -p /app/config /app/house_design_app /app/.streamlit /tmp/build
+# app.pyに実行権限を付与
+RUN chmod +x /app/app.py
 
-# コピースクリプトをコピー
-COPY copy_files.sh /tmp/
-RUN chmod +x /tmp/copy_files.sh
+# configディレクトリを作成
+RUN mkdir -p /app/config/
+RUN mkdir -p /app/house/train /app/house/val
 
-# ビルドコンテキストをコピー
-COPY . /tmp/build/
-
-# ファイルコピースクリプトを実行
-RUN /tmp/copy_files.sh
-
-# 必須ファイルをコピー（存在する場合）
-COPY check_required_files.sh /app/
-RUN chmod +x /app/check_required_files.sh
-
-# その他のプロジェクトファイルをコピー
-COPY . /app/
-
-# Cloud Run環境でのGCP認証を設定
-ENV USE_GCP_DEFAULT_CREDENTIALS=true
-
-# ポートを公開
-EXPOSE 8080
+# サービスアカウントキーをコピー
+COPY config/service_account.json /app/config/service_account.json
+# data.yamlをコピー
+COPY config/data.yaml /app/config/data.yaml
 
 # 環境変数を設定
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json
 ENV PYTHONPATH=/app
 ENV PATH="/usr/local/bin:${PATH}"
+
+# gsutilのキャッシュを無効化（トラブルシューティング用）
 ENV CLOUDSDK_PYTHON_SITEPACKAGES=1
 
-# Streamlitを起動
-CMD ["streamlit", "run", "house_design_app/main.py", "--server.port=8080", "--server.address=0.0.0.0"]
+# エントリーポイントを設定
+ENTRYPOINT ["python3", "-m", "src.cli"]

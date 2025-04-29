@@ -1,222 +1,197 @@
 # House Design AI
 
-建物のセグメンテーションとグリッド生成のためのYOLOシリーズベースのAIソリューション
+建物のセグメンテーションとグリッド生成のためのYOLO11ベースのAIソリューション。Google Cloud Platform (Vertex AI)を活用したトレーニングと、Streamlitを使用した使いやすいインターフェースを提供します。
 
-## 概要
+## 機能
 
-House Design AIは、建物のセグメンテーションとグリッド生成を自動化するAIソリューションです。YOLOシリーズを使用した物体検出とセグメンテーション、Google Cloud Platform (Vertex AI)を活用したトレーニング、Streamlitを使用した使いやすいインターフェースを提供します。
-
-## 主な機能
-
-- 建物と道路の検出・セグメンテーション
-- 住居と道路の関係性を考慮した建物解析
-- 建物領域への規則的なグリッド適用
-- Vertex AIでのモデルトレーニング
-- Streamlitベースの直感的なUIの提供
-- FreeCAD APIによる3Dモデル生成
-
-## 技術スタック
-
-- **Python バージョン:** Python 3.9+
-- **依存関係管理:** pip (requirements.txt)
-- **コード整形:** Ruff (black併用)
-- **型ヒント:** typingモジュールを厳格に使用
-- **テストフレームワーク:** pytest
-- **ドキュメント:** Googleスタイルのdocstring
-- **環境管理:** venv
-- **コンテナ化:** docker
-- **デモフレームワーク:** streamlit
-- **コンピュータビジョン:** ultralytics (YOLO v11)
-- **画像処理:** OpenCV, PIL, numpy, matplotlib
-- **クラウドインフラ:** Google Cloud Platform (Vertex AI, Cloud Storage)
-- **データ処理:** PyYAML, numpy
-- **データ検証:** pydantic
-- **バージョン管理:** git
-- **3Dモデリング:** FreeCAD API
-
-## プロジェクト構造
-
-```
-house-design-ai/
-├── config/                   # 設定ファイル (data.yaml, service_account.json)
-├── datasets/                 # データセットディレクトリ
-├── deploy/                   # デプロイ関連ファイル
-├── DOCS/                     # ドキュメント
-│   ├── architecture/         # アーキテクチャ関連ドキュメント
-│   ├── deployment/           # デプロイメント関連ドキュメント
-│   ├── development/          # 開発関連ドキュメント
-│   └── roadmap/              # ロードマップ関連ドキュメント
-├── freecad_api/              # FreeCAD API関連
-│   ├── Dockerfile            # FreeCAD API用Dockerfile
-│   ├── Dockerfile.freecad    # FreeCAD用Dockerfile
-│   ├── examples/             # サンプルコード
-│   ├── main.py               # FreeCAD APIのメインコード
-│   ├── requirements-freecad-api.txt # FreeCAD API用依存関係
-│   ├── scripts/              # FreeCAD用スクリプト
-│   └── test_data.json        # テストデータ
-├── house_design_app/         # Streamlitアプリケーション
-│   ├── main.py               # メインアプリケーション
-│   ├── pages/                # マルチページアプリのサブページ
-│   ├── requirements-streamlit.txt # Streamlit用依存関係
-│   └── logo.png              # アプリロゴ
-├── notebooks/                # Jupyter notebooks
-├── scripts/                  # ユーティリティスクリプト
-├── src/                      # ソースコード
-│   ├── cloud/                # クラウド連携 (Vertex AI)
-│   ├── processing/           # 画像処理ロジック
-│   ├── utils/                # ユーティリティ関数
-│   ├── visualization/        # 可視化ツール
-│   ├── cli.py                # コマンドラインインターフェース
-│   ├── train.py              # モデルトレーニングロジック
-│   └── inference.py          # 推論ロジック
-├── terraform/                # Terraformインフラストラクチャコード
-├── tests/                    # テストコード
-├── Dockerfile                # メインDockerfile
-├── requirements.txt          # 依存関係
-├── requirements-dev.txt      # 開発用依存関係
-├── README.md                 # プロジェクト説明
-├── directorystructure.md     # ディレクトリ構造
-└── technologystack.md        # 技術スタック
-```
+- 📸 **セグメンテーション**: 画像内の建物と道路を検出・セグメンテーション
+- 🏠 **建物解析**: 住居と道路の関係性を考慮した処理
+- 📊 **グリッド生成**: 建物領域に規則的なグリッドを適用
+- ☁️ **クラウド統合**: Vertex AIでのモデルトレーニングに対応
+- 🖥️ **ユーザーインターフェース**: Streamlitベースの直感的なUI
 
 ## セットアップ
 
 ### 前提条件
 
 - Python 3.9以上
-- pip
-- git
-- Docker (オプション)
-- Google Cloud SDK (オプション)
+- Google Cloud Platform アカウント (Vertex AI使用時のみ)
 
-### インストール
+### 環境構築
 
-1. リポジトリのクローン:
-```bash
-git clone https://github.com/yourusername/house-design-ai.git
-cd house-design-ai
-```
+1. リポジトリをクローン:
 
-2. 仮想環境の作成と有効化:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linuxの場合
-# または
-.\venv\Scripts\activate  # Windowsの場合
-```
+   ```bash
+   git clone https://github.com/yourusername/house-design-ai.git
+   cd house-design-ai
+   ```
 
-3. 依存関係のインストール:
-```bash
-pip install -r requirements.txt
-```
+2. 仮想環境を作成:
 
-4. 開発用依存関係のインストール（開発者の場合）:
-```bash
-pip install -r requirements-dev.txt
-```
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
+   ```
+
+3. 依存関係をインストール:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. GCPサービスアカウント設定 (Vertex AI使用時のみ):
+   - サービスアカウントキーを `config/service_account.json` に配置
+   - または環境変数 `GOOGLE_APPLICATION_CREDENTIALS` を設定
 
 ## 使用方法
 
-### ローカル開発
+### Streamlitアプリの起動
 
-1. Streamlitアプリの起動:
 ```bash
-cd house_design_app
-streamlit run main.py
+python -m src.cli app
 ```
 
-2. モデルのトレーニング:
+これにより、ブラウザでStreamlitアプリが開きます（デフォルトは <http://localhost:8501> ）。
+
+### Vertex AIでのトレーニング
+
 ```bash
-python src/train.py --config config/train_config.yaml
+python -m src.cli vertex --model yolo11l-seg.pt --epochs 100
 ```
 
-3. 推論の実行:
+詳細なオプションは以下で確認できます:
+
 ```bash
-python src/inference.py --image path/to/image.jpg
+python -m src.cli vertex --help
 ```
 
-### FreeCAD APIの使用
+### ローカルでのモデルトレーニング
 
-1. FreeCAD APIの起動:
 ```bash
-cd freecad_api
-python main.py
+python -m src.cli train --data config/data.yaml --model yolo11l-seg.pt --epochs 50
 ```
 
-2. Dockerを使用した起動:
+### 推論実行
+
 ```bash
-cd freecad_api
-docker build -t freecad-api -f Dockerfile.freecad .
-docker run -p 8000:8000 freecad-api
+python -m src.cli inference --model_path yolo11l-seg.pt --image_path path/to/image.jpg
 ```
 
-### クラウドデプロイ
+### 可視化ツール
 
-1. GCPプロジェクトの設定:
 ```bash
-gcloud config set project YOUR_PROJECT_ID
+python -m src.cli visualize --result_path path/to/results --output_dir path/to/output
 ```
 
-2. 必要なAPIの有効化:
+## Docker対応
+
+Dockerを使用して環境を構築することも可能です:
+
 ```bash
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
+# イメージのビルド
+docker build -t house-design-ai .
+
+# コンテナの実行（Streamlitアプリ）
+docker run -p 8501:8501 house-design-ai
 ```
 
-3. Terraformによるインフラストラクチャのデプロイ:
+### 可視化ツール
+
 ```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
+# 推論結果の可視化
+python -m src.cli visualize --result_path path/to/results --output_dir path/to/output
+
+# データセットの可視化
+python -m src.visualization.dataset --data_yaml=config/data.yaml --num_samples=5 --output_dir=visualization_results
+
+# Dockerパスとローカルパスが異なる場合、オーバーライドオプションを使用
+python -m src.visualization.dataset --data_yaml=config/data.yaml --override_train_path=datasets/house/train
 ```
 
-## デプロイ済みサービス
+オプション:
+- `--data_yaml`: データセット設定ファイルへのパス
+- `--num_samples`: 視覚化するサンプル数（デフォルト: 5）
+- `--output_dir`: 出力ディレクトリ（デフォルト: visualization_results）
+- `--override_train_path`: data.yamlのtrainパスを上書き（Docker/クラウド用のパスをローカル環境用に変更する場合に使用）
 
-### FreeCAD API
-- URL: https://freecad-api-513507930971.asia-northeast1.run.app
-- 設定:
-  - メモリ: 2GB
-  - CPU: 2
-  - タイムアウト: 300秒
+## トラブルシューティング
 
-## 開発状況
+### OpenCVの依存関係エラー
 
-### 完了した機能
-- ✅ 環境セットアップ
-- ✅ コア機能開発
-- ✅ FreeCAD統合
-- ✅ クラウドデプロイメント
+Docker環境で以下のようなエラーが発生した場合：
 
-### 進行中の機能
-- 🟡 運用管理強化
-  - Cloud Loggingの設定
-  - Cloud Monitoringのメトリクス設定
-  - APIドキュメントの整備
-  - エラーハンドリングの強化
+```
+ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+```
 
-### 今後の機能
-- ⏳ Vertex AI統合
-- ⏳ Firebase/Firestore実装
-- ⏳ 高度な機能の追加
+これはOpenCVに必要なシステムライブラリが不足していることを示しています。Dockerfileに以下のライブラリを追加してください：
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  libgl1 \
+  libglx0 \
+  libglvnd0 \
+  libsm6 \
+  libxext6 \
+  libxrender1
+```
+
+その後、再度Dockerイメージをビルドしてください。
+
+## プロジェクト構造
+
+```
+house-design-ai/
+├── app.py                    # エントリーポイント
+├── Dockerfile                # Dockerコンテナ定義
+├── requirements.txt          # 依存パッケージ
+├── config/                   # 設定ファイル
+├── datasets/                 # データセットディレクトリ
+├── deploy/                   # デプロイ関連ファイル
+├── notebooks/                # Jupyter notebooks
+├── scripts/                  # ユーティリティスクリプト
+├── src/                      # ソースコード
+│   ├── cloud/                # クラウド連携
+│   ├── processing/           # 画像処理ロジック
+│   ├── utils/                # ユーティリティ
+│   ├── visualization/        # 可視化ツール
+│   ├── cli.py                # コマンドラインインターフェース
+│   ├── train.py              # モデルトレーニングロジック
+│   └── inference.py          # 推論ロジック
+├── streamlit/                # Streamlitアプリ
+│   ├── pages/                # マルチページアプリのサブページ
+│   └── app.py                # メインアプリケーション
+└── tests/                    # テストコード
+```
+
+## 開発者向け情報
+
+### コーディング規約
+
+- PEP 8に準拠し、Ruffとblackでコード整形
+- すべての関数に型アノテーションとDocstringを追加
+- モジュール性と再利用性を重視したコード設計
+
+### 主要な依存関係
+
+- **ultralytics**: YOLO11モデルの実装
+- **google-cloud-aiplatform**: Vertex AI連携
+- **streamlit**: ウェブインターフェース
+- **opencv-python**: 画像処理
+- **pydantic**: データ検証
+
+### テスト実行
+
+```bash
+pytest tests/
+```
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
+[MIT License](LICENSE)
 
-## 貢献
+## 謝辞
 
-プロジェクトへの貢献は大歓迎です。貢献する前に、以下の手順に従ってください：
-
-1. このリポジトリをフォーク
-2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
-
-詳細な貢献ガイドについては、[CONTRIBUTING.md](DOCS/development/contributing.md)を参照してください。
-
-## 連絡先
-
-プロジェクトに関する質問や提案がある場合は、Issueを作成してください。
+- YOLO11: [Ultralytics](https://github.com/ultralytics/ultralytics)
+- Streamlit: [Streamlit](https://streamlit.io/)
+- Google Cloud Platform: [GCP](https://cloud.google.com/)
