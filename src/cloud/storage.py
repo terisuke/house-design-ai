@@ -61,12 +61,21 @@ def initialize_gcs_client():
         service_account_path = os.path.join("config", "service_account.json")
 
         if os.path.exists(service_account_path):
-            # 指定されたパスのサービスアカウントキーを使用
-            client = storage.Client.from_service_account_json(service_account_path)
-            logger.info(
-                f"サービスアカウントファイルからGCSクライアントを初期化: {service_account_path}"
-            )
-            return client
+            try:
+                file_size = os.path.getsize(service_account_path)
+                if file_size < 50:  # 有効なサービスアカウントJSONは通常数百バイト以上
+                    logger.warning(f"サービスアカウントファイルが小さすぎます（{file_size}バイト）。有効なJSONではない可能性があります。")
+                    # 他の認証方法にフォールバック
+                else:
+                    # 指定されたパスのサービスアカウントキーを使用
+                    client = storage.Client.from_service_account_json(service_account_path)
+                    logger.info(
+                        f"サービスアカウントファイルからGCSクライアントを初期化: {service_account_path}"
+                    )
+                    return client
+            except Exception as e:
+                logger.warning(f"サービスアカウントファイルからの認証に失敗しました: {e}")
+                # 他の認証方法にフォールバック
         
         # 3. Cloud Run環境でのデフォルト認証を使用
         use_default_creds = os.environ.get("USE_GCP_DEFAULT_CREDENTIALS", "").lower() == "true"
