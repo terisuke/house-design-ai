@@ -19,9 +19,16 @@ resource "google_storage_bucket" "bucket" {
   }
 }
 
+resource "google_storage_bucket_object" "logo" {
+  count  = var.upload_logo ? 1 : 0
+  name   = "logo.png"
+  bucket = google_storage_bucket.bucket.name
+  source = var.logo_file_path
+}
+
 resource "google_storage_bucket_iam_member" "public_read" {
   count  = var.public_access ? 1 : 0
   bucket = google_storage_bucket.bucket.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
-} 
+}  

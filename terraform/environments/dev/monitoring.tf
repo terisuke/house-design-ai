@@ -1,7 +1,7 @@
 module "monitoring" {
   source = "../../modules/monitoring"
 
-  project_id   = "yolov8environment"
+  project_id   = var.project_id
   alert_email  = "company@cor-jp.com"
   service_name = "freecad-api"
 }

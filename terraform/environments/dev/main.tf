@@ -24,10 +24,14 @@ module "streamlit_service" {
   image                 = var.streamlit_image
   memory                = "1Gi"
   cpu                   = "1"
+  platform              = var.streamlit_image_platform
   allow_unauthenticated = true
   environment_variables = {
-    BUCKET_NAME     = module.storage.bucket_name
-    FREECAD_API_URL = "https://freecad-api-service-xxxxx-xx.a.run.app" # デプロイ後に実際のURLに置き換える
+    BUCKET_NAME                  = module.storage.bucket_name
+    FREECAD_API_URL              = "https://freecad-api-service-xxxxx-xx.a.run.app" # デプロイ後に実際のURLに置き換える
+    USE_GCP_DEFAULT_CREDENTIALS  = "true"
+    SECRET_MANAGER_SERVICE_ACCOUNT = module.secrets.service_account_secret_name
+    LOGO_GCS_PATH                = module.storage.logo_url
   }
 }
 
@@ -51,9 +55,11 @@ module "freecad_api_service" {
 module "storage" {
   source = "../../modules/cloud-storage"
 
-  project_id  = var.project_id
-  bucket_name = "house-design-ai-data"
-  location    = var.region
+  project_id     = var.project_id
+  bucket_name    = "house-design-ai-data"
+  location       = var.region
+  upload_logo    = fileexists(var.logo_file_path)
+  logo_file_path = var.logo_file_path
 }
 
 # Artifact Registry リポジトリ
@@ -89,4 +95,13 @@ module "freecad_job" {
   environment_variables = {
     BUCKET_NAME = module.storage.bucket_name
   }
+}
+
+module "secrets" {
+  source = "../../modules/secret-manager"
+
+  service_account_secret_id = var.service_account_secret_id
+  service_account_file_path = var.service_account_file_path
+  create_from_file          = fileexists(var.service_account_file_path)
+  service_account_email     = var.cloud_run_service_account
 }

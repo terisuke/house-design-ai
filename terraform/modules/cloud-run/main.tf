@@ -13,6 +13,14 @@ resource "google_cloud_run_service" "service" {
             cpu    = var.cpu
           }
         }
+        
+        dynamic "ports" {
+          for_each = var.platform != "" ? [1] : []
+          content {
+            name           = "http1"
+            container_port = 8080
+          }
+        }
 
         dynamic "env" {
           for_each = var.environment_variables
@@ -50,4 +58,4 @@ resource "google_cloud_run_service_iam_policy" "noauth" {
   service  = google_cloud_run_service.service.name
 
   policy_data = data.google_iam_policy.noauth[0].policy_data
-} 
+}  

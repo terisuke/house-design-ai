@@ -107,10 +107,10 @@ resource "google_monitoring_alert_policy" "memory_usage" {
   conditions {
     display_name = "Memory Usage > 80%"
     condition_threshold {
-      filter          = "metric.type=\"run.googleapis.com/container/memory/used_bytes\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"freecad-api\""
+      filter          = "metric.type=\"run.googleapis.com/container/memory/utilization\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"freecad-api\""
       duration        = "300s"
       comparison      = "COMPARISON_GT"
-      threshold_value = 1600000000 # 1.6GB in bytes
+      threshold_value = 0.8 # 80% utilization
 
       aggregations {
         alignment_period   = "60s"

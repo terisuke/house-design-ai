@@ -40,4 +40,10 @@ variable "allow_unauthenticated" {
   description = "Allow unauthenticated access"
   type        = bool
   default     = false
-} 
+}
+
+variable "platform" {
+  description = "コンテナイメージのプラットフォーム"
+  type        = string
+  default     = ""
+}  
