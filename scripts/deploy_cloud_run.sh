@@ -7,8 +7,11 @@ MEMORY="1Gi"
 
 IMAGE_PATH="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
+echo "必須ファイルの存在を確認しています..."
+./check_required_files.sh
+
 echo "StreamlitアプリのDockerイメージをビルドしています..."
-gcloud builds submit --tag ${IMAGE_PATH} --substitutions=_IS_CLOUD_BUILD=true .
+gcloud builds submit --tag ${IMAGE_PATH} .
 
 echo "Cloud Runにデプロイしています..."
 gcloud run deploy ${SERVICE_NAME} \
@@ -16,7 +19,8 @@ gcloud run deploy ${SERVICE_NAME} \
   --platform managed \
   --region ${REGION} \
   --memory ${MEMORY} \
-  --allow-unauthenticated
+  --allow-unauthenticated \
+  --set-env-vars="USE_GCP_DEFAULT_CREDENTIALS=true"
 
 echo "デプロイが完了しました。"
 echo "サービスURL: https://${SERVICE_NAME}-513507930971.${REGION}.run.app"
