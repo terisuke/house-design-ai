@@ -101,6 +101,10 @@ RUN mkdir -p /app/config/ && \
     echo "{}" > /app/config/service_account.json; \
     fi
 
+# Cloud Run環境でのGCP認証を設定
+# Cloud Runのデフォルト認証情報を使用するための設定
+ENV USE_GCP_DEFAULT_CREDENTIALS=true
+
 # ポートを公開
 EXPOSE 8080
 

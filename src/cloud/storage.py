@@ -36,8 +36,9 @@ def initialize_gcs_client():
         # 認証方法の優先順位:
         # 1. Streamlit secretsの使用（Streamlit環境の場合）
         # 2. 指定されたサービスアカウントファイル
-        # 3. 環境変数 GOOGLE_APPLICATION_CREDENTIALS
-        # 4. デフォルトの認証
+        # 3. Cloud Run環境でのデフォルト認証（USE_GCP_DEFAULT_CREDENTIALS=true）
+        # 4. 環境変数 GOOGLE_APPLICATION_CREDENTIALS
+        # 5. デフォルトの認証
 
         # 1. Streamlit secretsが利用可能かチェック
         if is_streamlit:
@@ -66,15 +67,26 @@ def initialize_gcs_client():
                 f"サービスアカウントファイルからGCSクライアントを初期化: {service_account_path}"
             )
             return client
-        else:
-            # デフォルト認証を使用
+        
+        # 3. Cloud Run環境でのデフォルト認証を使用
+        use_default_creds = os.environ.get("USE_GCP_DEFAULT_CREDENTIALS", "").lower() == "true"
+        if use_default_creds:
             try:
                 client = storage.Client()
-                logger.info("デフォルト認証でGCSクライアントを初期化")
+                logger.info("Cloud Runのデフォルト認証でGCSクライアントを初期化")
                 return client
             except Exception as e:
-                logger.error(f"デフォルト認証でのGCS初期化エラー: {e}")
-                return None
+                logger.warning(f"Cloud Runのデフォルト認証に失敗しました: {e}")
+                # 他の認証方法にフォールバック
+        
+        # 4. デフォルト認証を使用
+        try:
+            client = storage.Client()
+            logger.info("デフォルト認証でGCSクライアントを初期化")
+            return client
+        except Exception as e:
+            logger.error(f"デフォルト認証でのGCS初期化エラー: {e}")
+            return None
 
     except ImportError:
         logger.error("google-cloud-storageがインストールされていません")
