@@ -55,7 +55,7 @@ gcloud run deploy house-design-ai-streamlit \
 ```
 
 3. デプロイ後、以下のURLにアクセスしてアプリケーションが正常に動作することを確認:
-   https://house-design-ai-streamlit-513507930971.asia-northeast1.run.app/
+   https://streamlit-web-513507930971.asia-northeast1.run.app/
 
 ## 追加の最適化オプション
 
