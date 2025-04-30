@@ -19,12 +19,14 @@
 - [プロジェクトロードマップ](roadmap/roadmap.md): 短期・中期・長期の開発計画
 - [詳細ロードマップ](roadmap/detailed_roadmap.md): より詳細な開発ロードマップ
 
-## 実装状況 (2025-04-28更新)
+## 実装状況 (2025-04-30更新)
 
 - ✅ FreeCAD APIのCloud Runデプロイ成功
 - ✅ Streamlitアプリケーションの実行確認
+- ✅ StreamlitアプリケーションのCloud Runデプロイ完了
 - ✅ Cloud StorageでのFCStdモデル保存
 - ✅ PyTorchとStreamlitの互換性問題の解決
+- ✅ Terraformによるインフラストラクチャのコード化完了
 
 ## FreeCAD API実装の詳細
 
@@ -58,10 +60,11 @@ https://streamlit-web-513507930971.asia-northeast1.run.app
 
 ## 今後の開発計画
 
-- StreamlitアプリケーションのCloud Runデプロイ
 - FreeCAD APIの完全実装
 - Vertex AI統合の実装
 - セグメンテーション精度の向上
 - 建築基準法チェック機能の実装
+- Terraformによるデプロイプロセスの完全自動化
+- マルチリージョンデプロイメントの実装
 
 詳細については、[プロジェクトロードマップ](roadmap/roadmap.md)を参照してください。
