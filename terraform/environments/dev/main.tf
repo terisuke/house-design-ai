@@ -22,8 +22,8 @@ module "streamlit_service" {
   region                = var.region
   service_name          = "streamlit-web"
   image                 = var.streamlit_image
-  memory                = "1Gi"
-  cpu                   = "1"
+  memory                = "4Gi"
+  cpu                   = "2"
   platform              = var.streamlit_image_platform
   allow_unauthenticated = true
   environment_variables = {
