@@ -100,6 +100,7 @@
 2. 建築基準法チェック機能の実装開始
 3. 建具記号ライブラリの作成
 4. タイトルブロックテンプレートの設計
+5. Terraformによるデプロイプロセスの完全自動化
 
 ## 現在のフェーズ（2024年Q2）
 
@@ -108,7 +109,9 @@
 - ✅ FreeCAD統合の基本実装
 - ✅ Google Cloud Platform環境の構築
 - ✅ Dockerコンテナ化の実装
-- ✅ Cloud Runへのデプロイ
+- ✅ Cloud RunへのFreeCAD APIデプロイ
+- ✅ StreamlitアプリケーションのCloud Runデプロイ
+- ✅ Terraformによるインフラストラクチャのコード化
 
 ### 進行中の項目
 - 🔄 セグメンテーション精度の向上
@@ -208,6 +211,7 @@
 - サーバーレスアーキテクチャの最適化
 - コンテナ化の改善
 - モニタリングの強化
+- Terraformによるインフラストラクチャのコード化の拡張
 
 ## コミュニティ貢献
 
@@ -270,4 +274,4 @@
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/)  
+- [Streamlit Documentation](https://docs.streamlit.io/)            
