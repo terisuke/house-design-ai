@@ -8,7 +8,7 @@ MEMORY="1Gi"
 IMAGE_PATH="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 echo "必須ファイルの存在を確認しています..."
-./check_required_files.sh
+./scripts/check_required_files.sh
 
 echo "StreamlitアプリのDockerイメージをビルドしています..."
 gcloud builds submit --config=cloudbuild.yaml --substitutions=_IMAGE_NAME=${IMAGE_PATH} .
@@ -23,4 +23,4 @@ gcloud run deploy ${SERVICE_NAME} \
   --set-env-vars="USE_GCP_DEFAULT_CREDENTIALS=true"
 
 echo "デプロイが完了しました。"
-echo "サービスURL: https://${SERVICE_NAME}-513507930971.${REGION}.run.app"
+echo "サービスURL: https://streamlit-web-513507930971.${REGION}.run.app"

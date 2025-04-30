@@ -92,7 +92,7 @@ ERROR:src.cloud.storage:モデルダウンロードエラー: Access denied: buc
 
 デプロイ後、以下のURLにアクセスしてアプリケーションが正常に動作することを確認してください：
 
-https://house-design-ai-streamlit-513507930971.asia-northeast1.run.app/
+https://streamlit-web-513507930971.asia-northeast1.run.app/
 
 正常に動作している場合：
 - ロゴが表示される

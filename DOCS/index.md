@@ -1,6 +1,6 @@
 # House Design AI ドキュメント
 
-## 最終更新日: 2025年4月28日
+## 最終更新日: 2025年4月30日
 
 ## ドキュメント構造
 
@@ -49,6 +49,11 @@ APIテスト結果：
 Streamlitアプリケーションは以下のコマンドで実行できます：
 ```bash
 PYTHONPATH=. streamlit run house_design_app/main.py
+```
+
+デプロイ済みStreamlitアプリケーションは以下のURLで利用可能です：
+```
+https://streamlit-web-513507930971.asia-northeast1.run.app
 ```
 
 ## 今後の開発計画

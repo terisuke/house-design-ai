@@ -70,7 +70,7 @@ RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/im
 RUN mkdir -p /app/config /app/house_design_app /app/.streamlit /tmp/build
 
 # コピースクリプトをコピー
-COPY copy_files.sh /tmp/
+COPY scripts/copy_files.sh /tmp/
 RUN chmod +x /tmp/copy_files.sh
 
 # ビルドコンテキストをコピー
@@ -80,7 +80,7 @@ COPY . /tmp/build/
 RUN /tmp/copy_files.sh
 
 # 必須ファイルをコピー（存在する場合）
-COPY check_required_files.sh /app/
+COPY scripts/check_required_files.sh /app/
 RUN chmod +x /app/check_required_files.sh
 
 # その他のプロジェクトファイルをコピー
