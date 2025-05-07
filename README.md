@@ -121,8 +121,8 @@ pip install -r requirements-dev.txt
 
 1. Streamlitアプリの起動:
 ```bash
-cd house_design_app
-streamlit run main.py
+# プロジェクトのルートディレクトリで実行
+PYTHONPATH=$PYTHONPATH:. streamlit run house_design_app/main.py
 ```
 
 2. モデルのトレーニング:

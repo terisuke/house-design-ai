@@ -1,0 +1,290 @@
+"""
+3Dモデル生成ページ
+間取り情報からFreeCAD APIを使って3Dモデルを生成します。
+"""
+
+import io
+import logging
+import os
+import streamlit as st
+import tempfile
+import requests
+import json
+from PIL import Image
+import numpy as np
+import sys
+from pathlib import Path
+import torch
+
+# 親ディレクトリをPythonパスに追加
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# ユーティリティをインポート
+try:
+    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, convert_to_2d_drawing
+except ImportError as e:
+    st.error(f"スタイルユーティリティのインポート失敗: {e}")
+
+# ロギング設定
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("streamlit-app-3d-model")
+
+# タイトルと説明
+# st.set_page_config() # メインページで設定済み
+
+# カスタムCSSを適用
+try:
+    apply_custom_css()
+except Exception as e:
+    st.error(f"スタイルの適用に失敗: {e}")
+
+# ロゴを表示
+with st.sidebar:
+    display_logo()
+
+# メインタイトルとコンテンツ
+st.title("3Dモデル生成")
+st.markdown("""
+このページでは、土地画像から生成された間取り情報をもとに3Dモデルを生成します。  
+メインページで間取り画像を生成した後、このページで3Dモデルを作成できます。
+""")
+
+# セッションステートで間取り情報を確認
+if "debug_info" not in st.session_state or "result_image" not in st.session_state:
+    st.warning("まだ間取り情報が生成されていません。最初にメインページで土地画像をアップロードして間取りを生成してください。")
+    st.info("メインページに戻るには、左側のサイドバーの「Home」をクリックしてください。")
+    
+    # サンプル画像を使用するオプション
+    st.subheader("サンプルデータを使用")
+    if st.button("サンプルデータをロード"):
+        # サンプルの間取り情報をロード
+        try:
+            # サンプルの間取り情報を生成
+            sample_madori_info = {
+                "E": {"width": 2, "height": 2, "position": [0, 0]},
+                "L": {"width": 4, "height": 3, "position": [2, 0]},
+                "D": {"width": 3, "height": 2, "position": [2, 3]},
+                "K": {"width": 2, "height": 2, "position": [0, 2]},
+                "B": {"width": 2, "height": 2, "position": [6, 0]},
+                "T": {"width": 1, "height": 1, "position": [6, 2]},
+                "UT": {"width": 2, "height": 1, "position": [5, 3]}
+            }
+            
+            # 画像サイズの設定
+            img_width = 800
+            img_height = 600
+            sample_image = Image.new("RGB", (img_width, img_height), color=(255, 255, 255))
+            
+            # 画像をセッションステートに保存
+            st.session_state.result_image = sample_image
+            st.session_state.debug_info = {
+                "madori_info": sample_madori_info,
+                "params": {
+                    "global_setback_mm": 5.0,
+                    "road_setback_mm": 50.0,
+                    "grid_mm": 9.1,
+                    "floorplan_mode": True
+                },
+                "bounding_box": {"x": 100, "y": 100, "width": 600, "height": 400},
+                "cell_px": 54,
+                "px_per_mm": 5.9,
+                "grid": {"width": 8, "height": 6},
+                "grid_stats": {"cells_drawn": 30, "cells_skipped": 0}
+            }
+            
+            st.success("サンプルデータをロードしました！")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"サンプルデータのロード中にエラーが発生しました: {e}")
+    
+    # メインページへのボタン
+    st.button("メインページへ戻る", on_click=lambda: st._rerun())
+    
+    # フッターを表示
+    try:
+        display_footer()
+    except Exception as e:
+        st.markdown(
+            """
+            <div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: white; text-align: center; padding: 10px; font-size: 14px; border-top: 1px solid #f0f0f0; z-index: 999;">
+                © 2025 U-DAKE - 土地画像から間取りを生成するAIツール
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    st.stop()
+
+# 間取り情報の表示
+st.subheader("間取り情報")
+
+# 前のページで生成した画像を表示
+st.image(st.session_state.result_image, use_column_width=True, caption="生成された間取り図")
+
+# 間取り情報を表示（テーブル形式）
+debug_info = st.session_state.debug_info
+madori_info = debug_info.get("madori_info", {})
+
+if madori_info:
+    madori_descriptions = {
+        "E": "玄関",
+        "L": "リビング",
+        "D": "ダイニング",
+        "K": "キッチン",
+        "B": "バスルーム",
+        "T": "トイレ",
+        "UT": "脱衣所",
+    }
+    
+    # 間取りデータをテーブル形式で表示
+    madori_data = []
+    for madori_name, info in madori_info.items():
+        description = madori_descriptions.get(madori_name, "")
+        width = info.get("width", 0)
+        height = info.get("height", 0)
+        area = width * height * 0.91 * 0.91  # 1グリッド = 0.91m x 0.91m
+        madori_data.append({
+            "記号": madori_name,
+            "名称": description,
+            "幅": f"{width}マス",
+            "高さ": f"{height}マス",
+            "床面積": f"{area:.2f}㎡",
+        })
+    
+    # DataFrameに変換して表示
+    if madori_data:
+        import pandas as pd
+        df = pd.DataFrame(madori_data)
+        st.dataframe(df)
+        
+        # 合計面積の表示
+        total_area = sum(float(item["床面積"].replace("㎡", "")) for item in madori_data)
+        st.info(f"総床面積: {total_area:.2f}㎡")
+
+# 3Dモデル生成のためのFreeCAD API設定
+st.subheader("3Dモデル生成")
+with st.expander("詳細設定", expanded=True):
+    freecad_api_url = st.text_input(
+        "FreeCAD API URL",
+        value=os.environ.get("FREECAD_API_URL", "https://freecad-api-513507930971.asia-northeast1.run.app"),
+        help="FreeCAD APIのエンドポイントURL"
+    )
+    
+    wall_height = st.slider(
+        "壁の高さ (m)",
+        min_value=2.0,
+        max_value=4.0,
+        value=2.5,
+        step=0.1,
+        help="3Dモデルの壁の高さを設定します"
+    )
+    
+    include_furniture = st.checkbox(
+        "家具を含める",
+        value=True,
+        help="3Dモデルに基本的な家具を含めます"
+    )
+
+# 3Dモデル生成ボタン
+if st.button("3Dモデルを生成", key="generate_3d_model"):
+    with st.spinner("3Dモデルを生成中..."):
+        try:
+            # サンプルデータ形式でAPIに送信
+            grid_data_obj = {
+                "width": 10.0,
+                "length": 15.0,
+                "height": wall_height,
+                "parameters": {
+                    "wall_thickness": 0.2,
+                    "window_size": 1.5,
+                    "include_furniture": include_furniture
+                }
+            }
+            response = requests.post(
+                f"{freecad_api_url}/generate",
+                json=grid_data_obj,
+                headers={"Content-Type": "application/json"},
+                timeout=60
+            )
+            response.raise_for_status()
+            cad_model_result = response.json()
+            st.write(cad_model_result)  # デバッグ用にAPIレスポンスを表示
+            logger.info(f"APIレスポンス: {cad_model_result}")
+            if "url" in cad_model_result:
+                st.session_state.cad_model_url = cad_model_result["url"]
+                st.success("3Dモデルの生成に成功しました")
+                st.markdown(f"モデルURL: {cad_model_result['url']}")
+                if "preview_url" in cad_model_result:
+                    st.image(cad_model_result["preview_url"], use_column_width=True, caption="3Dモデルプレビュー")
+                st.markdown(f"[3Dモデルをダウンロード]({cad_model_result['url']})")
+            else:
+                st.error(f"3Dモデル生成エラー: {cad_model_result.get('error', '不明なエラー')}")
+        except requests.exceptions.RequestException as e:
+            st.error(f"APIリクエストエラー: {str(e)}")
+            logger.error(f"APIリクエストエラー: {e}")
+        except Exception as e:
+            st.error(f"3Dモデル生成中にエラーが発生しました: {str(e)}")
+            logger.exception(f"3Dモデル生成エラー: {e}")
+
+# 2D図面生成部分
+if "cad_model_url" in st.session_state:
+    st.subheader("2D図面生成")
+    st.info("3Dモデルから2D図面を生成します。建築図面として利用できるPDF形式で出力されます。")
+    
+    # 図面タイプの選択
+    drawing_type = st.selectbox(
+        "図面タイプ",
+        options=["平面図", "立面図", "断面図", "アイソメトリック"],
+        index=0,
+        help="生成する図面の種類を選択します"
+    )
+    
+    drawing_scale = st.selectbox(
+        "縮尺",
+        options=["1:50", "1:100", "1:200"],
+        index=1,
+        help="図面の縮尺を選択します"
+    )
+    
+    # 2D図面生成ボタン
+    if st.button("2D図面を生成"):
+        with st.spinner("2D図面を生成中..."):
+            try:
+                # FreeCAD APIに2D図面生成リクエストを送信
+                response = requests.post(
+                    f"{freecad_api_url}/process/drawing",
+                    json={
+                        "model_url": st.session_state.cad_model_url,
+                        "drawing_type": drawing_type,
+                        "scale": drawing_scale
+                    },
+                    timeout=60
+                )
+                response.raise_for_status()
+                drawing_result = response.json()
+                
+                if "url" in drawing_result:
+                    st.success("2D図面の生成に成功しました")
+                    st.markdown(f"[2D図面をダウンロード]({drawing_result['url']})")
+                    
+                    # プレビュー画像がある場合は表示
+                    if "preview_url" in drawing_result:
+                        st.image(drawing_result["preview_url"], use_column_width=True, caption="2D図面プレビュー")
+                else:
+                    st.error(f"2D図面生成エラー: {drawing_result.get('error', '不明なエラー')}")
+            except Exception as e:
+                st.error(f"2D図面生成中にエラーが発生しました: {str(e)}")
+                logger.exception(f"2D図面生成エラー: {e}")
+
+# フッターを表示
+try:
+    display_footer()
+except Exception as e:
+    st.markdown(
+        """
+        <div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: white; text-align: center; padding: 10px; font-size: 14px; border-top: 1px solid #f0f0f0; z-index: 999;">
+            © 2025 U-DAKE - 土地画像から間取りを生成するAIツール
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
