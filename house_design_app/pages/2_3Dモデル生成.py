@@ -15,6 +15,7 @@ import numpy as np
 import sys
 from pathlib import Path
 import torch
+import streamlit.components.v1 as components
 
 # 親ディレクトリをPythonパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -275,6 +276,41 @@ if "cad_model_url" in st.session_state:
             except Exception as e:
                 st.error(f"2D図面生成中にエラーが発生しました: {str(e)}")
                 logger.exception(f"2D図面生成エラー: {e}")
+
+# 3Dモデル生成後のglTFプレビュー機能
+if "cad_model_url" in st.session_state:
+    st.subheader("3DモデルWebプレビュー (glTF)")
+    if st.button("3Dプレビューを生成", key="generate_gltf_preview"):
+        with st.spinner("glTF変換中..."):
+            try:
+                # FCStdファイルをglTFに変換
+                fcstd_url = st.session_state.cad_model_url
+                r = requests.get(fcstd_url)
+                r.raise_for_status()
+                files = {'file': ('model.fcstd', r.content)}
+                response = requests.post(
+                    f"{freecad_api_url}/convert/3d",
+                    files=files,
+                    timeout=120
+                )
+                response.raise_for_status()
+                result = response.json()
+                if "url" in result:
+                    st.session_state.gltf_url = result["url"]
+                    st.success("glTF変換に成功しました")
+                else:
+                    st.error(f"glTF変換エラー: {result.get('error', '不明なエラー')}")
+            except Exception as e:
+                st.error(f"glTF変換中にエラーが発生しました: {str(e)}")
+
+    # glTFプレビュー表示
+    if "gltf_url" in st.session_state:
+        st.markdown("### 3Dモデルプレビュー")
+        components.html(f'''
+        <model-viewer src="{st.session_state.gltf_url}" alt="3D model" auto-rotate camera-controls style="width: 100%; height: 500px;"></model-viewer>
+        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+        ''', height=520)
+        st.markdown(f"[glTFファイルをダウンロード]({st.session_state.gltf_url})")
 
 # フッターを表示
 try:

@@ -291,3 +291,58 @@ print(f"図面を保存しました: {{output_file}}")
         return JSONResponse(
             status_code=500, content={"error": f"Error converting to 2D: {str(e)}"}
         )
+
+
+@app.post("/convert/3d")
+async def convert_to_3d(file: UploadFile = File(...)):
+    """
+    FCStdファイルをglTFに変換し、Cloud StorageにアップロードしてURLを返す
+    """
+    if not file.filename.endswith(".fcstd"):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid file format. Only .fcstd files are supported."},
+        )
+    try:
+        # 一時ファイル保存
+        temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False)
+        content = await file.read()
+        temp_file.write(content)
+        temp_file.close()
+
+        # FreeCADスクリプトでglTF変換
+        temp_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+        with open(temp_script.name, "w") as f:
+            f.write(f"""
+import os
+import FreeCAD
+import Import
+import Mesh
+import ImportGui
+import Part
+import MeshPart
+import ImportExport
+import ImportGLTF
+
+doc = FreeCAD.open(\"{temp_file.name}\")
+obj = doc.Objects[0]
+output_file = \"{temp_file.name}.gltf\"
+ImportGLTF.export([obj], output_file)
+print(f\"Exported: {{output_file}}\")
+""")
+        output_file = f"{temp_file.name}.gltf"
+        os.environ["OUTPUT_DIR"] = os.path.dirname(output_file)
+        result = subprocess.run(
+            ["FreeCADCmd", temp_script.name], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return JSONResponse(status_code=500, content={"error": "Failed to convert to glTF", "stderr": result.stderr})
+        # Cloud Storageアップロード
+        storage = CloudStorage()
+        url = storage.upload_file(output_file, f"models/{uuid.uuid4()}.gltf")
+        os.unlink(temp_file.name)
+        os.unlink(temp_script.name)
+        os.unlink(output_file)
+        return {"url": url}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
