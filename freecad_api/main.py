@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import subprocess
 import tempfile
 import uuid
 import requests
@@ -172,16 +173,16 @@ wall_thickness = grid_data.get("wall_thickness", 0.12)  # デフォルト120mm
 include_furniture = grid_data.get("include_furniture", True)
 
 # 部屋を作成
-for room in grid_data["rooms"]:
-    dimensions = room["dimensions"]
-    position = room["position"]
+for room_data in grid_data["rooms"]:
+    dimensions = room_data["dimensions"]
+    position = room_data["position"]
     
     # 部屋の形状を作成
     box = Part.makeBox(dimensions[0], dimensions[1], 2.5, 
                        FreeCAD.Vector(position[0], position[1], 0))
     
     # オブジェクトを追加
-    obj = doc.addObject("Part::Feature", f"Room_{room['id']}")
+    obj = doc.addObject("Part::Feature", f"Room_{{room_data['id']}}")
     obj.Shape = box
 
 # 壁を作成
@@ -210,7 +211,7 @@ for wall in grid_data["walls"]:
         )
     
     # オブジェクトを追加
-    obj = doc.addObject("Part::Feature", f"Wall_{start[0]}_{start[1]}")
+    obj = doc.addObject("Part::Feature", f"Wall_{{wall['start'][0]}}_{{wall['start'][1]}}")
     obj.Shape = wall_box
 
 # ドキュメントを再計算

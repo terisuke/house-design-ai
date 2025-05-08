@@ -94,12 +94,12 @@ if "debug_info" not in st.session_state or "result_image" not in st.session_stat
             }
             
             st.success("サンプルデータをロードしました！")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"サンプルデータのロード中にエラーが発生しました: {e}")
     
     # メインページへのボタン
-    st.button("メインページへ戻る", on_click=lambda: st._rerun())
+    st.button("メインページへ戻る", on_click=lambda: st.rerun())
     
     # フッターを表示
     try:
