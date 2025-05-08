@@ -851,6 +851,7 @@ def main():
                                             ),  # result_gridの代わりにdebug_infoから取得
                                             "madori_info": madori_info,
                                             "params": debug_info.get("params", {}),
+                                            "grid_stats": debug_info.get("grid_stats", {})
                                         }
 
                                         # FreeCAD APIに送信
