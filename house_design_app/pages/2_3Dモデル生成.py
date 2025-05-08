@@ -190,34 +190,131 @@ with st.expander("詳細設定", expanded=True):
 if st.button("3Dモデルを生成", key="generate_3d_model"):
     with st.spinner("3Dモデルを生成中..."):
         try:
-            # サンプルデータ形式でAPIに送信
+            # 間取り情報からグリッドデータを作成
+            rooms = []
+            walls = []
+            room_id = 1
+            
+            # 間取り情報からルームデータを作成
+            for madori_name, info in madori_info.items():
+                width = info.get("width", 0) * 0.91  # グリッドサイズを実寸（m）に変換
+                height = info.get("height", 0) * 0.91
+                pos_x = info.get("position", [0, 0])[0] * 0.91
+                pos_y = info.get("position", [0, 0])[1] * 0.91
+                
+                # 部屋データを追加
+                rooms.append({
+                    "id": room_id,
+                    "dimensions": [width, height],
+                    "position": [pos_x, pos_y],
+                    "label": madori_descriptions.get(madori_name, madori_name)
+                })
+                
+                # 部屋の周囲に壁を作成
+                walls.extend([
+                    {"start": [pos_x, pos_y], "end": [pos_x + width, pos_y], "height": wall_height},
+                    {"start": [pos_x + width, pos_y], "end": [pos_x + width, pos_y + height], "height": wall_height},
+                    {"start": [pos_x + width, pos_y + height], "end": [pos_x, pos_y + height], "height": wall_height},
+                    {"start": [pos_x, pos_y + height], "end": [pos_x, pos_y], "height": wall_height}
+                ])
+                
+                room_id += 1
+            
+            # グリッドデータオブジェクトを作成
             grid_data_obj = {
-                "width": 10.0,
-                "length": 15.0,
-                "height": wall_height,
-                "parameters": {
-                    "wall_thickness": 0.2,
-                    "window_size": 1.5,
+                "rooms": rooms,
+                "walls": walls,
+                "wall_thickness": 0.12,  # 壁の厚さ120mm
+                "include_furniture": include_furniture
+            }
+            
+            # グリッドデータが空の場合はサンプルデータを使用
+            if len(rooms) == 0:
+                st.warning("間取り情報から有効なデータが生成できませんでした。サンプルデータを使用します。")
+                grid_data_obj = {
+                    "rooms": [
+                        {
+                            "id": 1,
+                            "dimensions": [10.0, 10.0],
+                            "position": [0.0, 0.0],
+                            "label": "Main Room"
+                        }
+                    ],
+                    "walls": [
+                        {"start": [0.0, 0.0], "end": [10.0, 0.0], "height": wall_height},
+                        {"start": [10.0, 0.0], "end": [10.0, 10.0], "height": wall_height},
+                        {"start": [10.0, 10.0], "end": [0.0, 10.0], "height": wall_height},
+                        {"start": [0.0, 10.0], "end": [0.0, 0.0], "height": wall_height}
+                    ],
+                    "wall_thickness": 0.12,
                     "include_furniture": include_furniture
                 }
-            }
+            
+            # APIリクエストを送信
             response = requests.post(
-                f"{freecad_api_url}/generate",
+                f"{freecad_api_url}/process/grid",
                 json=grid_data_obj,
                 headers={"Content-Type": "application/json"},
                 timeout=60
             )
             response.raise_for_status()
             cad_model_result = response.json()
-            st.write(cad_model_result)  # デバッグ用にAPIレスポンスを表示
             logger.info(f"APIレスポンス: {cad_model_result}")
+            
             if "url" in cad_model_result:
                 st.session_state.cad_model_url = cad_model_result["url"]
                 st.success("3Dモデルの生成に成功しました")
                 st.markdown(f"モデルURL: {cad_model_result['url']}")
+                
                 if "preview_url" in cad_model_result:
                     st.image(cad_model_result["preview_url"], use_column_width=True, caption="3Dモデルプレビュー")
-                st.markdown(f"[3Dモデルをダウンロード]({cad_model_result['url']})")
+                
+                # FCStdファイルを自動的にglTFに変換してWebで表示
+                with st.spinner("3Dモデルをブラウザ表示用に変換中..."):
+                    try:
+                        fcstd_url = cad_model_result["url"]
+                        r = requests.get(fcstd_url)
+                        r.raise_for_status()
+                        files = {'file': ('model.fcstd', r.content)}
+                        convert_response = requests.post(
+                            f"{freecad_api_url}/convert/3d",
+                            files=files,
+                            timeout=180
+                        )
+                        convert_response.raise_for_status()
+                        gltf_result = convert_response.json()
+                        
+                        if "url" in gltf_result:
+                            st.session_state.gltf_url = gltf_result["url"]
+                            st.session_state.gltf_format = gltf_result.get("format", "gltf")
+                            st.success("3Dモデルの表示準備ができました")
+                            
+                            # 3Dビューアーの表示
+                            st.markdown("### 3Dモデルプレビュー")
+                            
+                            # model-viewerコンポーネントで表示（拡張オプション付き）
+                            components.html(f'''
+                            <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
+                                auto-rotate camera-controls 
+                                style="width: 100%; height: 500px;" 
+                                shadow-intensity="1" 
+                                environment-image="neutral" 
+                                exposure="0.5"
+                                camera-orbit="45deg 60deg 3m"
+                                ar ar-modes="webxr scene-viewer quick-look">
+                            </model-viewer>
+                            <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+                            ''', height=520)
+                            
+                            # ダウンロードリンク
+                            file_format = st.session_state.gltf_format.upper()
+                            st.markdown(f"[3Dモデルをダウンロード ({file_format}形式)]({st.session_state.gltf_url})")
+                        else:
+                            st.warning("3Dモデルの変換には成功しましたが、ブラウザでの表示に対応していません")
+                            st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({cad_model_result['url']})")
+                    except Exception as e:
+                        st.warning(f"3Dモデルの表示準備中にエラーが発生しました: {str(e)}")
+                        st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({cad_model_result['url']})")
             else:
                 st.error(f"3Dモデル生成エラー: {cad_model_result.get('error', '不明なエラー')}")
         except requests.exceptions.RequestException as e:
@@ -278,10 +375,12 @@ if "cad_model_url" in st.session_state:
                 logger.exception(f"2D図面生成エラー: {e}")
 
 # 3Dモデル生成後のglTFプレビュー機能
-if "cad_model_url" in st.session_state:
-    st.subheader("3DモデルWebプレビュー (glTF)")
+if "cad_model_url" in st.session_state and "gltf_url" not in st.session_state:
+    st.subheader("3DモデルWebプレビュー")
+    st.info("モデル生成後に自動的にブラウザ表示用の変換が行われなかった場合、ここから手動で変換できます。")
+    
     if st.button("3Dプレビューを生成", key="generate_gltf_preview"):
-        with st.spinner("glTF変換中..."):
+        with st.spinner("3Dモデルをブラウザ表示用に変換中..."):
             try:
                 # FCStdファイルをglTFに変換
                 fcstd_url = st.session_state.cad_model_url
@@ -291,26 +390,41 @@ if "cad_model_url" in st.session_state:
                 response = requests.post(
                     f"{freecad_api_url}/convert/3d",
                     files=files,
-                    timeout=120
+                    timeout=180
                 )
                 response.raise_for_status()
                 result = response.json()
+                
                 if "url" in result:
                     st.session_state.gltf_url = result["url"]
-                    st.success("glTF変換に成功しました")
+                    st.session_state.gltf_format = result.get("format", "gltf")
+                    st.success("3Dモデルの表示準備ができました")
+                    
+                    # 3Dビューアーの表示
+                    st.markdown("### 3Dモデルプレビュー")
+                    
+                    # model-viewerコンポーネントで表示（拡張オプション付き）
+                    components.html(f'''
+                    <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
+                        auto-rotate camera-controls 
+                        style="width: 100%; height: 500px;" 
+                        shadow-intensity="1" 
+                        environment-image="neutral" 
+                        exposure="0.5"
+                        camera-orbit="45deg 60deg 3m"
+                        ar ar-modes="webxr scene-viewer quick-look">
+                    </model-viewer>
+                    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+                    ''', height=520)
+                    
+                    # ダウンロードリンク
+                    file_format = st.session_state.gltf_format.upper()
+                    st.markdown(f"[3Dモデルをダウンロード ({file_format}形式)]({st.session_state.gltf_url})")
                 else:
-                    st.error(f"glTF変換エラー: {result.get('error', '不明なエラー')}")
+                    st.error(f"3Dモデル変換エラー: {result.get('error', '不明なエラー')}")
             except Exception as e:
-                st.error(f"glTF変換中にエラーが発生しました: {str(e)}")
-
-    # glTFプレビュー表示
-    if "gltf_url" in st.session_state:
-        st.markdown("### 3Dモデルプレビュー")
-        components.html(f'''
-        <model-viewer src="{st.session_state.gltf_url}" alt="3D model" auto-rotate camera-controls style="width: 100%; height: 500px;"></model-viewer>
-        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-        ''', height=520)
-        st.markdown(f"[glTFファイルをダウンロード]({st.session_state.gltf_url})")
+                st.error(f"3Dモデル変換中にエラーが発生しました: {str(e)}")
+                logger.exception(f"3Dモデル変換エラー: {e}")
 
 # フッターを表示
 try:
