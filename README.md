@@ -137,18 +137,50 @@ python src/inference.py --image path/to/image.jpg
 
 ### FreeCAD APIの使用
 
-1. FreeCAD APIの起動:
+1. FreeCAD APIの起動（ローカル開発用）:
 ```bash
 cd freecad_api
 python main.py
 ```
 
-2. Dockerを使用した起動:
+2. Dockerを使用した起動（ローカル）:
 ```bash
 cd freecad_api
 docker build -t freecad-api -f Dockerfile.freecad .
 docker run -p 8000:8000 freecad-api
 ```
+
+3. GCP Artifact Registryへのビルド＆プッシュ（buildx推奨）:
+```bash
+bash scripts/build_and_push_docker.sh
+```
+
+4. Cloud Runへのデプロイ:
+```bash
+gcloud run deploy freecad-api \
+  --image asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:<TAG> \
+  --region asia-northeast1 \
+  --platform=managed \
+  --allow-unauthenticated
+```
+
+5. 動作テスト:
+```bash
+python3 scripts/test_freecad_api.py
+```
+
+- テスト成功例:
+```
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "gs://house-design-ai-data/models/model.FCStd"
+}
+```
+
+- Artifact Registryのリポジトリ名は `asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api` に統一されています。
 
 ### クラウドデプロイ
 

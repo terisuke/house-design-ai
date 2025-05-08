@@ -4,7 +4,7 @@ set -e
 # 環境変数の設定
 PROJECT_ID="yolov8environment"
 REGION="asia-northeast1"
-REPOSITORY="house-design-ai"
+REPOSITORY="freecad-api"
 STREAMLIT_IMAGE="streamlit"
 FREECAD_API_IMAGE="freecad-api"
 
@@ -17,20 +17,18 @@ fi
 echo "GCPに認証します..."
 gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
-# 一意なタグ（コミットハッシュ or 日付）を使う
-GIT_TAG=$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
-IMAGE_TAG=${GIT_TAG}
+# タグを日付＋乱数で生成（例: 20240612160000-12345）
+IMAGE_TAG="$(date +%Y%m%d%H%M%S)-$RANDOM"
 
 # Streamlitイメージのビルドとプッシュはスキップ
 # echo "Streamlitイメージをビルドします..."
-# docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${STREAMLIT_IMAGE}:${IMAGE_TAG} -f Dockerfile .
-# docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${STREAMLIT_IMAGE}:${IMAGE_TAG}
+# docker buildx build --platform linux/amd64 -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/house-design-ai/${STREAMLIT_IMAGE}:${IMAGE_TAG} -f Dockerfile . --push
 
-# FreeCAD APIイメージのビルドとプッシュ
-echo "FreeCAD APIイメージをビルドします..."
+# FreeCAD APIイメージのビルドとプッシュ（buildxでamd64のみ）
+REPO_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FREECAD_API_IMAGE}:${IMAGE_TAG}"
+echo "FreeCAD APIイメージをbuildxでビルド＆プッシュします..."
 cd freecad_api
-docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FREECAD_API_IMAGE}:${IMAGE_TAG} -f Dockerfile.freecad .
-docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FREECAD_API_IMAGE}:${IMAGE_TAG}
+docker buildx build --platform linux/amd64 -t ${REPO_PATH} -f Dockerfile.freecad . --push
 cd ..
 
 echo "Dockerイメージのビルドとプッシュが完了しました。"

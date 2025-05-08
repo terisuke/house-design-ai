@@ -52,7 +52,7 @@ chmod +x curl_examples.sh
    - メソッド: GET
 
 2. 3Dモデル生成
-   - エンドポイント: `/generate`
+   - エンドポイント: `/generate`（※Cloud Run本番環境では `/api/v1/generate-model` も利用可能）
    - メソッド: POST
    - パラメータ:
      - width: 建物の幅（1.0m ～ 100.0m）
@@ -61,6 +61,25 @@ chmod +x curl_examples.sh
      - parameters:
        - wall_thickness: 壁の厚さ（0.1m ～ 1.0m）
        - window_size: 窓のサイズ（0.5m ～ 3.0m）
+
+- 本番APIエンドポイント例: `https://freecad-api-513507930971.asia-northeast1.run.app/api/v1/generate-model`
+
+## テスト方法
+
+- Cloud Run本番APIの動作確認は、プロジェクトルートで
+```bash
+python3 scripts/test_freecad_api.py
+```
+- テスト成功例:
+```
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "gs://house-design-ai-data/models/model.FCStd"
+}
+```
 
 ## レスポンス例
 

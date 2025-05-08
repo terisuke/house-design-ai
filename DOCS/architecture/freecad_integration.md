@@ -45,50 +45,44 @@ CMD ["python3", "src/cli.py"]
 
 ## 4. ビルドとプッシュ
 
-### 4.1 イメージのビルド
+### 4.1 イメージのビルド（buildx推奨）
 ```bash
-docker build -t asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 .
+docker buildx build --platform linux/amd64 -t asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:<TAG> -f Dockerfile.freecad . --push
 ```
 
-### 4.2 イメージのプッシュ
+### 4.2 スクリプトによる自動化
 ```bash
-docker push asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0
+bash scripts/build_and_push_docker.sh
 ```
 
 ## 5. Cloud Runへのデプロイ
 
 ### 5.1 サービスの作成
 ```bash
-gcloud run deploy house-design-ai \
-    --image asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0 \
-    --platform managed \
-    --region asia-northeast1 \
-    --memory 2Gi \
-    --cpu 2 \
-    --min-instances 0 \
-    --max-instances 10
+gcloud run deploy freecad-api \
+  --image asia-northeast1-docker.pkg.dev/yolov8environment/freecad-api/freecad-api:<TAG> \
+  --platform managed \
+  --region asia-northeast1 \
+  --memory 2Gi \
+  --cpu 2 \
+  --allow-unauthenticated
 ```
 
-### 5.2 環境変数の設定
+## 6. 動作テスト
+
 ```bash
-gcloud run services update house-design-ai \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/workspace/service-account-key.json"
+python3 scripts/test_freecad_api.py
 ```
 
-## 6. 実行方法
-
-### 6.1 ローカルでの実行
-```bash
-docker run -it --rm \
-    -v $(pwd):/app \
-    asia-northeast1-docker.pkg.dev/[PROJECT_ID]/house-design-ai/freecad:v1.0.0
+- テスト成功例:
 ```
-
-### 6.2 Cloud Runでの実行
-```bash
-curl -X POST https://house-design-ai-[HASH].a.run.app/process \
-    -H "Content-Type: application/json" \
-    -d '{"input_file": "path/to/input.stl"}'
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "gs://house-design-ai-data/models/model.FCStd"
+}
 ```
 
 ## 7. トラブルシューティング
@@ -481,10 +475,10 @@ https://freecad-api-513507930971.asia-northeast1.run.app
 
 ### エンドポイント一覧
 
-| メソッド | パス | 説明 |
-|---------|------|------|
-| POST | `/api/v1/generate-model` | セグメンテーションデータから3Dモデルを生成 |
-| GET | `/api/v1/models/{model_id}` | 生成済みモデルの情報を取得 |
+| メソッド | パス                          | 説明                     |
+|------|-----------------------------|------------------------|
+| POST | `/api/v1/generate-model`    | セグメンテーションデータから3Dモデルを生成 |
+| GET  | `/api/v1/models/{model_id}` | 生成済みモデルの情報を取得     |
 
 ### エンドポイント詳細
 
@@ -523,19 +517,19 @@ https://freecad-api-513507930971.asia-northeast1.run.app
 ```
 
 **パラメータ説明**:
-| パラメータ | 型 | 必須 | 説明 |
-|-----------|-----|------|------|
-| segmentation_data | Object | はい | 建物と道路のセグメンテーションデータ |
-| segmentation_data.buildings | Array | はい | 建物オブジェクトの配列 |
-| segmentation_data.buildings[].id | String | はい | 建物の一意識別子 |
-| segmentation_data.buildings[].coordinates | Array | はい | 建物の頂点座標の配列 [[x,y], ...] |
-| segmentation_data.buildings[].height | Number | はい | 建物の高さ（メートル） |
-| segmentation_data.buildings[].type | String | いいえ | 建物のタイプ（residential, commercial等） |
-| segmentation_data.roads | Array | いいえ | 道路オブジェクトの配列 |
-| parameters | Object | はい | モデル生成のパラメータ |
-| parameters.building_height | Number | いいえ | デフォルトの建物高さ（メートル） |
-| parameters.road_width | Number | いいえ | デフォルトの道路幅（メートル） |
-| parameters.grid_size | Number | いいえ | グリッドサイズ（メートル） |
+| パラメータ                                     | 型     | 必須 | 説明                                |
+|-------------------------------------------|--------|------|-------------------------------------|
+| segmentation_data                         | Object | はい   | 建物と道路のセグメンテーションデータ              |
+| segmentation_data.buildings               | Array  | はい   | 建物オブジェクトの配列                     |
+| segmentation_data.buildings[].id          | String | はい   | 建物の一意識別子                     |
+| segmentation_data.buildings[].coordinates | Array  | はい   | 建物の頂点座標の配列 [[x,y], ...]     |
+| segmentation_data.buildings[].height      | Number | はい   | 建物の高さ（メートル）                      |
+| segmentation_data.buildings[].type        | String | いいえ  | 建物のタイプ（residential, commercial等） |
+| segmentation_data.roads                   | Array  | いいえ  | 道路オブジェクトの配列                     |
+| parameters                                | Object | はい   | モデル生成のパラメータ                       |
+| parameters.building_height                | Number | いいえ  | デフォルトの建物高さ（メートル）                 |
+| parameters.road_width                     | Number | いいえ  | デフォルトの道路幅（メートル）                  |
+| parameters.grid_size                      | Number | いいえ  | グリッドサイズ（メートル）                       |
 
 **レスポンス**:
 ```json
@@ -552,22 +546,22 @@ https://freecad-api-513507930971.asia-northeast1.run.app
 ```
 
 **レスポンスパラメータ**:
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| status | String | 処理結果のステータス（success/error） |
-| model_url | String | 生成されたモデルファイルのURL |
-| metadata | Object | モデルに関するメタデータ |
-| metadata.building_count | Number | 処理された建物の数 |
-| metadata.road_count | Number | 処理された道路の数 |
-| metadata.total_area | Number | 総面積（平方メートル） |
-| metadata.generation_time | Number | 生成処理にかかった時間（秒） |
+| パラメータ                    | 型     | 説明                          |
+|--------------------------|--------|------------------------------|
+| status                   | String | 処理結果のステータス（success/error） |
+| model_url                | String | 生成されたモデルファイルのURL            |
+| metadata                 | Object | モデルに関するメタデータ                 |
+| metadata.building_count  | Number | 処理された建物の数                |
+| metadata.road_count      | Number | 処理された道路の数                |
+| metadata.total_area      | Number | 総面積（平方メートル）              |
+| metadata.generation_time | Number | 生成処理にかかった時間（秒）         |
 
 **ステータスコード**:
-| コード | 説明 |
-|--------|------|
-| 200 | 成功 |
+| コード | 説明                 |
+|-----|----------------------|
+| 200 | 成功                 |
 | 400 | 不正なリクエスト（パラメータエラー） |
-| 500 | サーバーエラー |
+| 500 | サーバーエラー              |
 
 #### 2. モデル情報取得
 
@@ -576,9 +570,9 @@ https://freecad-api-513507930971.asia-northeast1.run.app
 **説明**: 生成済みの3Dモデルの情報を取得します。
 
 **パスパラメータ**:
-| パラメータ | 型 | 必須 | 説明 |
-|-----------|-----|------|------|
-| model_id | String | はい | 取得するモデルの一意識別子 |
+| パラメータ    | 型     | 必須 | 説明                 |
+|----------|--------|------|--------------------|
+| model_id | String | はい   | 取得するモデルの一意識別子 |
 
 **レスポンス**:
 ```json
@@ -596,20 +590,20 @@ https://freecad-api-513507930971.asia-northeast1.run.app
 ```
 
 **レスポンスパラメータ**:
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| model_id | String | モデルの一意識別子 |
-| status | String | モデルの状態（completed/processing/failed） |
-| created_at | String | モデル作成日時（ISO 8601形式） |
-| file_url | String | モデルファイルのダウンロードURL |
-| metadata | Object | モデルに関するメタデータ |
+| パラメータ      | 型     | 説明                                  |
+|------------|--------|---------------------------------------|
+| model_id   | String | モデルの一意識別子                        |
+| status     | String | モデルの状態（completed/processing/failed） |
+| created_at | String | モデル作成日時（ISO 8601形式）             |
+| file_url   | String | モデルファイルのダウンロードURL                     |
+| metadata   | Object | モデルに関するメタデータ                         |
 
 **ステータスコード**:
-| コード | 説明 |
-|--------|------|
-| 200 | 成功 |
+| コード | 説明        |
+|-----|-------------|
+| 200 | 成功        |
 | 404 | モデルが見つからない |
-| 500 | サーバーエラー |
+| 500 | サーバーエラー     |
 
 ## クライアント実装例
 
@@ -718,34 +712,34 @@ curl -X POST \
 ```
 
 ### エラーコード一覧
-| コード | 説明 | 対処方法 |
-|--------|------|----------|
-| `INVALID_INPUT` | 入力データの形式が不正 | リクエストパラメータを確認し、必須フィールドが正しく設定されているか確認してください |
-| `PROCESSING_ERROR` | モデル生成中のエラー | 入力データの複雑さを減らすか、サポートに問い合わせてください |
-| `STORAGE_ERROR` | ファイル保存時のエラー | 一時的な問題の可能性があります。再試行するか、サポートに問い合わせてください |
-| `TIMEOUT` | 処理時間超過 | 入力データの複雑さを減らすか、より小さなモデルに分割してください |
+| コード                | 説明              | 対処方法                                            |
+|--------------------|-----------------|-------------------------------------------------|
+| `INVALID_INPUT`    | 入力データの形式が不正 | リクエストパラメータを確認し、必須フィールドが正しく設定されているか確認してください |
+| `PROCESSING_ERROR` | モデル生成中のエラー     | 入力データの複雑さを減らすか、サポートに問い合わせてください               |
+| `STORAGE_ERROR`    | ファイル保存時のエラー    | 一時的な問題の可能性があります。再試行するか、サポートに問い合わせてください |
+| `TIMEOUT`          | 処理時間超過      | 入力データの複雑さを減らすか、より小さなモデルに分割してください            |
 
 ## API制限事項
 
 ### 1. リクエスト制限
-| 項目 | 制限値 | 説明 |
-|------|--------|------|
-| リクエストサイズ | 最大10MB | リクエストボディの合計サイズ |
-| 建物数 | 最大100 | 1リクエストあたりの建物オブジェクト数 |
-| 道路数 | 最大50 | 1リクエストあたりの道路オブジェクト数 |
-| リクエスト頻度 | 1分あたり60回 | APIキーごとの制限 |
+| 項目      | 制限値     | 説明                   |
+|-----------|----------|----------------------|
+| リクエストサイズ  | 最大10MB   | リクエストボディの合計サイズ       |
+| 建物数    | 最大100    | 1リクエストあたりの建物オブジェクト数 |
+| 道路数    | 最大50     | 1リクエストあたりの道路オブジェクト数 |
+| リクエスト頻度 | 1分あたり60回 | APIキーごとの制限           |
 
 ### 2. 処理時間制限
-| 項目 | 制限値 | 説明 |
-|------|--------|------|
-| タイムアウト | 300秒 | 処理が完了しない場合はタイムアウトエラー |
-| 推奨建物数 | 20以下 | 最適なパフォーマンスのための推奨値 |
+| 項目       | 制限値 | 説明                       |
+|------------|-------|--------------------------|
+| タイムアウト     | 300秒  | 処理が完了しない場合はタイムアウトエラー |
+| 推奨建物数 | 20以下 | 最適なパフォーマンスのための推奨値     |
 
 ### 3. 出力形式制限
-| 形式 | 拡張子 | 最大サイズ | 説明 |
-|------|--------|------------|------|
-| STEP | .step | 50MB | 標準的な3D CAD交換形式 |
-| STL | .stl | 50MB | 3Dプリント用メッシュ形式 |
+| 形式 | 拡張子 | 最大サイズ | 説明                  |
+|------|--------|---------|---------------------|
+| STEP | .step  | 50MB    | 標準的な3D CAD交換形式 |
+| STL  | .stl   | 50MB    | 3Dプリント用メッシュ形式      |
 
 ## 実装ベストプラクティス
 
