@@ -36,4 +36,4 @@ RUN if [ ! -f /app/config/service_account.json ]; then echo "Warning: service_ac
 RUN chmod +x /app/run_freecad.py
 
 # FastAPIアプリケーションを実行
-CMD ["python3", "/app/main.py"]
+CMD ["python3", "/app/run_freecad.py"]
