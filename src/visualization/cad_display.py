@@ -12,8 +12,12 @@ import io
 import logging
 import base64
 
-# FreeCADのパスを追加
-sys.path.append('/usr/lib/freecad-python3/lib')
+# FreeCADの環境設定をインポート
+from src.utils.setup_freecad import setup_freecad_environment
+
+# FreeCADの環境をセットアップ
+if not setup_freecad_environment():
+    logging.warning("FreeCAD環境のセットアップに失敗しました")
 
 # FreeCADの利用可能性をチェック
 try:
