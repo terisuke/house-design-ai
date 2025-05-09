@@ -85,16 +85,11 @@ runs/
 *.tiff
 *.txt
 !requirements.txt
-!requirements-dev.txt
-!requirements-freecad-api.txt
 !data.yaml
 !requirements.yaml
 
 # クラウド関連
 config/service_account.json
-freecad_api/config/service_account.json
-.streamlit/secrets.toml
-.gcloud/
 service-account-key.json
 .streamlit/secrets.toml
 .gcloud/

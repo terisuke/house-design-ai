@@ -7,7 +7,6 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from google.cloud import storage
@@ -347,8 +346,3 @@ print(f\"Exported: {{output_file}}\")
         return {"url": url}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
