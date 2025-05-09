@@ -13,6 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import storage
 from pydantic import BaseModel
 
+try:
+    import trimesh
+except ImportError:
+    logging.error("Failed to import trimesh module")
+    trimesh = None
+
 # FreeCADのPython APIをインポート
 try:
     import FreeCAD
@@ -140,124 +146,88 @@ async def process_grid(grid_data: GridData):
     Returns:
         生成されたモデルのURL
     """
+    logger.info(f"Input grid_data: {grid_data.dict()}")
+    
     if len(grid_data.rooms) == 0:
         return JSONResponse(status_code=400, content={"error": "No rooms provided"})
+    
+    if len(grid_data.walls) == 0:
+        logger.warning("No walls provided in grid data")
 
     try:
-        # 一時ファイルにグリッドデータを保存
-        temp_json = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
-        with open(temp_json.name, "w") as f:
-            json.dump(grid_data.dict(), f)
-
-        # 一時ファイルにFreeCADスクリプトを保存
-        temp_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
-        with open(temp_script.name, "w") as f:
-            f.write(
-                f"""
-import json
-import os
-import sys
-import FreeCAD
-import Part
-
-# グリッドデータを読み込む
-with open("{temp_json.name}", "r") as f:
-    grid_data = json.load(f)
-
-# 新しいドキュメントを作成
-doc = FreeCAD.newDocument("HouseModel")
-
-# パラメータを取得
-wall_thickness = grid_data.get("wall_thickness", 0.12)  # デフォルト120mm
-include_furniture = grid_data.get("include_furniture", True)
-
-# 部屋を作成
-for room in grid_data["rooms"]:
-    dimensions = room["dimensions"]
-    position = room["position"]
-    
-    # 部屋の形状を作成
-    box = Part.makeBox(dimensions[0], dimensions[1], 2.5, 
-                       FreeCAD.Vector(position[0], position[1], 0))
-    
-    # オブジェクトを追加
-    obj = doc.addObject("Part::Feature", f"Room_{room['id']}")
-    obj.Shape = box
-
-# 壁を作成
-for wall in grid_data["walls"]:
-    start = wall["start"]
-    end = wall["end"]
-    height = wall.get("height", 2.5)
-    
-    # 壁の長さを計算
-    wall_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
-    
-    # 壁の向きを判定（X方向かY方向か）
-    is_x_direction = abs(end[0] - start[0]) > abs(end[1] - start[1])
-    
-    if is_x_direction:
-        # X方向の壁
-        wall_box = Part.makeBox(
-            wall_length, wall_thickness, height,
-            FreeCAD.Vector(start[0], start[1] - wall_thickness/2, 0)
-        )
-    else:
-        # Y方向の壁
-        wall_box = Part.makeBox(
-            wall_thickness, wall_length, height,
-            FreeCAD.Vector(start[0] - wall_thickness/2, start[1], 0)
-        )
-    
-    # オブジェクトを追加
-    obj = doc.addObject("Part::Feature", f"Wall_{start[0]}_{start[1]}")
-    obj.Shape = wall_box
-
-# ドキュメントを再計算
-doc.recompute()
-
-# 出力ディレクトリを設定
-output_dir = os.environ.get("OUTPUT_DIR", "/tmp")
-os.makedirs(output_dir, exist_ok=True)
-
-# ファイルを保存
-output_file = os.path.join(output_dir, "model.FCStd")
-doc.saveAs(output_file)
-
-print(f"モデルを保存しました: {{output_file}}")
-"""
-            )
-
-        # FreeCADスクリプトを実行
+        # 新しいドキュメントを作成
+        doc = FreeCAD.newDocument("HouseModel")
+        
+        # パラメータを取得
+        wall_thickness = grid_data.wall_thickness
+        include_furniture = grid_data.include_furniture
+        
+        # 部屋を作成
+        for room in grid_data.rooms:
+            dimensions = room.dimensions
+            position = room.position
+            
+            # 部屋の形状を作成
+            box = Part.makeBox(dimensions[0], dimensions[1], 2.5, 
+                            FreeCAD.Vector(position[0], position[1], 0))
+            
+            # オブジェクトを追加
+            obj = doc.addObject("Part::Feature", f"Room_{room.id}")
+            obj.Shape = box
+        
+        # 壁を作成
+        for wall in grid_data.walls:
+            start = wall.start
+            end = wall.end
+            height = wall.height
+            
+            # 壁の長さを計算
+            wall_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
+            
+            is_x_direction = abs(end[0] - start[0]) > abs(end[1] - start[1])
+            
+            if is_x_direction:
+                # X方向の壁
+                wall_box = Part.makeBox(
+                    wall_length, wall_thickness, height,
+                    FreeCAD.Vector(start[0], start[1] - wall_thickness/2, 0)
+                )
+            else:
+                # Y方向の壁
+                wall_box = Part.makeBox(
+                    wall_thickness, wall_length, height,
+                    FreeCAD.Vector(start[0] - wall_thickness/2, start[1], 0)
+                )
+            
+            # オブジェクトを追加
+            obj = doc.addObject("Part::Feature", f"Wall_{start[0]}_{start[1]}")
+            obj.Shape = wall_box
+        
+        # ドキュメントを再計算
+        doc.recompute()
+        
         output_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False).name
-        os.environ["OUTPUT_DIR"] = os.path.dirname(output_file)
-
-        result = subprocess.run(
-            ["/usr/lib/freecad/bin/FreeCADCmd", temp_script.name], capture_output=True, text=True
-        )
-
-        if result.returncode != 0:
-            logger.error(f"FreeCADスクリプトの実行に失敗しました: {result.stderr}")
-            return JSONResponse(
-                status_code=500, content={"error": "Failed to generate model"}
-            )
-
-        # 一時ファイルを削除
-        os.unlink(temp_json.name)
-        os.unlink(temp_script.name)
-
-        # 生成されたモデルをCloud Storageにアップロード
+        doc.saveAs(output_file)
+        
+        # Cloud Storageにアップロード
         storage = CloudStorage()
         url = storage.upload_file(output_file, f"models/{uuid.uuid4()}.fcstd")
-
+        
         # 一時ファイルを削除
         os.unlink(output_file)
-
+        
         return {"url": url}
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         logger.error(f"グリッドデータの処理中にエラーが発生しました: {e}")
+        logger.error(f"エラートレース: {error_trace}")
         return JSONResponse(
-            status_code=500, content={"error": f"Error processing grid: {str(e)}"}
+            status_code=500, 
+            content={
+                "error": f"Error processing grid: {str(e)}", 
+                "trace": error_trace if os.environ.get("DEBUG", "false").lower() == "true" else None
+            }
         )
 
 
@@ -326,6 +296,53 @@ async def convert_to_3d(file: UploadFile = File(...)):
         logger.error(f"3D変換中にエラーが発生しました: {e}")
         return JSONResponse(
             status_code=500, content={"error": f"Error converting to 3D: {str(e)}"}
+        )
+
+
+@app.post("/convert/stl-to-gltf")
+async def convert_stl_to_gltf(file: UploadFile = File(...)):
+    """
+    STLファイルをglTF形式に変換する
+    """
+    if not file.filename.endswith(".stl"):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid file format. Only .stl files are supported."},
+        )
+
+    try:
+        if trimesh is None:
+            return JSONResponse(
+                status_code=500, 
+                content={"error": "trimesh module not available for STL to glTF conversion"}
+            )
+            
+        # 一時ファイルにアップロードされたファイルを保存
+        temp_stl = tempfile.NamedTemporaryFile(suffix=".stl", delete=False)
+        content = await file.read()
+        temp_stl.write(content)
+        temp_stl.close()
+
+        mesh = trimesh.load(temp_stl.name)
+        
+        output_gltf = temp_stl.name.replace(".stl", ".gltf")
+        mesh.export(output_gltf, file_type="gltf")
+        
+        # Cloud Storageにアップロード
+        storage = CloudStorage()
+        url = storage.upload_file(output_gltf, f"models/{uuid.uuid4()}.gltf")
+        
+        # 一時ファイルを削除
+        os.unlink(temp_stl.name)
+        os.unlink(output_gltf)
+        
+        return {"url": url, "format": "gltf"}
+    except Exception as e:
+        logger.error(f"STL→glTF変換中にエラーが発生しました: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500, content={"error": f"Error converting STL to glTF: {str(e)}"}
         )
 
 

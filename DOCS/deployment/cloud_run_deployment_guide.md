@@ -34,12 +34,12 @@ chmod +x scripts/deploy_cloud_run.sh
 # イメージをビルド
 gcloud builds submit --tag gcr.io/yolov8environment/house-design-ai-streamlit .
 
-# Cloud Runにデプロイ（重要: --memory 1Giパラメータを必ず指定）
+# Cloud Runにデプロイ（重要: --memory 2Giパラメータを必ず指定）
 gcloud run deploy house-design-ai-streamlit \
   --image gcr.io/yolov8environment/house-design-ai-streamlit \
   --platform managed \
   --region asia-northeast1 \
-  --memory 1Gi \
+  --memory 2Gi \
   --allow-unauthenticated
 ```
 
@@ -47,10 +47,10 @@ gcloud run deploy house-design-ai-streamlit \
 
 ### メモリ割り当て
 
-YOLOモデルを使用するため、デフォルトの512MiBでは不十分です。必ず `--memory 1Gi` パラメータを指定してください。
+YOLOモデルを使用するため、デフォルトの512MiBでは不十分です。必ず `--memory 2Gi` パラメータを指定してください。
 
 ```bash
-gcloud run deploy house-design-ai-streamlit --memory 1Gi ...
+gcloud run deploy house-design-ai-streamlit --memory 2Gi ...
 ```
 
 ### 認証設定
@@ -75,7 +75,7 @@ Cloud Run環境では、サービスアカウントに適切なIAMロールが�
 Memory limit of 512 MiB exceeded with XXX MiB used.
 ```
 
-このエラーが表示される場合は、デプロイコマンドに `--memory 1Gi` パラメータを追加してください。
+このエラーが表示される場合は、デプロイコマンドに `--memory 2Gi` パラメータを追加してください。
 
 ### 認証エラー
 
