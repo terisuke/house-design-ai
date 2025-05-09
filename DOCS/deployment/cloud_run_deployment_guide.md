@@ -28,7 +28,9 @@ chmod +x scripts/deploy_cloud_run.sh
 
 ### 2. 手動でデプロイする方法
 
-手動でデプロイする場合は、以下のコマンドを実行します：
+#### Streamlitアプリケーションのデプロイ
+
+手動でStreamlitアプリケーションをデプロイする場合は、以下のコマンドを実行します：
 
 ```bash
 # イメージをビルド
@@ -42,6 +44,28 @@ gcloud run deploy house-design-ai-streamlit \
   --memory 1Gi \
   --allow-unauthenticated
 ```
+
+#### FreeCAD APIのデプロイ
+
+FreeCAD APIをデプロイする場合は、以下のコマンドを実行します：
+
+```bash
+# freecad_apiディレクトリに移動
+cd freecad_api
+
+# イメージをビルド
+gcloud builds submit --tag gcr.io/yolov8environment/freecad-api .
+
+# Cloud Runにデプロイ（重要: --memory 1Giパラメータを必ず指定）
+gcloud run deploy freecad-api \
+  --image gcr.io/yolov8environment/freecad-api \
+  --platform managed \
+  --region asia-northeast1 \
+  --memory 1Gi \
+  --allow-unauthenticated
+```
+
+**注意**: FreeCAD APIは3Dモデル処理に多くのメモリを必要とするため、`--memory 1Gi`パラメータを必ず指定してください。メモリ不足の場合、3Dモデル生成時に500エラーが発生します。
 
 ## 重要な設定
 

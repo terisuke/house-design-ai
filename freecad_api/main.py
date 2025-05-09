@@ -11,7 +11,11 @@ from typing import Dict, List, Optional, Union
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from google.cloud import storage
+try:
+    from google.cloud import storage
+except ImportError:
+    logging.error("Failed to import google.cloud.storage module")
+    storage = None
 from pydantic import BaseModel
 
 # FreeCADのPython APIをインポート
@@ -68,8 +72,15 @@ class CloudStorage:
 
     def __init__(self):
         self.bucket_name = os.environ.get("BUCKET_NAME", "house-design-ai-data")
-        self.client = storage.Client()
-        self.bucket = self.client.bucket(self.bucket_name)
+        try:
+            if storage is None:
+                raise ImportError("google.cloud.storage module not available")
+            self.client = storage.Client()
+            self.bucket = self.client.bucket(self.bucket_name)
+        except Exception as e:
+            logging.error(f"Failed to initialize CloudStorage: {e}")
+            self.client = None
+            self.bucket = None
 
     def upload_file(
         self, file_path: str, destination_blob_name: Optional[str] = None
@@ -87,16 +98,24 @@ class CloudStorage:
         if destination_blob_name is None:
             destination_blob_name = os.path.basename(file_path)
 
-        blob = self.bucket.blob(destination_blob_name)
-        blob.upload_from_filename(file_path)
+        if self.bucket is None:
+            logging.warning("CloudStorage not initialized. Using local file.")
+            return f"file://{file_path}"
 
-        # 署名付きURLを生成（1時間有効）
-        url = blob.generate_signed_url(version="v4", expiration=3600, method="GET")
+        try:
+            blob = self.bucket.blob(destination_blob_name)
+            blob.upload_from_filename(file_path)
 
-        logger.info(
-            f"ファイルをアップロードしました: gs://{self.bucket_name}/{destination_blob_name}"
-        )
-        return url
+            # 署名付きURLを生成（1時間有効）
+            url = blob.generate_signed_url(version="v4", expiration=3600, method="GET")
+
+            logger.info(
+                f"ファイルをアップロードしました: gs://{self.bucket_name}/{destination_blob_name}"
+            )
+            return url
+        except Exception as e:
+            logging.error(f"Failed to upload file to Cloud Storage: {e}")
+            return f"file://{file_path}"
 
 
 class ModelParameters(BaseModel):
@@ -141,8 +160,13 @@ async def process_grid(grid_data: GridData):
     Returns:
         生成されたモデルのURL
     """
+    logger.info(f"Input grid_data: {grid_data.dict()}")
+    
     if len(grid_data.rooms) == 0:
         return JSONResponse(status_code=400, content={"error": "No rooms provided"})
+    
+    if len(grid_data.walls) == 0:
+        logger.warning("No walls provided in grid data")
 
     try:
         # 一時ファイルにグリッドデータを保存
@@ -256,9 +280,16 @@ print(f"モデルを保存しました: {{output_file}}")
 
         return {"url": url}
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         logger.error(f"グリッドデータの処理中にエラーが発生しました: {e}")
+        logger.error(f"エラートレース: {error_trace}")
         return JSONResponse(
-            status_code=500, content={"error": f"Error processing grid: {str(e)}"}
+            status_code=500, 
+            content={
+                "error": f"Error processing grid: {str(e)}", 
+                "trace": error_trace if os.environ.get("DEBUG", "false").lower() == "true" else None
+            }
         )
 
 
@@ -352,11 +383,22 @@ async def process_drawing(
                 bucket_name = match.group(1)
                 object_name = match.group(2)
                 
-                from google.cloud import storage
-                storage_client = storage.Client()
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(object_name)
-                blob.download_to_filename(temp_fcstd.name)
+                try:
+                    from google.cloud import storage
+                    storage_client = storage.Client()
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(object_name)
+                    blob.download_to_filename(temp_fcstd.name)
+                except ImportError:
+                    logging.error("Failed to import google.cloud.storage module")
+                    return JSONResponse(
+                        status_code=500, content={"error": "Cloud Storage module not available"}
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to download file from Cloud Storage: {e}")
+                    return JSONResponse(
+                        status_code=500, content={"error": f"Error downloading model: {str(e)}"}
+                    )
             else:
                 return JSONResponse(
                     status_code=400, content={"error": "Invalid GCS URL format"}

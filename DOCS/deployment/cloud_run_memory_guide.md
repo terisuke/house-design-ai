@@ -12,6 +12,10 @@ Memory limit of 512 MiB exceeded with 562 MiB used. Consider increasing the memo
 
 このエラーが発生すると、アプリケーションは強制終了され、ブラウザでは「The page that you have requested does not seem to exist」というエラーや、「Running...」と「Connecting...」が繰り返し表示されるだけになります。
 
+### FreeCAD API特有の問題
+
+FreeCAD APIでは、3Dモデル生成時に500エラー（Internal Server Error）が発生する場合があります。これは多くの場合、メモリ不足が原因です。FreeCADは3Dモデル処理に多くのメモリを必要とするため、デフォルトの512MiBでは不十分です。
+
 ## 解決策
 
 ### 1. Cloud Runのメモリ割り当てを増やす

@@ -35,6 +35,21 @@ FreeCAD APIは以下のエンドポイントで利用可能です：
 https://freecad-api-513507930971.asia-northeast1.run.app
 ```
 
+### Cloud Runデプロイメント注意事項
+
+FreeCAD APIをGoogle Cloud Runにデプロイする際は、十分なメモリを割り当てることが重要です：
+
+```bash
+gcloud run deploy freecad-api \
+  --image gcr.io/your-project/freecad-api:latest \
+  --platform managed \
+  --region asia-northeast1 \
+  --memory 1Gi \
+  --allow-unauthenticated
+```
+
+メモリ割り当てが不足していると、複雑なモデルを処理する際に500エラーが発生する可能性があります。デフォルトの512MiBではFreeCADの処理に不十分なため、必ず`--memory 1Gi`パラメータを指定してください。
+
 APIテスト結果：
 ```
 ✅ FreeCAD APIテスト成功

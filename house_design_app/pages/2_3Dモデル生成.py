@@ -225,7 +225,8 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                 "rooms": rooms,
                 "walls": walls,
                 "wall_thickness": 0.12,  # 壁の厚さ120mm
-                "include_furniture": include_furniture
+                "include_furniture": include_furniture,
+                "grid_stats": debug_info.get("grid_stats", {})
             }
             
             # グリッドデータが空の場合はサンプルデータを使用
@@ -247,7 +248,8 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                         {"start": [0.0, 10.0], "end": [0.0, 0.0], "height": wall_height}
                     ],
                     "wall_thickness": 0.12,
-                    "include_furniture": include_furniture
+                    "include_furniture": include_furniture,
+                    "grid_stats": {}
                 }
             
             # APIリクエストを送信
