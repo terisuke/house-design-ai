@@ -14,6 +14,7 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - Vertex AIでのモデルトレーニング
 - Streamlitベースの直感的なUIの提供
 - FreeCAD APIによる3Dモデル生成
+- STLからglTFへの変換によるウェブブラウザでの3D表示
 
 ## 技術スタック
 

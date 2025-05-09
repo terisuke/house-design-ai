@@ -20,7 +20,8 @@
 - **画像処理:** OpenCV, PIL, numpy, matplotlib
 - **データ処理:** PyYAML, numpy
 - **データ検証:** pydantic
-- **3Dモデリング:** FreeCAD API
+- **3Dモデリング:** FreeCAD API (直接Python API使用)
+- **3D形式変換:** trimesh (STLからglTFへの変換)
 
 ## クラウドインフラ
 - **プラットフォーム:** Google Cloud Platform

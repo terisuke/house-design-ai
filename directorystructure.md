@@ -37,7 +37,7 @@ house-design-ai/
 ├── Dockerfile                # メインDockerfile
 ├── requirements.txt          # 依存関係
 ├── requirements-dev.txt      # 開発用依存関係
-├── FreeCAD.md                # FreeCAD統合ガイド
+├── FreeCAD.md                # FreeCAD統合ガイド (直接Python API使用とSTL→glTF変換)
 ├── GCP_DEPLOYMENT_GUIDE.md   # GCPデプロイメントガイド
 ├── CLOUD_DEPLOYMENT_PLAN.md  # クラウドデプロイメント計画
 ├── CONTRIBUTING.md           # 貢献ガイド

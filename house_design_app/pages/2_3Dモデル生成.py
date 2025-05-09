@@ -225,7 +225,9 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                 "rooms": rooms,
                 "walls": walls,
                 "wall_thickness": 0.12,  # 壁の厚さ120mm
-                "include_furniture": include_furniture
+                "include_furniture": include_furniture,
+                    "grid_stats": {},
+                "grid_stats": debug_info.get("grid_stats", {})
             }
             
             # グリッドデータが空の場合はサンプルデータを使用
@@ -247,7 +249,9 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                         {"start": [0.0, 10.0], "end": [0.0, 0.0], "height": wall_height}
                     ],
                     "wall_thickness": 0.12,
-                    "include_furniture": include_furniture
+                    "include_furniture": include_furniture,
+                    "grid_stats": {},
+                "grid_stats": debug_info.get("grid_stats", {})
                 }
             
             # APIリクエストを送信
@@ -269,12 +273,18 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                 if "preview_url" in cad_model_result:
                     st.image(cad_model_result["preview_url"], use_column_width=True, caption="3Dモデルプレビュー")
                 
-                # FCStdファイルを自動的にglTFに変換してWebで表示
+                # FCStdファイルを自動的にSTL経由でglTFに変換してWebで表示
                 with st.spinner("3Dモデルをブラウザ表示用に変換中..."):
                     try:
+                        # FCStdファイルのURLを取得
                         fcstd_url = cad_model_result["url"]
+                        st.session_state.fcstd_url = fcstd_url
+                        
+                        # FCStdファイルをダウンロード
                         r = requests.get(fcstd_url)
                         r.raise_for_status()
+                        
+                        # FCStdファイルをSTLに変換
                         files = {'file': ('model.fcstd', r.content)}
                         convert_response = requests.post(
                             f"{freecad_api_url}/convert/3d",
@@ -282,39 +292,75 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                             timeout=180
                         )
                         convert_response.raise_for_status()
-                        gltf_result = convert_response.json()
+                        stl_result = convert_response.json()
                         
-                        if "url" in gltf_result:
-                            st.session_state.gltf_url = gltf_result["url"]
-                            st.session_state.gltf_format = gltf_result.get("format", "gltf")
-                            st.success("3Dモデルの表示準備ができました")
+                        if "url" in stl_result:
+                            st.session_state.stl_url = stl_result["url"]
                             
-                            # 3Dビューアーの表示
-                            st.markdown("### 3Dモデルプレビュー")
+                            stl_response = requests.get(stl_result["url"])
+                            stl_response.raise_for_status()
                             
-                            # model-viewerコンポーネントで表示（拡張オプション付き）
-                            components.html(f'''
-                            <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
-                                auto-rotate camera-controls 
-                                style="width: 100%; height: 500px;" 
-                                shadow-intensity="1" 
-                                environment-image="neutral" 
-                                exposure="0.5"
-                                camera-orbit="45deg 60deg 3m"
-                                ar ar-modes="webxr scene-viewer quick-look">
-                            </model-viewer>
-                            <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-                            ''', height=520)
+                            # STLファイルをglTFに変換
+                            files = {'file': ('model.stl', stl_response.content)}
+                            gltf_convert_response = requests.post(
+                                f"{freecad_api_url}/convert/stl-to-gltf",
+                                files=files,
+                                timeout=180
+                            )
+                            gltf_convert_response.raise_for_status()
+                            gltf_result = gltf_convert_response.json()
                             
-                            # ダウンロードリンク
-                            file_format = st.session_state.gltf_format.upper()
-                            st.markdown(f"[3Dモデルをダウンロード ({file_format}形式)]({st.session_state.gltf_url})")
+                            if "url" in gltf_result:
+                                st.session_state.gltf_url = gltf_result["url"]
+                                st.session_state.gltf_format = gltf_result.get("format", "gltf")
+                                st.success("3Dモデルの表示準備ができました")
+                                
+                                # 3Dビューアーの表示
+                                st.markdown("### 3Dモデルプレビュー")
+                                
+                                # model-viewerコンポーネントで表示（拡張オプション付き）
+                                components.html(f'''
+                                <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
+                                    auto-rotate camera-controls 
+                                    style="width: 100%; height: 500px;" 
+                                    shadow-intensity="1" 
+                                    environment-image="neutral" 
+                                    exposure="0.5"
+                                    camera-orbit="45deg 60deg 3m"
+                                    ar ar-modes="webxr scene-viewer quick-look">
+                                </model-viewer>
+                                <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+                                ''', height=520)
+                                
+                                # ダウンロードリンク
+                                st.subheader("3Dモデルのダウンロード")
+                                col1, col2, col3 = st.columns(3)
+                                
+                                with col1:
+                                    st.markdown(f"[FCStd形式]({st.session_state.fcstd_url})")
+                                    st.caption("FreeCADで編集可能")
+                                
+                                with col2:
+                                    st.markdown(f"[STL形式]({st.session_state.stl_url})")
+                                    st.caption("3Dプリント用")
+                                
+                                with col3:
+                                    file_format = st.session_state.gltf_format.upper()
+                                    st.markdown(f"[{file_format}形式]({st.session_state.gltf_url})")
+                                    st.caption("ウェブ表示用")
+                            else:
+                                st.warning("STLからglTFへの変換に失敗しました")
+                                st.markdown(f"[3Dモデルをダウンロード (STL形式)]({st.session_state.stl_url})")
                         else:
-                            st.warning("3Dモデルの変換には成功しましたが、ブラウザでの表示に対応していません")
+                            st.warning("FCStdからSTLへの変換には成功しましたが、glTF変換に失敗しました")
                             st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({cad_model_result['url']})")
                     except Exception as e:
                         st.warning(f"3Dモデルの表示準備中にエラーが発生しました: {str(e)}")
-                        st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({cad_model_result['url']})")
+                        logger.exception(f"3Dモデル変換エラー: {e}")
+                        if "fcstd_url" in st.session_state:
+                            st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({st.session_state.fcstd_url})")
+                        else:
+                            st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({cad_model_result['url']})")
             else:
                 st.error(f"3Dモデル生成エラー: {cad_model_result.get('error', '不明なエラー')}")
         except requests.exceptions.RequestException as e:
@@ -382,49 +428,90 @@ if "cad_model_url" in st.session_state and "gltf_url" not in st.session_state:
     if st.button("3Dプレビューを生成", key="generate_gltf_preview"):
         with st.spinner("3Dモデルをブラウザ表示用に変換中..."):
             try:
-                # FCStdファイルをglTFに変換
+                # FCStdファイルのURLを取得
                 fcstd_url = st.session_state.cad_model_url
+                st.session_state.fcstd_url = fcstd_url
+                
+                # FCStdファイルをダウンロード
                 r = requests.get(fcstd_url)
                 r.raise_for_status()
+                
+                # FCStdファイルをSTLに変換
                 files = {'file': ('model.fcstd', r.content)}
-                response = requests.post(
+                convert_response = requests.post(
                     f"{freecad_api_url}/convert/3d",
                     files=files,
                     timeout=180
                 )
-                response.raise_for_status()
-                result = response.json()
+                convert_response.raise_for_status()
+                stl_result = convert_response.json()
                 
-                if "url" in result:
-                    st.session_state.gltf_url = result["url"]
-                    st.session_state.gltf_format = result.get("format", "gltf")
-                    st.success("3Dモデルの表示準備ができました")
+                if "url" in stl_result:
+                    st.session_state.stl_url = stl_result["url"]
                     
-                    # 3Dビューアーの表示
-                    st.markdown("### 3Dモデルプレビュー")
+                    # STLファイルをダウンロード
+                    stl_response = requests.get(stl_result["url"])
+                    stl_response.raise_for_status()
                     
-                    # model-viewerコンポーネントで表示（拡張オプション付き）
-                    components.html(f'''
-                    <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
-                        auto-rotate camera-controls 
-                        style="width: 100%; height: 500px;" 
-                        shadow-intensity="1" 
-                        environment-image="neutral" 
-                        exposure="0.5"
-                        camera-orbit="45deg 60deg 3m"
-                        ar ar-modes="webxr scene-viewer quick-look">
-                    </model-viewer>
-                    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-                    ''', height=520)
+                    # STLファイルをglTFに変換
+                    files = {'file': ('model.stl', stl_response.content)}
+                    gltf_convert_response = requests.post(
+                        f"{freecad_api_url}/convert/stl-to-gltf",
+                        files=files,
+                        timeout=180
+                    )
+                    gltf_convert_response.raise_for_status()
+                    gltf_result = gltf_convert_response.json()
                     
-                    # ダウンロードリンク
-                    file_format = st.session_state.gltf_format.upper()
-                    st.markdown(f"[3Dモデルをダウンロード ({file_format}形式)]({st.session_state.gltf_url})")
+                    if "url" in gltf_result:
+                        st.session_state.gltf_url = gltf_result["url"]
+                        st.session_state.gltf_format = gltf_result.get("format", "gltf")
+                        st.success("3Dモデルの表示準備ができました")
+                        
+                        # 3Dビューアーの表示
+                        st.markdown("### 3Dモデルプレビュー")
+                        
+                        # model-viewerコンポーネントで表示（拡張オプション付き）
+                        components.html(f'''
+                        <model-viewer src="{st.session_state.gltf_url}" alt="3D model" 
+                            auto-rotate camera-controls 
+                            style="width: 100%; height: 500px;" 
+                            shadow-intensity="1" 
+                            environment-image="neutral" 
+                            exposure="0.5"
+                            camera-orbit="45deg 60deg 3m"
+                            ar ar-modes="webxr scene-viewer quick-look">
+                        </model-viewer>
+                        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+                        ''', height=520)
+                        
+                        # ダウンロードリンク
+                        st.subheader("3Dモデルのダウンロード")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.markdown(f"[FCStd形式]({st.session_state.fcstd_url})")
+                            st.caption("FreeCADで編集可能")
+                        
+                        with col2:
+                            st.markdown(f"[STL形式]({st.session_state.stl_url})")
+                            st.caption("3Dプリント用")
+                        
+                        with col3:
+                            file_format = st.session_state.gltf_format.upper()
+                            st.markdown(f"[{file_format}形式]({st.session_state.gltf_url})")
+                            st.caption("ウェブ表示用")
+                    else:
+                        st.warning("STLからglTFへの変換に失敗しました")
+                        st.markdown(f"[3Dモデルをダウンロード (STL形式)]({st.session_state.stl_url})")
                 else:
-                    st.error(f"3Dモデル変換エラー: {result.get('error', '不明なエラー')}")
+                    st.warning("FCStdからSTLへの変換には成功しましたが、glTF変換に失敗しました")
+                    st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({st.session_state.fcstd_url})")
             except Exception as e:
                 st.error(f"3Dモデル変換中にエラーが発生しました: {str(e)}")
                 logger.exception(f"3Dモデル変換エラー: {e}")
+                if "fcstd_url" in st.session_state:
+                    st.markdown(f"[3Dモデルをダウンロード (FCStd形式)]({st.session_state.fcstd_url})")
 
 # フッターを表示
 try:

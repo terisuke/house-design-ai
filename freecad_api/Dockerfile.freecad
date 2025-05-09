@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
 COPY ./requirements-freecad-api.txt /app/
 RUN pip3 install --no-cache-dir -r /app/requirements-freecad-api.txt
 
+# trimeshとその依存関係をインストール
+RUN pip3 install --no-cache-dir trimesh[easy] pyglet
+
 # FreeCADのPythonパスを環境変数に設定
 ENV PYTHONPATH=/usr/lib/freecad/lib
 ENV QT_QPA_PLATFORM=offscreen
