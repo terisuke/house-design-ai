@@ -24,16 +24,12 @@ ENV QT_QPA_PLATFORM=offscreen
 # サービスアカウント用のディレクトリを作成
 RUN mkdir -p /app/config
 
-# APIコードとスクリプトをコピー
-COPY ./scripts/run_freecad.py /app/
+# APIコードをコピー
 COPY ./main.py /app/
 
 # サービスアカウントキーをコピー
 COPY ./config/service_account.json /app/config/
 RUN if [ ! -f /app/config/service_account.json ]; then echo "Warning: service_account.json not found"; fi
 
-# 実行権限を設定
-RUN chmod +x /app/run_freecad.py
-
 # FastAPIアプリケーションを実行
-CMD ["python3", "/app/run_freecad.py"]
+CMD ["python3", "/app/main.py"]
