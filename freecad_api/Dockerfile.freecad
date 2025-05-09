@@ -29,7 +29,8 @@ COPY ./scripts/run_freecad.py /app/
 COPY ./main.py /app/
 
 # サービスアカウントキーをコピー
-COPY ./config/service_account.json /app/config/ || echo "Warning: service_account.json not found"
+COPY ./config/service_account.json /app/config/
+RUN if [ ! -f /app/config/service_account.json ]; then echo "Warning: service_account.json not found"; fi
 
 # 実行権限を設定
 RUN chmod +x /app/run_freecad.py
