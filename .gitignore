@@ -90,6 +90,7 @@ runs/
 
 # クラウド関連
 config/service_account.json
+freecad_api/config/service_account.json
 service-account-key.json
 .streamlit/secrets.toml
 .gcloud/
