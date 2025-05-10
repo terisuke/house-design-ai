@@ -1,8 +1,15 @@
 """
 FreeCAD MCP (Model Context Protocol) Client Example
 
-This example demonstrates how to use the Model Context Protocol to interact with FreeCAD
-for more efficient 3D model generation.
+このサンプルは、Model Context Protocol を使用して FreeCAD と対話し、
+より効率的に 3D モデルを生成する方法を示しています。
+
+MCP の主な利点:
+- JSON-RPC ベースの標準化されたインターフェース
+- 効率的なモデル生成と操作
+- 言語に依存しないアクセス (Python, JavaScript など)
+- Web アプリケーションとの容易な統合
+- カスタムコマンドによる拡張性
 
 References:
 - https://github.com/neka-nat/freecad-mcp
