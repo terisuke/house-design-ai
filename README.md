@@ -10,7 +10,8 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 
 - 建物と道路の検出・セグメンテーション
 - 住居と道路の関係性を考慮した建物解析
-- 建物領域への規則的なグリッド適用
+- 二層アーキテクチャによる間取り生成（HouseDiffusion + CP-SAT）
+- 建築基準法に準拠した間取り制約の自動適用
 - Vertex AIでのモデルトレーニング
 - Streamlitベースの直感的なUIの提供
 - FreeCAD APIによる3Dモデル生成
@@ -33,6 +34,9 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - **データ検証:** pydantic
 - **バージョン管理:** git
 - **3Dモデリング:** FreeCAD API
+- **生成モデル:** HouseDiffusion, Graph2Plan
+- **制約ソルバー:** Google OR-Tools CP-SAT
+- **ベクトル処理:** Shapely, NetworkX
 
 ## プロジェクト構造
 
@@ -213,13 +217,16 @@ terraform apply
   - CPU: 2
   - タイムアウト: 300秒
 
-## 開発状況
+## 開発状況（2025年5月11日時点）
 
 ### 完了した機能
 - ✅ 環境セットアップ
 - ✅ コア機能開発
 - ✅ FreeCAD統合
 - ✅ クラウドデプロイメント
+- ✅ YOLOv11による建物・道路セグメンテーション
+- ✅ セグメンテーション結果からの建築可能エリア計算
+- ✅ 基本的な間取り生成アルゴリズム
 
 ### 進行中の機能
 - 🟡 運用管理強化
@@ -227,8 +234,14 @@ terraform apply
   - Cloud Monitoringのメトリクス設定
   - APIドキュメントの整備
   - エラーハンドリングの強化
+- 🟡 間取り生成システムの二層アーキテクチャ実装
+  - YOLOアノテーション → ベクター/グラフJSON変換システム構築
+  - CP-SAT最小PoCの開発
+  - HouseDiffusionモデルの実装準備
 
 ### 今後の機能
+- ⏳ HouseDiffusionモデルの実装と訓練
+- ⏳ CP-SATによる建築基準法制約の完全実装
 - ⏳ Vertex AI統合
 - ⏳ Firebase/Firestore実装
 - ⏳ 高度な機能の追加

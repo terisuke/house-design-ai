@@ -21,6 +21,9 @@
 - **データ処理:** PyYAML, numpy
 - **データ検証:** pydantic
 - **3Dモデリング:** FreeCAD API
+- **生成モデル:** HouseDiffusion, Graph2Plan
+- **制約ソルバー:** Google OR-Tools CP-SAT
+- **ベクトル処理:** Shapely, NetworkX
 
 ## クラウドインフラ
 - **プラットフォーム:** Google Cloud Platform
