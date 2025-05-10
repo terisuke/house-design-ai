@@ -1,11 +1,12 @@
 # House Design AI ドキュメント
 
-## 最終更新日: 2025年4月30日
+## 最終更新日: 2025年5月11日
 
 ## ドキュメント構造
 
 ### [アーキテクチャ](architecture/)
 - [FreeCAD統合ガイド](architecture/freecad_integration.md): FreeCADの統合方法と実装状況
+- [間取り生成プラン分析](architecture/plan_analysis.md): 間取り生成システムの実装プラン分析と選定
 
 ### [デプロイメント](deployment/)
 - [クラウドデプロイメント計画](deployment/cloud_deployment_plan.md): GCPへのデプロイメント計画
