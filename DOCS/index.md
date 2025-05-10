@@ -1,6 +1,6 @@
 # House Design AI ドキュメント
 
-## 最終更新日: 2025年4月30日
+## 最終更新日: 2025年5月10日
 
 ## ドキュメント構造
 
@@ -45,6 +45,17 @@ APIテスト結果：
   "storage_url": "<gs://house-design-ai-data/models/model.FCStd>"
 }
 ```
+
+### デフォルト設定値
+FreeCAD APIでは以下のデフォルト値を使用しています：
+- 壁の厚さ: 120mm (0.12m)
+- 一階の壁の高さ: 2900mm (2.9m)
+- 二階の壁の高さ: 2800mm (2.8m)
+
+詳細なAPIドキュメントは[こちら](../freecad_api/docs/api_documentation.md)を参照してください。
+
+### Model Context Protocol (MCP)統合
+FreeCAD MCPを使用した効率的なCAD操作の例は[こちら](../freecad_api/examples/mcp_client.py)を参照してください。
 
 ## Streamlit実行方法
 

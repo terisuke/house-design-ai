@@ -5,12 +5,15 @@ import tempfile
 import uuid
 import requests
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from google.cloud import storage
+try:
+    from google.cloud import storage
+except ImportError:
+    storage = None
 from pydantic import BaseModel
 
 try:
@@ -56,7 +59,8 @@ class Room(BaseModel):
 class Wall(BaseModel):
     start: List[float]
     end: List[float]
-    height: float = 2.5
+    height: float = 2.9  # Default for 1st floor (2900mm)
+    floor: int = 1  # 1 for first floor, 2 for second floor
 
 
 class GridData(BaseModel):
@@ -73,8 +77,13 @@ class CloudStorage:
 
     def __init__(self):
         self.bucket_name = os.environ.get("BUCKET_NAME", "house-design-ai-data")
-        self.client = storage.Client()
-        self.bucket = self.client.bucket(self.bucket_name)
+        if storage is not None:
+            self.client = storage.Client()
+            self.bucket = self.client.bucket(self.bucket_name)
+        else:
+            logger.error("Google Cloud Storage module not available")
+            self.client = None
+            self.bucket = None
 
     def upload_file(
         self, file_path: str, destination_blob_name: Optional[str] = None
@@ -89,6 +98,10 @@ class CloudStorage:
         Returns:
             アップロードされたファイルのURL
         """
+        if self.client is None or self.bucket is None:
+            logger.warning("Cloud Storage client not available, returning local file path")
+            return f"file://{file_path}"
+            
         if destination_blob_name is None:
             destination_blob_name = os.path.basename(file_path)
 
@@ -179,7 +192,11 @@ async def process_grid(grid_data: GridData):
         for wall in grid_data.walls:
             start = wall.start
             end = wall.end
-            height = wall.height
+            
+            if hasattr(wall, 'floor') and wall.floor == 2:
+                height = 2.8  # 2nd floor height (2800mm)
+            else:
+                height = 2.9  # 1st floor height (2900mm)
             
             # 壁の長さを計算
             wall_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
@@ -368,10 +385,16 @@ async def process_drawing(
                 bucket_name = match.group(1)
                 object_name = match.group(2)
                 
-                from google.cloud import storage
-                storage_client = storage.Client()
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(object_name)
+                try:
+                    from google.cloud import storage as gcs
+                    storage_client = gcs.Client()
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(object_name)
+                except ImportError:
+                    logger.error("Google Cloud Storage module not available")
+                    return JSONResponse(
+                        status_code=500, content={"error": "Cloud Storage module not available"}
+                    )
                 blob.download_to_filename(temp_fcstd.name)
             else:
                 return JSONResponse(
