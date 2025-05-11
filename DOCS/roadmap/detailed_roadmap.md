@@ -103,11 +103,12 @@
 4. タイトルブロックテンプレートの設計
 5. Terraformによるデプロイプロセスの完全自動化
 
-## 現在のフェーズ（2024年Q2）
+## 現在のフェーズ（2025年Q2）
 
 ### 完了した項目
 - ✅ YOLOv11ベースの建物セグメンテーションモデルの開発
 - ✅ YOLOアノテーション→ベクター/グラフJSON変換システムの実装
+- ✅ CP-SAT最小PoCの開発（3LDKの基本レイアウト生成と建築基準法制約の実装）
 - ✅ FreeCAD統合の基本実装
 - ✅ Google Cloud Platform環境の構築
 - ✅ Dockerコンテナ化の実装
@@ -265,15 +266,16 @@
 
 ## 次のステップ
 
-1. セグメンテーションモデルの再トレーニング
-2. FreeCAD APIの安定性テスト
-3. クラウド環境のパフォーマンス測定
-4. ユーザーフィードバックの収集
-5. ドキュメントの更新
+1. FreeCAD APIの完全実装と安定性テスト
+2. 建築基準法チェック機能の拡張
+3. セグメンテーションモデルの再トレーニング
+4. クラウド環境のパフォーマンス測定
+5. ユーザーフィードバックの収集
+6. ドキュメントの更新
 
 ## 参考リンク
 
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/)                                                
+- [Streamlit Documentation](https://docs.streamlit.io/)                                                                                                                                                                                                                                                                                                                                                                                                                                                

@@ -7,6 +7,7 @@
 ### [アーキテクチャ](architecture/)
 - [FreeCAD統合ガイド](architecture/freecad_integration.md): FreeCADの統合方法と実装状況
 - [YOLOアノテーション変換システム](architecture/yolo_to_vector_conversion.md): YOLOアノテーションからベクター/グラフJSONへの変換システム
+- [CP-SAT間取り生成システム](architecture/cp_sat_layout_generation.md): CP-SATを使用した3LDK間取り生成システム
 
 ### [デプロイメント](deployment/)
 - [クラウドデプロイメント計画](deployment/cloud_deployment_plan.md): GCPへのデプロイメント計画
