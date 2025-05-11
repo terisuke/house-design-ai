@@ -123,11 +123,11 @@ with col2:
     col2_1, col2_2 = st.columns(2)
     with col2_1:
         land_area = st.number_input(
-            "敷地面積（㎡）",
-            min_value=50.0,
-            max_value=2000.0,
-            value=200.0,
-            step=10.0,
+            "敷地面積（mm²）",
+            min_value=50000000,  # 50m²
+            max_value=2000000000,  # 2000m²
+            value=200000000,  # 200m²
+            step=10000000,  # 10m²
             help="敷地の総面積を入力してください"
         )
         
@@ -142,11 +142,11 @@ with col2:
     
     with col2_2:
         land_width = st.number_input(
-            "間口（m）",
-            min_value=5.0,
-            max_value=50.0,
-            value=10.0,
-            step=1.0,
+            "間口（mm）",
+            min_value=5000,  # 5m
+            max_value=50000,  # 50m
+            value=10000,  # 10m
+            step=1000,  # 1m
             help="道路に面した土地の幅を入力してください"
         )
         
@@ -195,7 +195,7 @@ if st.button("建築基準法チェックを実行"):
         for room_name, room_info in madori_info.items():
             width = room_info.get("width", 0)
             height = room_info.get("height", 0)
-            room_area = width * height * 0.91 * 0.91  # 1グリッド = 0.91m x 0.91m
+            room_area = width * height * 910 * 910  # 1グリッド = 910mm x 910mm
             total_floor_area += room_area
             
             # 1階の部屋の場合は建ぺい率の計算に含める
@@ -218,16 +218,16 @@ if st.button("建築基準法チェックを実行"):
             if room_name in daylight_rooms:
                 width = room_info.get("width", 0)
                 height = room_info.get("height", 0)
-                room_area = width * height * 0.91 * 0.91
+                room_area = width * height * 910 * 910  # 1グリッド = 910mm x 910mm
                 
                 # 仮の採光面積（部屋の面積の10%と仮定）
                 window_area = room_area * 0.1
                 actual_daylight_factor = window_area / room_area
                 
                 daylight_checks[room_name] = {
-                    "室面積": f"{room_area:.2f}㎡",
-                    "必要採光面積": f"{room_area * daylight_factor:.2f}㎡",
-                    "想定採光面積": f"{window_area:.2f}㎡",
+                    "室面積": f"{room_area/1000000:.2f}㎡",
+                    "必要採光面積": f"{room_area * daylight_factor/1000000:.2f}㎡",
+                    "想定採光面積": f"{window_area/1000000:.2f}㎡",
                     "採光基準": "適合" if actual_daylight_factor >= daylight_factor else "不適合"
                 }
         
@@ -238,8 +238,8 @@ if st.button("建築基準法チェックを実行"):
         col_result1, col_result2 = st.columns(2)
         
         with col_result1:
-            st.info(f"### 建築面積\n{building_coverage:.2f}㎡（敷地面積の{building_coverage_ratio:.1f}%）")
-            st.info(f"### 延床面積\n{total_floor_area:.2f}㎡（敷地面積の{floor_area_ratio:.1f}%）")
+            st.info(f"### 建築面積\n{building_coverage/1000000:.2f}㎡（敷地面積の{building_coverage_ratio:.1f}%）")
+            st.info(f"### 延床面積\n{total_floor_area/1000000:.2f}㎡（敷地面積の{floor_area_ratio:.1f}%）")
         
         with col_result2:
             # 建ぺい率チェック結果
