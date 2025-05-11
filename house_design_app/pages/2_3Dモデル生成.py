@@ -94,12 +94,12 @@ if "debug_info" not in st.session_state or "result_image" not in st.session_stat
             }
             
             st.success("サンプルデータをロードしました！")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"サンプルデータのロード中にエラーが発生しました: {e}")
     
     # メインページへのボタン
-    st.button("メインページへ戻る", on_click=lambda: st._rerun())
+    st.button("メインページへ戻る", on_click=lambda: st.rerun())
     
     # フッターを表示
     try:
@@ -143,7 +143,7 @@ if madori_info:
         description = madori_descriptions.get(madori_name, "")
         width = info.get("width", 0)
         height = info.get("height", 0)
-        area = width * height * 0.91 * 0.91  # 1グリッド = 0.91m x 0.91m
+        area = width * height * 910 * 910 / 1000000  # 1グリッド = 910mm x 910mm
         madori_data.append({
             "記号": madori_name,
             "名称": description,
@@ -171,7 +171,7 @@ with st.expander("詳細設定", expanded=True):
         help="FreeCAD APIのエンドポイントURL"
     )
     
-    # グリッドサイズの設定
+    # グリッドサイズの設定（mm）
     grid_size = 910  # 1グリッド = 910mm
 
     # 壁の高さ設定
@@ -197,19 +197,19 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
             
             # 間取り情報からルームデータを作成
             for madori_name, info in madori_info.items():
-                width = info.get("width", 0) * 0.91  # グリッドサイズを実寸（m）に変換
-                height = info.get("height", 0) * 0.91
-                pos_x = info.get("position", [0, 0])[0] * 0.91
-                pos_y = info.get("position", [0, 0])[1] * 0.91
+                width = info.get("width", 0) * 910  # グリッドサイズを実寸（mm）に変換
+                height = info.get("height", 0) * 910
+                pos_x = info.get("position", [0, 0])[0] * 910
+                pos_y = info.get("position", [0, 0])[1] * 910
                 
                 # 部屋の寸法を計算
-                room_width = width * grid_size  # mm
-                room_height = height * grid_size  # mm
+                room_width = width  # mm (already converted to mm)
+                room_height = height  # mm (already converted to mm)
                 room_area = room_width * room_height  # mm²
 
                 # 部屋の情報を表示
-                st.write(f"部屋の寸法: {room_width/1000:.1f}m × {room_height/1000:.1f}m")
-                st.write(f"部屋の面積: {room_area/1000000:.1f}㎡")
+                st.write(f"部屋の寸法: {room_width:.1f}mm × {room_height:.1f}mm")
+                st.write(f"部屋の面積: {room_area:.1f}mm²")
                 
                 # 部屋データを追加
                 rooms.append({

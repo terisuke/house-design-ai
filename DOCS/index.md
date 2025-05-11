@@ -21,7 +21,7 @@
 - [プロジェクトロードマップ](roadmap/roadmap.md): 短期・中期・長期の開発計画
 - [詳細ロードマップ](roadmap/detailed_roadmap.md): より詳細な開発ロードマップ
 
-## 実装状況 (2025-04-30更新)
+## 実装状況 (2025-05-11更新)
 
 - ✅ FreeCAD APIのCloud Runデプロイ成功
 - ✅ Streamlitアプリケーションの実行確認
@@ -29,6 +29,9 @@
 - ✅ Cloud StorageでのFCStdモデル保存
 - ✅ PyTorchとStreamlitの互換性問題の解決
 - ✅ Terraformによるインフラストラクチャのコード化完了
+- ✅ CP-SAT最小PoCの実装（3LDK基本レイアウト生成）
+- ✅ 建築基準法制約の基本実装（セットバック、最小部屋サイズ）
+- ✅ 単位の統一（mm）
 
 ## FreeCAD API実装の詳細
 

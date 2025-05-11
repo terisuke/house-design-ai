@@ -86,10 +86,10 @@ if "debug_info" not in st.session_state or "result_image" not in st.session_stat
         }
         
         st.success("サンプルデータをロードしました！")
-        st.experimental_rerun()
+        st.rerun()
     
     # メインページへのボタン
-    st.button("メインページへ戻る", on_click=lambda: st._rerun())
+    st.button("メインページへ戻る", on_click=lambda: st.rerun())
     
     # フッターを表示
     try:
@@ -124,10 +124,10 @@ with col2:
     with col2_1:
         land_area = st.number_input(
             "敷地面積（mm²）",
-            min_value=50000000,  # 50m²
-            max_value=2000000000,  # 2000m²
-            value=200000000,  # 200m²
-            step=10000000,  # 10m²
+            min_value=50000000,  # 50000000mm²
+            max_value=2000000000,  # 2000000000mm²
+            value=200000000,  # 200000000mm²
+            step=10000000,  # 10000000mm²
             help="敷地の総面積を入力してください"
         )
         
@@ -225,9 +225,9 @@ if st.button("建築基準法チェックを実行"):
                 actual_daylight_factor = window_area / room_area
                 
                 daylight_checks[room_name] = {
-                    "室面積": f"{room_area/1000000:.2f}㎡",
-                    "必要採光面積": f"{room_area * daylight_factor/1000000:.2f}㎡",
-                    "想定採光面積": f"{window_area/1000000:.2f}㎡",
+                    "室面積": f"{room_area:.2f}mm²",
+                    "必要採光面積": f"{room_area * daylight_factor:.2f}mm²",
+                    "想定採光面積": f"{window_area:.2f}mm²",
                     "採光基準": "適合" if actual_daylight_factor >= daylight_factor else "不適合"
                 }
         
@@ -238,8 +238,8 @@ if st.button("建築基準法チェックを実行"):
         col_result1, col_result2 = st.columns(2)
         
         with col_result1:
-            st.info(f"### 建築面積\n{building_coverage/1000000:.2f}㎡（敷地面積の{building_coverage_ratio:.1f}%）")
-            st.info(f"### 延床面積\n{total_floor_area/1000000:.2f}㎡（敷地面積の{floor_area_ratio:.1f}%）")
+            st.info(f"### 建築面積\n{building_coverage:.2f}mm²（敷地面積の{building_coverage_ratio:.1f}%）")
+            st.info(f"### 延床面積\n{total_floor_area:.2f}mm²（敷地面積の{floor_area_ratio:.1f}%）")
         
         with col_result2:
             # 建ぺい率チェック結果
