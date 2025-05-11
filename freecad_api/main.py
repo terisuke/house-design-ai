@@ -4,16 +4,19 @@ import os
 import tempfile
 import uuid
 import requests
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Depends
+import uvicorn
+from fastapi import FastAPI, File, HTTPException, UploadFile, Body, Form, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 try:
-    from google.cloud import storage
+    from google.cloud import storage as gcs_storage
 except ImportError:
-    storage = None
+    logging.error("google-cloud-storage package is not installed. Cloud Storage functionality will be disabled.")
+    gcs_storage = None
 from pydantic import BaseModel
 
 try:
@@ -77,11 +80,19 @@ class CloudStorage:
 
     def __init__(self):
         self.bucket_name = os.environ.get("BUCKET_NAME", "house-design-ai-data")
-        if storage is not None:
-            self.client = storage.Client()
-            self.bucket = self.client.bucket(self.bucket_name)
+        if gcs_storage is not None:
+            try:
+                self.client = gcs_storage.Client()
+                self.bucket = self.client.bucket(self.bucket_name)
+                self.storage_available = True
+            except Exception as e:
+                logger.error(f"Cloud Storageの初期化に失敗しました: {e}")
+                self.storage_available = False
+                self.client = None
+                self.bucket = None
         else:
-            logger.error("Google Cloud Storage module not available")
+            logger.warning("Cloud Storageが利用できません。ローカルファイルのみ使用します。")
+            self.storage_available = False
             self.client = None
             self.bucket = None
 
@@ -98,10 +109,9 @@ class CloudStorage:
         Returns:
             アップロードされたファイルのURL
         """
-        if self.client is None or self.bucket is None:
-            logger.warning("Cloud Storage client not available, returning local file path")
+        if not self.storage_available or self.client is None or self.bucket is None:
+            logger.warning(f"Cloud Storageが利用できないため、ローカルファイルを使用します: {file_path}")
             return f"file://{file_path}"
-            
         if destination_blob_name is None:
             destination_blob_name = os.path.basename(file_path)
 
@@ -222,14 +232,12 @@ async def process_grid(grid_data: GridData):
         
         # ドキュメントを再計算
         doc.recompute()
-        
         output_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False).name
         doc.saveAs(output_file)
         
         # Cloud Storageにアップロード
-        storage = CloudStorage()
-        url = storage.upload_file(output_file, f"models/{uuid.uuid4()}.fcstd")
-        
+        storage_client = CloudStorage()
+        url = storage_client.upload_file(output_file, f"models/{uuid.uuid4()}.fcstd")
         # 一時ファイルを削除
         os.unlink(output_file)
         
@@ -248,27 +256,395 @@ async def process_grid(grid_data: GridData):
         )
 
 
-@app.post("/convert/3d")
-async def convert_to_3d(file: UploadFile = File(...)):
+@app.post("/convert/2d")
+async def convert_to_2d(file: Optional[UploadFile] = File(None), grid_data: Optional[Dict] = Body(None)):
     """
-    FCStdファイルをSTL形式に変換する
+    3DモデルをPDF図面に変換する
+
+    Args:
+        file: アップロードされたFreeCADファイル（ファイルアップロード方式）
+        grid_data: グリッドデータ（JSON方式）
+
+    Returns:
+        生成されたPDF図面のURL
     """
-    if not file.filename.endswith(".fcstd"):
+    is_file_upload = file is not None
+    is_json_data = grid_data is not None
+
+    if not is_file_upload and not is_json_data:
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid file format. Only .fcstd files are supported."},
+            content={"error": "Either file upload or grid data must be provided."},
         )
 
     try:
-        # 一時ファイルにアップロードされたファイルを保存
-        temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False)
-        content = await file.read()
-        temp_file.write(content)
-        temp_file.close()
+        temp_file = None
+        
+        if is_file_upload:
+            if not file.filename.endswith(".fcstd"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Invalid file format. Only .fcstd files are supported."},
+                )
+                
+            # 一時ファイルにアップロードされたファイルを保存
+            temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False)
+            content = await file.read()
+            temp_file.write(content)
+            temp_file.close()
+            
+        elif is_json_data:
+            temp_json = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+            with open(temp_json.name, "w") as f:
+                json.dump(grid_data, f)
+                
+            # 一時ファイルにFreeCADスクリプトを保存（モデル生成用）
+            temp_model_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+            with open(temp_model_script.name, "w") as f:
+                f.write(
+                    f"""
+import json
+import os
+import sys
+import FreeCAD
+import Part
+
+# グリッドデータを読み込む
+with open("{temp_json.name}", "r") as f:
+    grid_data = json.load(f)
+
+# 新しいドキュメントを作成
+doc = FreeCAD.newDocument("HouseModel")
+
+wall_thickness = 0.12  # 120mm
+first_floor_height = 2.9  # 2900mm
+second_floor_height = 2.8  # 2800mm
+
+if "rooms" in grid_data:
+    for room_obj in grid_data["rooms"]:
+        dimensions = room_obj["dimensions"]
+        position = room_obj["position"]
+        
+        # 部屋の形状を作成
+        box = Part.makeBox(dimensions[0], dimensions[1], first_floor_height, 
+                           FreeCAD.Vector(position[0], position[1], 0))
+        
+        # オブジェクトを追加
+        obj = doc.addObject("Part::Feature", f"Room_{{room_obj['id']}}")
+        obj.Shape = box
+
+if "walls" in grid_data:
+    for i, wall in enumerate(grid_data["walls"]):
+        start = wall["start"]
+        end = wall["end"]
+        height = wall.get("height", first_floor_height)
+        
+        import math
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx*dx + dy*dy)
+        angle = math.atan2(dy, dx) * 180 / math.pi
+        
+        # 壁の形状を作成
+        wall_box = Part.makeBox(length, wall_thickness, height,
+                               FreeCAD.Vector(start[0], start[1], 0))
+        
+        if angle != 0:
+            wall_box.rotate(FreeCAD.Vector(start[0], start[1], 0), FreeCAD.Vector(0, 0, 1), angle)
+        
+        # オブジェクトを追加
+        obj = doc.addObject("Part::Feature", f"Wall_{{i}}")
+        obj.Shape = wall_box
+
+# ドキュメントを再計算
+doc.recompute()
+
+# 出力ディレクトリを設定
+output_dir = os.environ.get("OUTPUT_DIR", "/tmp")
+os.makedirs(output_dir, exist_ok=True)
+
+# ファイルを保存
+output_file = os.path.join(output_dir, "model.FCStd")
+doc.saveAs(output_file)
+
+print(f"モデルを保存しました: {{output_file}}")
+"""
+                )
+                
+            # FreeCADスクリプトを実行してモデルを生成
+            temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False).name
+            os.environ["OUTPUT_DIR"] = os.path.dirname(temp_file)
+            
+            model_result = subprocess.run(
+                ["FreeCADCmd", temp_model_script.name], capture_output=True, text=True
+            )
+            
+            if model_result.returncode != 0:
+                logger.error(f"FreeCADモデル生成に失敗しました: {model_result.stderr}")
+                return JSONResponse(
+                    status_code=500, content={"error": "Failed to generate 3D model from grid data"}
+                )
+                
+            # 一時ファイルを削除
+            os.unlink(temp_json.name)
+            os.unlink(temp_model_script.name)
+
+        # 一時ファイルにFreeCADスクリプトを保存（2D変換用）
+        temp_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+        with open(temp_script.name, "w") as f:
+            f.write(
+                f"""
+import os
+import sys
+import FreeCAD
+import TechDraw
+
+# モデルを開く
+doc = FreeCAD.open("{temp_file}")
+
+# 新しいTechDrawドキュメントを作成
+tdoc = FreeCAD.newDocument("TechDraw")
+
+# ページを作成 - A3サイズを使用
+page = tdoc.addObject('TechDraw::DrawPage', 'Page')
+template = FreeCAD.getResourceDir() + '/Mod/TechDraw/Templates/A3_Landscape_ISO.svg'
+page.Template = template
+
+# モデル内のすべてのオブジェクトを取得
+objects = []
+for obj in doc.Objects:
+    if hasattr(obj, "Shape"):
+        objects.append(obj)
+
+# ビューを作成（すべてのオブジェクトを対象に）
+if objects:
+    top_view = tdoc.addObject('TechDraw::DrawViewPart', 'TopView')
+    top_view.Source = objects
+    top_view.Direction = FreeCAD.Vector(0, 0, 1)
+    top_view.Scale = 0.1  # 1:10スケール
+    top_view.X = 100
+    top_view.Y = 100
+    page.addView(top_view)
+    
+    front_view = tdoc.addObject('TechDraw::DrawViewPart', 'FrontView')
+    front_view.Source = objects
+    front_view.Direction = FreeCAD.Vector(0, -1, 0)
+    front_view.Scale = 0.1
+    front_view.X = 100
+    front_view.Y = 250
+    page.addView(front_view)
+    
+    side_view = tdoc.addObject('TechDraw::DrawViewPart', 'SideView')
+    side_view.Source = objects
+    side_view.Direction = FreeCAD.Vector(1, 0, 0)
+    side_view.Scale = 0.1
+    side_view.X = 250
+    side_view.Y = 250
+    page.addView(side_view)
+    
+    iso_view = tdoc.addObject('TechDraw::DrawViewPart', 'IsoView')
+    iso_view.Source = objects
+    iso_view.Direction = FreeCAD.Vector(1, 1, 1)
+    iso_view.Scale = 0.1
+    iso_view.X = 250
+    iso_view.Y = 100
+    page.addView(iso_view)
+else:
+    print("モデル内に表示可能なオブジェクトが見つかりません")
+    sys.exit(1)
+
+# ドキュメントを再計算
+tdoc.recompute()
+
+# 出力ディレクトリを設定
+output_dir = os.environ.get("OUTPUT_DIR", "/tmp")
+os.makedirs(output_dir, exist_ok=True)
+
+# PDFをエクスポート
+output_file = os.path.join(output_dir, "drawing.pdf")
+page.exportPDF(output_file)
+
+print(f"PDFを保存しました: {{output_file}}")
+"""
+            )
+
+        output_file = os.path.join(os.path.dirname(temp_script.name), "drawing.pdf")
+        os.environ["OUTPUT_DIR"] = os.path.dirname(output_file)
+        
+        # FreeCADスクリプトを実行
+        result = subprocess.run(
+            ["FreeCADCmd", temp_script.name], capture_output=True, text=True
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"FreeCADスクリプトの実行に失敗しました: {result.stderr}")
+            return JSONResponse(
+                status_code=500, content={"error": "Failed to convert to 2D drawing"}
+            )
+            
+        # 一時ファイルを削除
+        if is_file_upload and isinstance(temp_file, tempfile._TemporaryFileWrapper):
+            os.unlink(temp_file.name)
+        os.unlink(temp_script.name)
+        
+        # 生成されたPDFをCloud Storageにアップロード
+        storage_client = CloudStorage()
+        url = storage_client.upload_file(output_file, f"drawings/{uuid.uuid4()}.pdf")
+        
+        # 一時ファイルを削除
+        os.unlink(output_file)
+        
+        return {"url": url}
+    except Exception as e:
+        logger.error(f"2D変換中にエラーが発生しました: {e}")
+        return JSONResponse(
+            status_code=500, content={"error": f"Error converting to 2D: {str(e)}"}
+        )
+
+
+@app.post("/convert/3d")
+async def convert_to_3d(
+    file: Optional[UploadFile] = File(None),
+    grid_data: Optional[GridData] = None
+):
+    """
+    FCStdファイルをSTL形式に変換する
+
+    Args:
+        file: アップロードされたFreeCADファイル（ファイルアップロード方式）
+        grid_data: グリッドデータ（JSON方式）
+
+    Returns:
+        変換されたSTLモデルのURL
+    """
+    is_file_upload = file is not None
+    is_json_data = grid_data is not None
+
+    if not is_file_upload and not is_json_data:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Either file upload or grid data must be provided."},
+        )
+
+    try:
+        temp_file = None
+        
+        if is_file_upload:
+            if not file.filename.endswith(".fcstd"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Invalid file format. Only .fcstd files are supported."},
+                )
+                
+            # 一時ファイルにアップロードされたファイルを保存
+            temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False)
+            content = await file.read()
+            temp_file.write(content)
+            temp_file.close()
+            
+        elif is_json_data:
+            temp_json = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+            with open(temp_json.name, "w") as f:
+                json.dump(grid_data, f)
+                
+            # 一時ファイルにFreeCADスクリプトを保存（モデル生成用）
+            temp_model_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+            with open(temp_model_script.name, "w") as f:
+                f.write(
+                    f"""
+import json
+import os
+import sys
+import FreeCAD
+import Part
+
+# グリッドデータを読み込む
+with open("{temp_json.name}", "r") as f:
+    grid_data = json.load(f)
+
+# 新しいドキュメントを作成
+doc = FreeCAD.newDocument("HouseModel")
+
+wall_thickness = 0.12  # 120mm
+first_floor_height = 2.9  # 2900mm
+second_floor_height = 2.8  # 2800mm
+
+if "rooms" in grid_data:
+    for room_obj in grid_data["rooms"]:
+        dimensions = room_obj["dimensions"]
+        position = room_obj["position"]
+        
+        # 部屋の形状を作成
+        box = Part.makeBox(dimensions[0], dimensions[1], first_floor_height, 
+                           FreeCAD.Vector(position[0], position[1], 0))
+        
+        # オブジェクトを追加
+        obj = doc.addObject("Part::Feature", f"Room_{{room_obj['id']}}")
+        obj.Shape = box
+
+if "walls" in grid_data:
+    for i, wall in enumerate(grid_data["walls"]):
+        start = wall["start"]
+        end = wall["end"]
+        height = wall.get("height", first_floor_height)
+        
+        import math
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx*dx + dy*dy)
+        angle = math.atan2(dy, dx) * 180 / math.pi
+        
+        # 壁の形状を作成
+        wall_box = Part.makeBox(length, wall_thickness, height,
+                               FreeCAD.Vector(start[0], start[1], 0))
+        
+        if angle != 0:
+            wall_box.rotate(FreeCAD.Vector(start[0], start[1], 0), FreeCAD.Vector(0, 0, 1), angle)
+        
+        # オブジェクトを追加
+        obj = doc.addObject("Part::Feature", f"Wall_{{i}}")
+        obj.Shape = wall_box
+
+# ドキュメントを再計算
+doc.recompute()
+
+# 出力ディレクトリを設定
+output_dir = os.environ.get("OUTPUT_DIR", "/tmp")
+os.makedirs(output_dir, exist_ok=True)
+
+# ファイルを保存
+output_file = os.path.join(output_dir, "model.FCStd")
+doc.saveAs(output_file)
+
+print(f"モデルを保存しました: {{output_file}}")
+"""
+                )
+                
+            # FreeCADスクリプトを実行してモデルを生成
+            temp_file = tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False).name
+            os.environ["OUTPUT_DIR"] = os.path.dirname(temp_file)
+            
+            model_result = subprocess.run(
+                ["FreeCADCmd", temp_model_script.name], capture_output=True, text=True
+            )
+            
+            if model_result.returncode != 0:
+                logger.error(f"FreeCADモデル生成に失敗しました: {model_result.stderr}")
+                return JSONResponse(
+                    status_code=500, content={"error": "Failed to generate 3D model from grid data"}
+                )
+                
+            # 一時ファイルを削除
+            os.unlink(temp_json.name)
+            os.unlink(temp_model_script.name)
 
         # モデルを開く
-        doc = FreeCAD.open(temp_file.name)
-
+        if temp_file is None:
+            return JSONResponse(
+                status_code=500, content={"error": "Failed to create temporary file"}
+            )
+        doc = FreeCAD.open(temp_file if isinstance(temp_file, str) else temp_file.name)
+        
         # すべてのオブジェクトを取得
         objects = doc.Objects
 
@@ -303,7 +679,10 @@ async def convert_to_3d(file: UploadFile = File(...)):
         url = storage.upload_file(output_stl, f"models/{uuid.uuid4()}.stl")
 
         # 一時ファイルを削除
-        os.unlink(temp_file.name)
+        if is_file_upload and isinstance(temp_file, tempfile._TemporaryFileWrapper):
+            os.unlink(temp_file.name)
+        elif isinstance(temp_file, str):
+            os.unlink(temp_file)
         os.unlink(output_stl)
         import shutil
         shutil.rmtree(output_dir, ignore_errors=True)
@@ -340,20 +719,56 @@ async def convert_stl_to_gltf(file: UploadFile = File(...)):
         temp_stl.write(content)
         temp_stl.close()
 
-        mesh = trimesh.load(temp_stl.name)
-        
-        output_gltf = temp_stl.name.replace(".stl", ".gltf")
-        mesh.export(output_gltf, file_type="gltf")
-        
-        # Cloud Storageにアップロード
-        storage = CloudStorage()
-        url = storage.upload_file(output_gltf, f"models/{uuid.uuid4()}.gltf")
-        
-        # 一時ファイルを削除
-        os.unlink(temp_stl.name)
-        os.unlink(output_gltf)
-        
-        return {"url": url, "format": "gltf"}
+        if trimesh is not None:
+            mesh = trimesh.load(temp_stl.name)
+            
+            output_gltf = temp_stl.name.replace(".stl", ".gltf")
+            mesh.export(output_gltf, file_type="gltf")
+            
+            # Cloud Storageにアップロード
+            storage = CloudStorage()
+            url = storage.upload_file(output_gltf, f"models/{uuid.uuid4()}.gltf")
+            
+            # 一時ファイルを削除
+            os.unlink(temp_stl.name)
+            os.unlink(output_gltf)
+            
+            return {"url": url, "format": "gltf"}
+        else:
+            # FreeCADスクリプトでglTF変換
+            temp_script = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+            with open(temp_script.name, "w") as f:
+                f.write(f"""
+import os
+import FreeCAD
+import Import
+import Mesh
+import ImportGui
+import Part
+import MeshPart
+import ImportExport
+import ImportGLTF
+
+doc = FreeCAD.open(\"{temp_stl.name}\")
+obj = doc.Objects[0]
+output_file = \"{temp_stl.name}.gltf\"
+ImportGLTF.export([obj], output_file)
+print(f\"Exported: {{output_file}}\")
+""")
+            output_file = f"{temp_stl.name}.gltf"
+            os.environ["OUTPUT_DIR"] = os.path.dirname(output_file)
+            result = subprocess.run(
+                ["FreeCADCmd", temp_script.name], capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return JSONResponse(status_code=500, content={"error": "Failed to convert to glTF", "stderr": result.stderr})
+            # Cloud Storageアップロード
+            storage = CloudStorage()
+            url = storage.upload_file(output_file, f"models/{uuid.uuid4()}.gltf")
+            os.unlink(temp_stl.name)
+            os.unlink(temp_script.name)
+            os.unlink(output_file)
+            return {"url": url, "format": "gltf"}
     except Exception as e:
         logger.error(f"STL→glTF変換中にエラーが発生しました: {e}")
         import traceback
