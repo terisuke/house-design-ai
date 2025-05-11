@@ -159,7 +159,11 @@ else:
 テストの実行方法：
 
 ```bash
-python -m unittest tests.test_cp_sat_solver
+# 必要なパッケージのインストール
+pip install ortools
+
+# テストの実行
+python -m pytest tests/test_cp_sat_solver.py -v
 ```
 
 ## 実装状況
