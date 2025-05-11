@@ -37,12 +37,12 @@
 
 ### 1. 間取り生成システムの二層アーキテクチャ実装
 - [ ] データ整備
-  - [ ] YOLOアノテーション → ベクター/グラフJSON変換システム構築
+  - [x] YOLOアノテーション → ベクター/グラフJSON変換システム構築
   - [ ] 間取り図データセットの整備
   - [ ] 敷地形状と方位条件の埋め込みメカニズム実装
-- [ ] CP-SAT最小PoCの開発
-  - [ ] 3LDKの基本レイアウト生成
-  - [ ] 910mmグリッド + 採光条件 + 階段寸法の基本制約実装
+- [x] CP-SAT最小PoCの開発
+  - [x] 3LDKの基本レイアウト生成
+  - [x] 910mmグリッド + 採光条件 + 階段寸法の基本制約実装
   - [ ] 建築基準法チェック機能の基本実装
 
 ### 2. 建築基準法チェック機能
@@ -136,8 +136,8 @@
 - 🔄 FreeCAD APIの安定化
 - 🔄 クラウド環境でのパフォーマンス最適化
 - 🔄 ドキュメントの充実化
-- 🔄 YOLOアノテーション → ベクター/グラフJSON変換システム構築
-- 🔄 CP-SAT最小PoCの開発
+- ✅ YOLOアノテーション → ベクター/グラフJSON変換システム構築
+- ✅ CP-SAT最小PoCの開発
 - 🔄 HouseDiffusionモデルの実装準備
 
 ## 2024年Q3
@@ -299,4 +299,4 @@
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/)
+- [Streamlit Documentation](https://docs.streamlit.io/)                                                                                                                                                                                                                                                                                                                                                                                                
