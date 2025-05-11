@@ -171,15 +171,15 @@ with st.expander("詳細設定", expanded=True):
         help="FreeCAD APIのエンドポイントURL"
     )
     
-    wall_height = st.slider(
-        "壁の高さ (m)",
-        min_value=2.0,
-        max_value=4.0,
-        value=2.5,
-        step=0.1,
-        help="3Dモデルの壁の高さを設定します"
-    )
-    
+    # グリッドサイズの設定
+    grid_size = 910  # 1グリッド = 910mm
+
+    # 壁の高さ設定
+    wall_height = 2500  # 壁の高さ（mm）
+
+    # 部屋の高さ設定
+    room_height = 2800  # 部屋の高さ（mm）
+
     include_furniture = st.checkbox(
         "家具を含める",
         value=True,
@@ -201,6 +201,15 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
                 height = info.get("height", 0) * 0.91
                 pos_x = info.get("position", [0, 0])[0] * 0.91
                 pos_y = info.get("position", [0, 0])[1] * 0.91
+                
+                # 部屋の寸法を計算
+                room_width = width * grid_size  # mm
+                room_height = height * grid_size  # mm
+                room_area = room_width * room_height  # mm²
+
+                # 部屋の情報を表示
+                st.write(f"部屋の寸法: {room_width/1000:.1f}m × {room_height/1000:.1f}m")
+                st.write(f"部屋の面積: {room_area/1000000:.1f}㎡")
                 
                 # 部屋データを追加
                 rooms.append({

@@ -26,17 +26,17 @@ class Room:
     
     Attributes:
         name: 部屋の名前
-        min_area: 最小面積（m²）
+        min_area: 最小面積（mm²）
         preferred_ratio: 望ましい縦横比
-        x: x座標（CP-SAT変数）
-        y: y座標（CP-SAT変数）
-        width: 幅（CP-SAT変数）
-        height: 高さ（CP-SAT変数）
-        area: 面積（CP-SAT変数）
+        x: x座標（CP-SAT変数、mm）
+        y: y座標（CP-SAT変数、mm）
+        width: 幅（CP-SAT変数、mm）
+        height: 高さ（CP-SAT変数、mm）
+        area: 面積（CP-SAT変数、mm²）
     """
     def __init__(self, name: str, min_area: float, preferred_ratio: float = 1.0):
         self.name = name
-        self.min_area = min_area  # 最小面積（m²）
+        self.min_area = min_area  # 最小面積（mm²）
         self.preferred_ratio = preferred_ratio  # 望ましい縦横比
         
         self.x: Any = None  # x座標
@@ -53,22 +53,22 @@ class BuildingConstraints:
     建築基準法の制約を表すクラス
     
     Attributes:
-        min_room_size: 居室の最小面積（m²）
-        min_ceiling_height: 最小天井高（m）
-        min_corridor_width: 最小廊下幅（m）
-        min_door_width: 最小ドア幅（m）
-        wall_thickness: 壁の厚さ（m）
-        first_floor_height: 1階の高さ（m）
-        second_floor_height: 2階の高さ（m）
+        min_room_size: 居室の最小面積（mm²）
+        min_ceiling_height: 最小天井高（mm）
+        min_corridor_width: 最小廊下幅（mm）
+        min_door_width: 最小ドア幅（mm）
+        wall_thickness: 壁の厚さ（mm）
+        first_floor_height: 1階の高さ（mm）
+        second_floor_height: 2階の高さ（mm）
     """
     def __init__(self):
-        self.min_room_size = 4.5  # 居室の最小面積（m²）
-        self.min_ceiling_height = 2.1  # 最小天井高（m）
-        self.min_corridor_width = 0.78  # 最小廊下幅（m）
-        self.min_door_width = 0.75  # 最小ドア幅（m）
-        self.wall_thickness = 0.12  # 壁の厚さ（m）
-        self.first_floor_height = 2.9  # 1階の高さ（m）
-        self.second_floor_height = 2.8  # 2階の高さ（m）
+        self.min_room_size = 4500  # 居室の最小面積（mm²）
+        self.min_ceiling_height = 2100  # 最小天井高（mm）
+        self.min_corridor_width = 780  # 最小廊下幅（mm）
+        self.min_door_width = 750  # 最小ドア幅（mm）
+        self.wall_thickness = 120  # 壁の厚さ（mm）
+        self.first_floor_height = 2900  # 1階の高さ（mm）
+        self.second_floor_height = 2800  # 2階の高さ（mm）
         
         self.building_coverage_ratio = 0.6  # 建蔽率（敷地面積に対する建築面積の割合）
         self.floor_area_ratio = 2.0  # 容積率（敷地面積に対する延床面積の割合）
@@ -289,8 +289,8 @@ def solve_and_convert(model: cp_model.CpModel, rooms: Dict[str, Room], solver: c
         model: CP-SATモデル
         rooms: 部屋の辞書
         solver: CP-SATソルバー
-        site_width: 敷地の幅（m）
-        site_height: 敷地の高さ（m）
+        site_width: 敷地の幅（mm）
+        site_height: 敷地の高さ（mm）
         
     Returns:
         LayoutResult: 間取り生成結果
@@ -308,11 +308,11 @@ def solve_and_convert(model: cp_model.CpModel, rooms: Dict[str, Room], solver: c
             assert room.width is not None and room.height is not None
             assert room.area is not None
             
-            x = solver.Value(room.x) / SCALE
-            y = solver.Value(room.y) / SCALE
-            width = solver.Value(room.width) / SCALE
-            height = solver.Value(room.height) / SCALE
-            area = solver.Value(room.area) / (SCALE * SCALE)
+            x = solver.Value(room.x)
+            y = solver.Value(room.y)
+            width = solver.Value(room.width)
+            height = solver.Value(room.height)
+            area = solver.Value(room.area)
             total_area += area
             
             room_type = "other"

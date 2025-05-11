@@ -20,23 +20,23 @@ CP-SAT 間取り生成システムは、Google OR-ToolsのCP-SATソルバーを�
 部屋を表すクラスで、以下の属性を持ちます：
 
 - `name`: 部屋の名前
-- `min_area`: 最小面積（m²）
+- `min_area`: 最小面積（mm²）
 - `preferred_ratio`: 望ましい縦横比
-- `x`, `y`: 部屋の左下隅の座標（CP-SAT変数）
-- `width`, `height`: 部屋の幅と高さ（CP-SAT変数）
-- `area`: 部屋の面積（CP-SAT変数）
+- `x`, `y`: 部屋の左下隅の座標（CP-SAT変数、mm）
+- `width`, `height`: 部屋の幅と高さ（CP-SAT変数、mm）
+- `area`: 部屋の面積（CP-SAT変数、mm²）
 
 ### BuildingConstraints クラス
 
 建築基準法の制約を表すクラスで、以下の属性を持ちます：
 
-- `min_room_size`: 居室の最小面積（4.5m²）
-- `min_ceiling_height`: 最小天井高（2.1m）
-- `min_corridor_width`: 最小廊下幅（0.78m）
-- `min_door_width`: 最小ドア幅（0.75m）
-- `wall_thickness`: 壁の厚さ（0.12m）
-- `first_floor_height`: 1階の高さ（2.9m）
-- `second_floor_height`: 2階の高さ（2.8m）
+- `min_room_size`: 居室の最小面積（4500mm²）
+- `min_ceiling_height`: 最小天井高（2100mm）
+- `min_corridor_width`: 最小廊下幅（780mm）
+- `min_door_width`: 最小ドア幅（750mm）
+- `wall_thickness`: 壁の厚さ（120mm）
+- `first_floor_height`: 1階の高さ（2900mm）
+- `second_floor_height`: 2階の高さ（2800mm）
 - `building_coverage_ratio`: 建蔽率（0.6）
 - `floor_area_ratio`: 容積率（2.0）
 
@@ -45,9 +45,9 @@ CP-SAT 間取り生成システムは、Google OR-ToolsのCP-SATソルバーを�
 生成された部屋のレイアウト情報を表すPydanticモデルで、以下の属性を持ちます：
 
 - `name`: 部屋の名前
-- `x`, `y`: 部屋の左下隅の座標（m）
-- `width`, `height`: 部屋の幅と高さ（m）
-- `area`: 部屋の面積（m²）
+- `x`, `y`: 部屋の左下隅の座標（mm）
+- `width`, `height`: 部屋の幅と高さ（mm）
+- `area`: 部屋の面積（mm²）
 - `room_type`: 部屋のタイプ（"living", "bedroom", "bathroom"など）
 
 ### LayoutResult クラス
@@ -55,8 +55,8 @@ CP-SAT 間取り生成システムは、Google OR-ToolsのCP-SATソルバーを�
 間取り生成結果を表すPydanticモデルで、以下の属性を持ちます：
 
 - `rooms`: 部屋のリスト（RoomLayoutオブジェクト）
-- `site_width`, `site_height`: 敷地の幅と高さ（m）
-- `total_area`: 総面積（m²）
+- `site_width`, `site_height`: 敷地の幅と高さ（mm）
+- `total_area`: 総面積（mm²）
 - `building_coverage_ratio`: 建蔽率
 - `floor_area_ratio`: 容積率
 
@@ -82,7 +82,7 @@ CP-SATソルバーは以下の目標を最適化します：
 ### コマンドラインからの使用
 
 ```bash
-python -m src.cli layout-generate --site-width 15.0 --site-height 12.0 --output-dir output
+python -m src.cli layout-generate --site-width 15000 --site-height 12000 --output-dir output
 ```
 
 ### プログラムからの使用
@@ -91,14 +91,14 @@ python -m src.cli layout-generate --site-width 15.0 --site-height 12.0 --output-
 from src.optimization.cp_sat_solver import generate_3ldk_layout
 
 # 3LDKの間取りを生成
-site_width = 15.0  # 敷地の幅（m）
-site_height = 12.0  # 敷地の高さ（m）
+site_width = 15000  # 敷地の幅（mm）
+site_height = 12000  # 敷地の高さ（mm）
 output_dir = "output"  # 出力ディレクトリ
 
 result = generate_3ldk_layout(site_width, site_height, output_dir)
 
 if result:
-    print(f"間取り生成に成功しました: 総面積 {result.total_area:.1f}m²")
+    print(f"間取り生成に成功しました: 総面積 {result.total_area/1000000:.1f}m²")
 else:
     print("間取り生成に失敗しました")
 ```
@@ -112,27 +112,27 @@ else:
   "rooms": [
     {
       "name": "LDK",
-      "x": 1.0,
-      "y": 1.0,
-      "width": 6.0,
-      "height": 5.0,
-      "area": 30.0,
+      "x": 1000,
+      "y": 1000,
+      "width": 6000,
+      "height": 5000,
+      "area": 30000000,
       "room_type": "living"
     },
     {
       "name": "Bedroom1",
-      "x": 7.0,
-      "y": 1.0,
-      "width": 4.0,
-      "height": 3.0,
-      "area": 12.0,
+      "x": 7000,
+      "y": 1000,
+      "width": 4000,
+      "height": 3000,
+      "area": 12000000,
       "room_type": "bedroom"
     },
     ...
   ],
-  "site_width": 15.0,
-  "site_height": 12.0,
-  "total_area": 80.0,
+  "site_width": 15000,
+  "site_height": 12000,
+  "total_area": 80000000,
   "building_coverage_ratio": 0.44,
   "floor_area_ratio": 0.44
 }
