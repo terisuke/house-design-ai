@@ -276,10 +276,17 @@ def convert_to_pydantic_models(polygons: List[Polygon], graph: nx.Graph,
             
     building = Building(rooms=rooms, walls=walls)
     
-    all_polygons = unary_union([Polygon([(p.x, p.y) for p in room.points]) for room in rooms])
-    boundary_points = []
-    for x, y in all_polygons.exterior.coords[:-1]:
-        boundary_points.append(Point(x=float(x), y=float(y)))
+    # 境界の生成
+    if rooms:
+        all_polygons = unary_union([Polygon([(p.x, p.y) for p in room.points]) for room in rooms])
+        if isinstance(all_polygons, Polygon):
+            boundary_points = [Point(x=float(x), y=float(y)) for x, y in all_polygons.exterior.coords[:-1]]
+        else:
+            # GeometryCollectionの場合、最大のポリゴンを使用
+            max_polygon = max(all_polygons.geoms, key=lambda p: p.area)
+            boundary_points = [Point(x=float(x), y=float(y)) for x, y in max_polygon.exterior.coords[:-1]]
+    else:
+        boundary_points = []
         
     road_access = []
     if road_polygons:
@@ -391,15 +398,19 @@ def serialize_to_json(site: Site, output_path: str) -> bool:
     サイトデータをJSON形式でシリアライズして保存
     
     Args:
-        site: サイトデータを表すPydanticモデル
-        output_path: 出力JSONファイルのパス
+        site: サイトデータ
+        output_path: 出力ファイルのパス
         
     Returns:
-        bool: 保存に成功したかどうか
+        bool: 成功したかどうか
     """
     try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(site.json(indent=2))
+        # Pydantic V2の新しいJSONシリアライズ方法を使用
+        json_data = site.model_dump_json(indent=2)
+        
+        with open(output_path, 'w') as f:
+            f.write(json_data)
+            
         return True
     except Exception as e:
         logger.error(f"JSONの保存に失敗しました: {e}")
