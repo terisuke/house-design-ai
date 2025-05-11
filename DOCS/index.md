@@ -78,6 +78,7 @@ https://streamlit-web-513507930971.asia-northeast1.run.app
 ## 今後の開発計画
 
 - FreeCAD APIの完全実装
+- HouseDiffusionモデルの実装と訓練
 - Vertex AI統合の実装
 - セグメンテーション精度の向上
 - 建築基準法チェック機能の実装
