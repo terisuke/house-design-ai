@@ -57,29 +57,35 @@ terraform apply
 ./scripts/apply_terraform.sh
 ```
 
-### 3. Dockerイメージのビルドとプッシュ
+### 3. FreeCAD APIのビルドとデプロイ
 
-FreeCAD APIとStreamlitアプリケーションのDockerイメージをビルドし、Artifact Registryにプッシュします。
-
-```bash
-# FreeCAD APIのDockerイメージをビルドしてプッシュ
-./scripts/build_and_push_docker.sh freecad-api
-
-# Streamlitアプリケーションのイメージをビルドしてプッシュ
-./scripts/build_and_push_docker.sh streamlit-app
-```
-
-### 4. Cloud Runへのデプロイ
-
-ビルドしたDockerイメージをCloud Runにデプロイします。
+FreeCAD APIのDockerイメージをビルドし、Artifact Registryにプッシュして、Cloud Runにデプロイします。
 
 ```bash
-# FreeCAD APIをデプロイ
-./scripts/deploy_cloud_run.sh freecad-api
-
-# Streamlitアプリケーションをデプロイ
-./scripts/deploy_streamlit.sh
+# FreeCAD APIのDockerイメージをビルド、プッシュ、デプロイ
+./scripts/build_and_push_docker.sh
 ```
+
+このスクリプトは以下の処理を行います：
+- FreeCAD APIのDockerイメージをビルド
+- Artifact Registryにイメージをプッシュ
+- Cloud Runにサービスをデプロイ（メモリ2Gi、CPU 2、タイムアウト3600秒）
+- デプロイ完了後にサービスURLを表示
+
+### 4. Streamlitアプリケーションのビルドとデプロイ
+
+Streamlitアプリケーションのビルドとデプロイには、新しく統合されたスクリプトを使用します。
+
+```bash
+# Streamlitアプリケーションのビルド、プッシュ、デプロイ
+./scripts/build_and_push_streamlit.sh
+```
+
+このスクリプトは以下の処理を行います：
+- Streamlitアプリケーションのイメージをビルド
+- Artifact Registryにイメージをプッシュ
+- Cloud Runにサービスをデプロイ（メモリ1Gi、タイムアウト3600秒）
+- デプロイ完了後にサービスURLを表示
 
 ## 主要なTerraformモジュール
 
@@ -127,24 +133,61 @@ FreeCAD APIとStreamlitアプリケーションは、以下の環境変数を使
 - `PORT`: APIサーバーのポート（デフォルト: 8080）
 - `BUCKET_NAME`: Cloud Storageバケット名（デフォルト: house-design-ai-data）
 - `OUTPUT_DIR`: 一時ファイルの出力ディレクトリ（デフォルト: /tmp）
+- `GOOGLE_APPLICATION_CREDENTIALS`: サービスアカウント認証情報のパス（デフォルト: /app/config/service_account.json）
 
 ### Streamlitアプリケーション
 
-- `FREECAD_API_URL`: FreeCAD APIのURL
+- `FREECAD_API_URL`: FreeCAD APIのURL（デフォルト: https://freecad-api-513507930971.asia-northeast1.run.app）
 - `GOOGLE_APPLICATION_CREDENTIALS`: サービスアカウント認証情報のパス（デフォルト: /app/config/service_account.json）
+- `USE_GCP_DEFAULT_CREDENTIALS`: GCPのデフォルト認証情報を使用するかどうか（デフォルト: true）
+
+## デプロイスクリプトの詳細
+
+### build_and_push_docker.sh（FreeCAD API用）
+
+このスクリプトはFreeCAD APIのビルド、プッシュ、デプロイを行います：
+
+- **ビルド**: Dockerfileを使用してFreeCAD APIのイメージをビルド
+- **プッシュ**: ビルドしたイメージをArtifact Registryにプッシュ
+- **デプロイ**: Cloud Runにサービスをデプロイ（メモリ2Gi、CPU 2）
+
+```bash
+# FreeCAD APIのデプロイ
+./scripts/build_and_push_docker.sh
+```
+
+### build_and_push_streamlit.sh（Streamlitアプリケーション用）
+
+このスクリプトはStreamlitアプリケーションのビルド、プッシュ、デプロイを行います：
+
+- **ビルド**: Dockerfileを使用してStreamlitアプリケーションのイメージをビルド
+- **プッシュ**: ビルドしたイメージをArtifact Registryにプッシュ
+- **デプロイ**: Cloud Runにサービスをデプロイ（メモリ1Gi）
+
+```bash
+# Streamlitアプリケーションのデプロイ
+./scripts/build_and_push_streamlit.sh
+```
 
 ## メモリ割り当ての最適化
 
-FreeCAD APIとStreamlitアプリケーションは、メモリを多く使用するため、適切なメモリ割り当てが重要です。
+FreeCAD APIとStreamlitアプリケーションは、メモリを多く使用するため、適切なメモリ割り当てが重要です。デプロイスクリプトでは以下のメモリ設定を使用しています：
+
+- **FreeCAD API**: 2Gi（CPU: 2）
+- **Streamlitアプリケーション**: 1Gi
+
+メモリ不足エラーが発生した場合は、以下のコマンドでメモリ割り当てを増やすことができます：
 
 ```bash
-# メモリ割り当てを指定してCloud Runにデプロイ
-gcloud run deploy freecad-api \
-  --image asia-northeast1-docker.pkg.dev/your-project-id/house-design-ai/freecad-api:latest \
-  --platform managed \
-  --region asia-northeast1 \
-  --memory 1Gi \
-  --allow-unauthenticated
+# FreeCAD APIのメモリ割り当てを増やす
+gcloud run services update freecad-api \
+  --memory 4Gi \
+  --region asia-northeast1
+
+# Streamlitアプリケーションのメモリ割り当てを増やす
+gcloud run services update house-design-ai-streamlit \
+  --memory 2Gi \
+  --region asia-northeast1
 ```
 
 ## トラブルシューティング
@@ -157,15 +200,13 @@ FreeCAD APIがCloud Storageに接続できない場合は、以下を確認し�
 2. 環境変数`GOOGLE_APPLICATION_CREDENTIALS`が正しく設定されていることを確認
 3. Cloud Storageバケットが存在し、アクセス可能であることを確認
 
-### メモリ不足エラー
+### サービスアカウントキーの問題
 
-メモリ不足エラーが発生した場合は、Cloud Runサービスのメモリ割り当てを増やしてください：
+サービスアカウントキーに関する問題が発生した場合は、以下を確認してください：
 
-```bash
-gcloud run services update freecad-api \
-  --memory 2Gi \
-  --region asia-northeast1
-```
+1. `config/service_account.json`ファイルが存在することを確認
+2. サービスアカウントに必要な権限（Storage Admin、Cloud Run Admin）があることを確認
+3. Dockerイメージ内の正しい場所（`/app/config/service_account.json`）にファイルがコピーされていることを確認
 
 ### デプロイスクリプトのカスタマイズ
 
@@ -176,3 +217,4 @@ gcloud run services update freecad-api \
 - 定期的にDockerイメージを更新して、セキュリティパッチを適用
 - Cloud Runサービスのログを監視して、エラーや問題を特定
 - 使用状況に基づいてリソース割り当てを調整
+- サービスアカウントの権限を定期的に確認し、必要に応じて更新
