@@ -1,11 +1,12 @@
 # House Design AI ドキュメント
 
-## 最終更新日: 2025年5月10日
+## 最終更新日: 2025年5月11日
 
 ## ドキュメント構造
 
 ### [アーキテクチャ](architecture/)
 - [FreeCAD統合ガイド](architecture/freecad_integration.md): FreeCADの統合方法と実装状況
+- [YOLOアノテーション変換システム](architecture/yolo_to_vector_conversion.md): YOLOアノテーションからベクター/グラフJSONへの変換システム
 
 ### [デプロイメント](deployment/)
 - [クラウドデプロイメント計画](deployment/cloud_deployment_plan.md): GCPへのデプロイメント計画
