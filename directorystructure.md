@@ -54,7 +54,12 @@ house-design-ai/
 ├── requirements-dev.txt      # 開発用依存関係
 ├── README.md                 # プロジェクト説明
 ├── directorystructure.md     # ディレクトリ構造
-└── technologystack.md        # 技術スタック
+├── technologystack.md        # 技術スタック
+├── FreeCAD.md                # FreeCAD統合ガイド (直接Python API使用とSTL→glTF変換)
+├── GCP_DEPLOYMENT_GUIDE.md   # GCPデプロイメントガイド
+├── CLOUD_DEPLOYMENT_PLAN.md  # クラウドデプロイメント計画
+├── CONTRIBUTING.md           # 貢献ガイド
+└── ROADMAP.md                # 開発ロードマップ
 ```
 
 ### 配置ルール

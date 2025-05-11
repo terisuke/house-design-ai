@@ -10,8 +10,12 @@ from PIL import Image
 import logging
 import io
 
-# FreeCADのパスを追加
-sys.path.append('/usr/lib/freecad-python3/lib')
+# FreeCADの環境設定をインポート
+from src.utils.setup_freecad import setup_freecad_environment
+
+# FreeCADの環境をセットアップ
+if not setup_freecad_environment():
+    logging.warning("FreeCAD環境のセットアップに失敗しました")
 
 try:
     import FreeCAD
@@ -71,7 +75,9 @@ def create_room(doc, name, x, y, width, height, room_type='L'):
     sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(x, y+height, 0), FreeCAD.Vector(x, y, 0)))
     
     # 部屋オブジェクトを作成
-    room = Arch.makeSpace(sketch, height=0.1, name=name)
+    room = Arch.makeSpace(sketch, name=name)
+    if hasattr(room, "Height"):
+        room.Height = 0.1
     
     # 部屋の色を設定
     color = ROOM_COLORS.get(room_type, ROOM_COLORS['R'])

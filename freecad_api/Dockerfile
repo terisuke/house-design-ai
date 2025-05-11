@@ -1,34 +1,23 @@
-FROM ubuntu:20.04
+FROM python:3.11-slim
 
-# タイムゾーン設定
-ENV TZ=Asia/Tokyo
-ENV PYTHONPATH=/usr/lib/freecad-python3/lib
-
-# システム依存関係のインストール
+# 必要なパッケージをインストール
 RUN apt-get update && apt-get install -y \
-  tzdata \
-  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
-  && echo $TZ > /etc/timezone \
-  && apt-get install -y \
-  software-properties-common \
-  python3-pip \
-  python3-dev \
-  python3-minimal \
-  python3-setuptools \
-  python3-wheel \
   freecad \
-  libgl1-mesa-glx \
-  xserver-xorg-video-all \
   && rm -rf /var/lib/apt/lists/*
 
-# 作業ディレクトリの設定
+# 作業ディレクトリを設定
 WORKDIR /app
 
-# アプリケーションのコピー
+# 必要なPythonパッケージをインストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションのコードをコピー
 COPY . .
 
-# 依存関係のインストール
-RUN pip3 install --no-cache-dir -r requirements.txt
+# 環境変数を設定
+ENV PYTHONPATH=/usr/lib/freecad-python3/lib:$PYTHONPATH
+ENV LD_LIBRARY_PATH=/usr/lib/freecad-python3/lib:$LD_LIBRARY_PATH
 
-# 実行コマンド
-CMD ["python3", "app.py"] 
+# アプリケーションを起動
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"] 

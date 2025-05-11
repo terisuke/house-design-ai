@@ -325,14 +325,14 @@ def send_to_freecad_api(grid_data: Dict[str, Any]) -> Dict[str, Any]:
                 height = room_info.get("height", 0)
                 position = room_info.get("position", [0, 0])
 
-                # 寸法をメートル単位に変換（1グリッド = 0.91m）
-                width_m = width * 0.91
-                height_m = height * 0.91
+                # 寸法をmm単位に変換（1グリッド = 910mm）
+                width_mm = width * 910
+                height_mm = height * 910
 
                 rooms.append(
                     {
                         "id": i,
-                        "dimensions": [width_m, height_m],
+                        "dimensions": [width_mm, height_mm],
                         "position": position,
                         "label": room_name,
                     }
@@ -347,7 +347,7 @@ def send_to_freecad_api(grid_data: Dict[str, Any]) -> Dict[str, Any]:
                         {
                             "start": boundary.get("start", [0, 0]),
                             "end": boundary.get("end", [0, 0]),
-                            "height": 2.5,
+                            "height": 2500,  # 壁の高さ（mm）
                         }
                     )
 

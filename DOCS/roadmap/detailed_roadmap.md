@@ -105,8 +105,9 @@
 
 ### 現在の状態
 - 開始日: 2024-03-27
-- ステータス: 基本機能実装完了、FreeCAD API実装中
-- 完了タスク: 14/30
+- 最終更新日: 2025-05-11
+- ステータス: 基本機能実装完了、YOLOアノテーション変換システム実装完了、FreeCAD API実装中
+- 完了タスク: 15/30
 
 ### 次のアクション
 1. FreeCAD APIの実際の処理実装
@@ -119,6 +120,8 @@
 
 ### 完了した項目
 - ✅ YOLOv11ベースの建物セグメンテーションモデルの開発
+- ✅ YOLOアノテーション→ベクター/グラフJSON変換システムの実装
+- ✅ CP-SAT最小PoCの開発（3LDKの基本レイアウト生成と建築基準法制約の実装）
 - ✅ FreeCAD統合の基本実装
 - ✅ Google Cloud Platform環境の構築
 - ✅ Dockerコンテナ化の実装
@@ -284,13 +287,16 @@
 1. YOLOアノテーション → ベクター/グラフJSON変換システム構築
 2. CP-SAT最小PoCの開発（3LDKの基本レイアウト生成）
 3. FreeCAD APIの完全実装と安定性テスト
-4. HouseDiffusion実装・小規模データセットでの初期トレーニング
-5. クラウド環境のパフォーマンス測定
-6. ユーザーフィードバックの収集
+4. 建築基準法チェック機能の拡張
+5. HouseDiffusion実装・小規模データセットでの初期トレーニング
+6. セグメンテーションモデルの再トレーニング
+7. クラウド環境のパフォーマンス測定
+8. ユーザーフィードバックの収集
+9. ドキュメントの更新
 
 ## 参考リンク
 
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/)                                                                                                
+- [Streamlit Documentation](https://docs.streamlit.io/)

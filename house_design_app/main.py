@@ -5,6 +5,7 @@ House Design AI メインアプリケーション
 
 import streamlit as st
 import sys
+import asyncio
 from pathlib import Path
 
 # プロジェクトルートをPythonパスに追加
@@ -41,6 +42,13 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# イベントループの設定
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
 # 画像アップロードページにリダイレクト
 st.switch_page("pages/1_画像アップロード.py")

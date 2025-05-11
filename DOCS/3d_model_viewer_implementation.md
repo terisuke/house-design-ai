@@ -123,9 +123,39 @@ if st.button("3Dモデルを生成", key="generate_3d_model"):
    - 変換処理のパフォーマンス確認
    - エラーハンドリングの確認
 
+## STLからglTFへの変換
+
+3Dモデルをウェブブラウザで表示するために、STLファイルをglTF形式に変換できます。
+この変換はFreeCAD APIの新しいエンドポイント `/convert/stl-to-gltf` を使用して行われます。
+
+### 変換方法
+
+```python
+# STLファイルをglTFに変換するコード例
+import requests
+import os
+
+def convert_stl_to_gltf(stl_file_path, api_url="https://freecad-api-513507930971.asia-northeast1.run.app"):
+    """STLファイルをglTF形式に変換する"""
+    
+    with open(stl_file_path, 'rb') as f:
+        files = {'file': (os.path.basename(stl_file_path), f, 'application/octet-stream')}
+        response = requests.post(f"{api_url}/convert/stl-to-gltf", files=files)
+    
+    if response.status_code == 200:
+        return response.json()["url"]
+    else:
+        raise Exception(f"Error: {response.json()['error']}")
+```
+
+### 注意点
+
+- glTF形式はウェブブラウザでのレンダリングに最適化されています
+- 変換後のURLはCloud Storageの一時URLであり、有効期限があります
+
 ## 注意点
 - FreeCADのPython APIの依存関係の管理
 - 一時ファイルの適切な削除
 - エラーハンドリングの徹底
 - パフォーマンスの最適化（特に大きなモデルの変換時）
-- セキュリティ考慮（ファイルサイズ制限、認証など） 
+- セキュリティ考慮（ファイルサイズ制限、認証など）  
