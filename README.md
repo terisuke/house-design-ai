@@ -11,6 +11,7 @@ House Design AIは、建物のセグメンテーションとグリッド生成�
 - 建物と道路の検出・セグメンテーション
 - 住居と道路の関係性を考慮した建物解析
 - 建物領域への規則的なグリッド適用
+- YOLOアノテーションからベクター/グラフJSONへの変換
 - Vertex AIでのモデルトレーニング
 - Streamlitベースの直感的なUIの提供
 - FreeCAD APIによる3Dモデル生成
@@ -64,7 +65,7 @@ house-design-ai/
 ├── scripts/                  # ユーティリティスクリプト
 ├── src/                      # ソースコード
 │   ├── cloud/                # クラウド連携 (Vertex AI)
-│   ├── processing/           # 画像処理ロジック
+│   ├── processing/           # 画像処理ロジック、YOLOアノテーション変換
 │   ├── utils/                # ユーティリティ関数
 │   ├── visualization/        # 可視化ツール
 │   ├── cli.py                # コマンドラインインターフェース
@@ -220,6 +221,7 @@ terraform apply
 - ✅ 環境セットアップ
 - ✅ コア機能開発
 - ✅ FreeCAD統合
+- ✅ YOLOアノテーション→ベクター/グラフJSON変換システム
 - ✅ クラウドデプロイメント
 
 ### 進行中の機能
