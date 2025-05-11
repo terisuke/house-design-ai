@@ -63,7 +63,7 @@ FreeCAD APIのDockerイメージをビルドし、Artifact Registryにプッシ�
 
 ```bash
 # FreeCAD APIのDockerイメージをビルド、プッシュ、デプロイ
-./scripts/build_and_push_docker.sh
+./scripts/build_and_push_fastapi.sh
 ```
 
 このスクリプトは以下の処理を行います：
@@ -143,7 +143,7 @@ FreeCAD APIとStreamlitアプリケーションは、以下の環境変数を使
 
 ## デプロイスクリプトの詳細
 
-### build_and_push_docker.sh（FreeCAD API用）
+### build_and_push_fastapi.sh（FreeCAD API用）
 
 このスクリプトはFreeCAD APIのビルド、プッシュ、デプロイを行います：
 
@@ -153,7 +153,7 @@ FreeCAD APIとStreamlitアプリケーションは、以下の環境変数を使
 
 ```bash
 # FreeCAD APIのデプロイ
-./scripts/build_and_push_docker.sh
+./scripts/build_and_push_fastapi.sh
 ```
 
 ### build_and_push_streamlit.sh（Streamlitアプリケーション用）
