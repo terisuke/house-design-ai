@@ -21,6 +21,9 @@ black==23.12.1
 ipython==8.12.3
 pydantic==2.5.3
 
+# 最適化関連の依存関係
+ortools>=9.12.0
+
 setuptools>=65.5.0
 wheel
 
