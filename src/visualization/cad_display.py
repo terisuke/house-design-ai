@@ -11,27 +11,44 @@ from PIL import Image
 import io
 import logging
 import base64
+import requests
 
 # FreeCADの環境設定をインポート
 from src.utils.setup_freecad import setup_freecad_environment
 
-# FreeCADの環境をセットアップ
-if not setup_freecad_environment():
-    logging.warning("FreeCAD環境のセットアップに失敗しました")
-
-# FreeCADの利用可能性をチェック
-try:
-    import FreeCAD
-    import Part
-    import Draft
-    import Sketcher
-    import Arch
-    FREECAD_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"FreeCADのインポートに失敗しました: {e}")
-    FREECAD_AVAILABLE = False
+# FreeCAD APIの設定
+FREECAD_API_URL = os.getenv(
+    "FREECAD_API_URL", "https://freecad-api-513507930971.asia-northeast1.run.app"
+)
 
 logger = logging.getLogger(__name__)
+
+def create_cad_display(grid_data):
+    """CAD風の表示を作成する関数
+    
+    Args:
+        grid_data (dict): グリッドデータ
+        
+    Returns:
+        dict: 表示データ
+    """
+    try:
+        # FreeCAD APIにリクエストを送信
+        response = requests.post(
+            f"{FREECAD_API_URL}/process/grid",
+            json=grid_data,
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"FreeCAD APIエラー: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"CAD表示の作成中にエラーが発生しました: {e}")
+        return None
 
 def display_cad_floorplan(floorplan_image, floorplan_stats, show_dimensions=True, show_furniture=True):
     """
@@ -68,206 +85,29 @@ def display_cad_floorplan(floorplan_image, floorplan_stats, show_dimensions=True
         df = pd.DataFrame(room_data)
         st.dataframe(df)
     
-    # 3Dビューの表示（FreeCADが利用可能な場合）
-    if FREECAD_AVAILABLE and show_furniture:
+    # 3Dビューの表示
+    if show_furniture:
         st.subheader("3D間取りビュー")
         
         try:
-            # 一時的なFreeCADドキュメントを作成
-            doc = create_temp_3d_floorplan(floorplan_stats)
+            # FreeCAD APIを使用して3Dモデルを生成
+            response = requests.post(
+                f"{FREECAD_API_URL}/process/grid",
+                json=floorplan_stats,
+                timeout=60
+            )
             
-            if doc:
-                # 3Dビューを画像として保存
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                    tmp_path = tmp.name
+            if response.status_code == 200:
+                model_data = response.json()
+                if "model_url" in model_data:
+                    st.image(model_data["model_url"], caption="3D間取りビュー", use_column_width=True)
+                else:
+                    st.warning("3DモデルのURLが見つかりませんでした")
+            else:
+                st.warning(f"3Dモデルの生成に失敗しました: {response.status_code}")
                 
-                # ビューを設定して3D図を作成
-                FreeCAD.Gui.ActiveDocument = FreeCAD.getDocument(doc.Name)
-                FreeCAD.Gui.ActiveDocument.ActiveView.viewIsometric()
-                FreeCAD.Gui.ActiveDocument.ActiveView.fitAll()
-                
-                # 画像として保存
-                FreeCAD.Gui.ActiveDocument.ActiveView.saveImage(tmp_path, 800, 600, 'White')
-                
-                # 画像を表示
-                st.image(tmp_path, caption="3D間取りビュー", use_column_width=True)
-                
-                # 一時ファイルを削除
-                os.unlink(tmp_path)
         except Exception as e:
             st.warning(f"3Dビューの生成に失敗しました: {e}")
-
-def create_temp_3d_floorplan(floorplan_stats):
-    """一時的な3D間取り図を作成"""
-    if not FREECAD_AVAILABLE:
-        return None
-    
-    try:
-        # FreeCADドキュメントを作成
-        doc = FreeCAD.newDocument("TempFloorPlan")
-        
-        # 部屋情報を取得
-        madori_info = floorplan_stats.get("madori_info", {})
-        positions = floorplan_stats.get("positions", {})
-        
-        # 壁の高さ
-        wall_height = 2500  # mm
-        
-        # 各部屋を作成
-        for name, info in madori_info.items():
-            width = info.get("width", 0) * 910  # mm
-            height = info.get("height", 0) * 910  # mm
-            
-            # 部屋の位置を取得
-            pos = positions.get(name, (0, 0))
-            x = pos[0] * 910
-            y = pos[1] * 910
-            
-            # 部屋の床を作成
-            floor = doc.addObject("Part::Box", f"Floor_{name}")
-            floor.Length = width
-            floor.Width = height
-            floor.Height = 100  # 床の厚さ
-            floor.Placement = FreeCAD.Placement(
-                FreeCAD.Vector(x, y, 0),
-                FreeCAD.Rotation(0, 0, 0, 1)
-            )
-            
-            # 部屋の壁を作成
-            # 前壁
-            front_wall = doc.addObject("Part::Box", f"FrontWall_{name}")
-            front_wall.Length = width
-            front_wall.Width = 100  # 壁の厚さ
-            front_wall.Height = wall_height
-            front_wall.Placement = FreeCAD.Placement(
-                FreeCAD.Vector(x, y, 0),
-                FreeCAD.Rotation(0, 0, 0, 1)
-            )
-            
-            # 後壁
-            back_wall = doc.addObject("Part::Box", f"BackWall_{name}")
-            back_wall.Length = width
-            back_wall.Width = 100
-            back_wall.Height = wall_height
-            back_wall.Placement = FreeCAD.Placement(
-                FreeCAD.Vector(x, y + height - 100, 0),
-                FreeCAD.Rotation(0, 0, 0, 1)
-            )
-            
-            # 左壁
-            left_wall = doc.addObject("Part::Box", f"LeftWall_{name}")
-            left_wall.Length = 100
-            left_wall.Width = height
-            left_wall.Height = wall_height
-            left_wall.Placement = FreeCAD.Placement(
-                FreeCAD.Vector(x, y, 0),
-                FreeCAD.Rotation(0, 0, 0, 1)
-            )
-            
-            # 右壁
-            right_wall = doc.addObject("Part::Box", f"RightWall_{name}")
-            right_wall.Length = 100
-            right_wall.Width = height
-            right_wall.Height = wall_height
-            right_wall.Placement = FreeCAD.Placement(
-                FreeCAD.Vector(x + width - 100, y, 0),
-                FreeCAD.Rotation(0, 0, 0, 1)
-            )
-            
-            # 部屋タイプに応じた家具を追加
-            if name == 'E':  # 玄関
-                # 玄関ドア
-                door_width = min(width * 0.4, 910)
-                door_x = x + width - door_width
-                door_y = y
-                door = doc.addObject("Part::Box", f"Door_{name}")
-                door.Length = door_width
-                door.Width = 100
-                door.Height = 2100  # ドアの高さ
-                door.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(door_x, door_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-                
-            elif name == 'L':  # リビング
-                # ソファ
-                sofa_width = width * 0.6
-                sofa_height = height * 0.2
-                sofa_x = x + (width - sofa_width) / 2
-                sofa_y = y + height * 0.1
-                sofa = doc.addObject("Part::Box", f"Sofa_{name}")
-                sofa.Length = sofa_width
-                sofa.Width = sofa_height
-                sofa.Height = 800  # ソファの高さ
-                sofa.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(sofa_x, sofa_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-                
-                # テーブル
-                table_size = min(width, height) * 0.3
-                table_x = x + (width - table_size) / 2
-                table_y = y + height * 0.4
-                table = doc.addObject("Part::Box", f"Table_{name}")
-                table.Length = table_size
-                table.Width = table_size
-                table.Height = 400  # テーブルの高さ
-                table.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(table_x, table_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-                
-            elif name == 'K':  # キッチン
-                # キッチンカウンター
-                counter_width = width * 0.8
-                counter_height = height * 0.3
-                counter_x = x + (width - counter_width) / 2
-                counter_y = y + height * 0.6
-                counter = doc.addObject("Part::Box", f"Counter_{name}")
-                counter.Length = counter_width
-                counter.Width = counter_height
-                counter.Height = 850  # カウンターの高さ
-                counter.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(counter_x, counter_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-                
-            elif name == 'B':  # バスルーム
-                # 浴槽
-                bath_width = width * 0.7
-                bath_height = height * 0.6
-                bath_x = x + (width - bath_width) / 2
-                bath_y = y + (height - bath_height) / 2
-                bath = doc.addObject("Part::Box", f"Bath_{name}")
-                bath.Length = bath_width
-                bath.Width = bath_height
-                bath.Height = 600  # 浴槽の高さ
-                bath.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(bath_x, bath_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-                
-            elif name == 'T':  # トイレ
-                # トイレ
-                toilet_size = min(width, height) * 0.4
-                toilet_x = x + (width - toilet_size) / 2
-                toilet_y = y + height * 0.6
-                toilet = doc.addObject("Part::Box", f"Toilet_{name}")
-                toilet.Length = toilet_size
-                toilet.Width = toilet_size
-                toilet.Height = 400  # トイレの高さ
-                toilet.Placement = FreeCAD.Placement(
-                    FreeCAD.Vector(toilet_x, toilet_y, 0),
-                    FreeCAD.Rotation(0, 0, 0, 1)
-                )
-        
-        # ドキュメントを更新
-        doc.recompute()
-        return doc
-        
-    except Exception as e:
-        logger.error(f"3D間取り図の作成に失敗しました: {e}")
-        return None
 
 def display_floorplan_details(floorplan_stats):
     """間取り図の詳細情報を表示"""
@@ -311,59 +151,36 @@ def display_floorplan_details(floorplan_stats):
 
 def export_floorplan_to_dxf(floorplan_stats):
     """間取り図をDXF形式でエクスポート"""
-    if not FREECAD_AVAILABLE:
-        st.warning("FreeCADが利用できないため、DXFエクスポートができません。")
-        return None
-    
     try:
-        # FreeCADドキュメントを作成
-        doc = FreeCAD.newDocument("ExportFloorPlan")
+        # FreeCAD APIを使用してDXFを生成
+        response = requests.post(
+            f"{FREECAD_API_URL}/process/drawing",
+            json={
+                "grid_data": floorplan_stats,
+                "drawing_type": "平面図",
+                "scale": "1:100"
+            },
+            timeout=60
+        )
         
-        # 部屋情報を取得
-        madori_info = floorplan_stats.get("madori_info", {})
-        positions = floorplan_stats.get("positions", {})
+        if response.status_code == 200:
+            data = response.json()
+            if "file_url" in data:
+                # DXFファイルをダウンロード
+                dxf_response = requests.get(data["file_url"])
+                if dxf_response.status_code == 200:
+                    return dxf_response.content
+                else:
+                    logger.error(f"DXFファイルのダウンロードに失敗しました: {dxf_response.status_code}")
+            else:
+                logger.error("DXFファイルのURLが見つかりませんでした")
+        else:
+            logger.error(f"DXFの生成に失敗しました: {response.status_code}")
         
-        # 各部屋を作成
-        for name, info in madori_info.items():
-            width = info.get("width", 0) * 910  # mm
-            height = info.get("height", 0) * 910  # mm
-            
-            # 部屋の位置を取得
-            pos = positions.get(name, (0, 0))
-            x = pos[0] * 910
-            y = pos[1] * 910
-            
-            # 部屋の輪郭を作成
-            sketch = doc.addObject('Sketcher::SketchObject', f'Sketch_{name}')
-            sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(x, y, 0), FreeCAD.Vector(x+width, y, 0)))
-            sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(x+width, y, 0), FreeCAD.Vector(x+width, y+height, 0)))
-            sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(x+width, y+height, 0), FreeCAD.Vector(x, y+height, 0)))
-            sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(x, y+height, 0), FreeCAD.Vector(x, y, 0)))
-            
-            # 部屋名をテキストとして追加
-            label = Draft.makeText([name], FreeCAD.Vector(x + width/2, y + height/2, 0))
-        
-        # ドキュメントを更新
-        doc.recompute()
-        
-        # DXFとしてエクスポート
-        with tempfile.NamedTemporaryFile(suffix='.dxf', delete=False) as tmp:
-            dxf_path = tmp.name
-        
-        import importDXF
-        importDXF.export([obj for obj in doc.Objects], dxf_path)
-        
-        # DXFファイルを読み込み
-        with open(dxf_path, 'rb') as f:
-            dxf_data = f.read()
-        
-        # 一時ファイルを削除
-        os.unlink(dxf_path)
-        
-        return dxf_data
+        return None
         
     except Exception as e:
-        st.error(f"DXFエクスポートに失敗しました: {e}")
+        logger.error(f"DXFエクスポートに失敗しました: {e}")
         return None
 
 def display_download_options(floorplan_image, floorplan_stats):
@@ -388,13 +205,12 @@ def display_download_options(floorplan_image, floorplan_stats):
         mime="image/png"
     )
     
-    # DXF形式でダウンロード（FreeCADが利用可能な場合）
-    if FREECAD_AVAILABLE:
-        dxf_data = export_floorplan_to_dxf(floorplan_stats)
-        if dxf_data:
-            st.download_button(
-                label="DXF形式でダウンロード（CADソフト用）",
-                data=dxf_data,
-                file_name="floorplan.dxf",
-                mime="application/dxf"
-            )
+    # DXF形式でダウンロード
+    dxf_data = export_floorplan_to_dxf(floorplan_stats)
+    if dxf_data:
+        st.download_button(
+            label="DXF形式でダウンロード（CADソフト用）",
+            data=dxf_data,
+            file_name="floorplan.dxf",
+            mime="application/dxf"
+        )
