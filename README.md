@@ -97,6 +97,14 @@ house-design-ai/
 - Docker (オプション)
 - Google Cloud SDK (オプション)
 
+#### WSL環境での注意点
+
+WSL (Windows Subsystem for Linux) 環境で開発する場合、以下の点に注意してください：
+
+- パスの問題：WSLとWindowsのパス構造の違いにより、一部のファイルパスが正しく解決されない場合があります。
+- 権限の問題：Windowsファイルシステム上のファイルに対する権限が正しく設定されていない場合があります。
+- 環境変数：`PYTHONPATH`の設定が必要な場合があります。常に`PYTHONPATH=$PYTHONPATH:.`を設定してから実行してください。
+
 ### インストール
 
 1. リポジトリのクローン:
@@ -118,10 +126,27 @@ source venv/bin/activate  # Linuxの場合
 pip install -r requirements.txt
 ```
 
-4. 開発用依存関係のインストール（開発者の場合）:
+### 依存関係の競合について
+
+本プロジェクトでは、ortoolsとその他のパッケージ間でprotobufのバージョン要求に競合があります：
+- ortools: protobuf >=5.26.1,<5.27 を要求
+- その他のパッケージ（streamlit, google-cloud等）: protobuf 4.x系を要求
+
+この競合を解決するため、以下の方法で仮想環境を分離することを推奨します：
+
 ```bash
-pip install -r requirements-dev.txt
+# メイン環境（streamlit, YOLOなど用）
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# ortools用の分離環境
+python -m venv venv_ortools
+source venv_ortools/bin/activate
+pip install ortools>=9.12.0
 ```
+
+最適化機能（CP-SAT）を使用する場合は、venv_ortools環境を使用してください。
 
 ## 使用方法
 
@@ -135,7 +160,7 @@ PYTHONPATH=$PYTHONPATH:. streamlit run house_design_app/main.py
 
 2. モデルのトレーニング:
 ```bash
-python src/train.py --config config/train_config.yaml
+python src/train.py --data_yaml config/data.yaml
 ```
 
 3. 推論の実行:
