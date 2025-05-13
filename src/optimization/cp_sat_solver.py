@@ -60,6 +60,7 @@ class BuildingConstraints:
         wall_thickness: 壁の厚さ（mm）
         first_floor_height: 1階の高さ（mm）
         second_floor_height: 2階の高さ（mm）
+        grid_size: グリッドサイズ（mm）
     """
     def __init__(self):
         self.min_room_size = 4500  # 居室の最小面積（mm²）
@@ -69,6 +70,7 @@ class BuildingConstraints:
         self.wall_thickness = 120  # 壁の厚さ（mm）
         self.first_floor_height = 2900  # 1階の高さ（mm）
         self.second_floor_height = 2800  # 2階の高さ（mm）
+        self.grid_size = 910  # グリッドサイズ（mm）
         
         self.building_coverage_ratio = 0.6  # 建蔽率（敷地面積に対する建築面積の割合）
         self.floor_area_ratio = 2.0  # 容積率（敷地面積に対する延床面積の割合）
@@ -139,14 +141,23 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
             "Corridor": Room("Corridor", 2.0, 3.0),  # 廊下
         }
     
+    grid_size_scaled = int(constraints.grid_size / 10)  # mmからcmへ変換
+    
     for room_name, room in rooms.items():
         room.x = model.NewIntVar(0, site_width_scaled, f"{room_name}_x")
+        model.AddModuloEquality(0, room.x, grid_size_scaled)
+        
         room.y = model.NewIntVar(0, site_height_scaled, f"{room_name}_y")
+        model.AddModuloEquality(0, room.y, grid_size_scaled)
         
         min_dim = int(np.sqrt(room.min_area * SCALE * SCALE / room.preferred_ratio))
+        min_dim = ((min_dim + grid_size_scaled - 1) // grid_size_scaled) * grid_size_scaled
         
         room.width = model.NewIntVar(min_dim, site_width_scaled, f"{room_name}_width")
+        model.AddModuloEquality(0, room.width, grid_size_scaled)
+        
         room.height = model.NewIntVar(min_dim, site_height_scaled, f"{room_name}_height")
+        model.AddModuloEquality(0, room.height, grid_size_scaled)
         
         room.area = model.NewIntVar(
             int(room.min_area * SCALE * SCALE),
