@@ -97,6 +97,14 @@ house-design-ai/
 - Docker (オプション)
 - Google Cloud SDK (オプション)
 
+#### WSL環境での注意点
+
+WSL (Windows Subsystem for Linux) 環境で開発する場合、以下の点に注意してください：
+
+- パスの問題：WSLとWindowsのパス構造の違いにより、一部のファイルパスが正しく解決されない場合があります。
+- 権限の問題：Windowsファイルシステム上のファイルに対する権限が正しく設定されていない場合があります。
+- 環境変数：`PYTHONPATH`の設定が必要な場合があります。常に`PYTHONPATH=$PYTHONPATH:.`を設定してから実行してください。
+
 ### インストール
 
 1. リポジトリのクローン:
@@ -123,6 +131,8 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
+注意: requirements.txtには既に一部の開発用依存関係（pytest、ruff、black）が含まれています。開発環境のセットアップに問題がある場合は、requirements.txtのみをインストールしても基本的な開発作業は可能です。
+
 ## 使用方法
 
 ### ローカル開発
@@ -135,7 +145,7 @@ PYTHONPATH=$PYTHONPATH:. streamlit run house_design_app/main.py
 
 2. モデルのトレーニング:
 ```bash
-python src/train.py --config config/train_config.yaml
+python src/train.py --data_yaml config/data.yaml
 ```
 
 3. 推論の実行:
