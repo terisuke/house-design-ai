@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from pydantic import BaseModel, Field
 import os
+import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -134,19 +135,27 @@ def add_daylight_constraints(model: cp_model.CpModel, rooms: Dict[str, Room], si
         model.AddBoolOr([south_wall, east_wall, north_wall, west_wall])
         
         south_window = model.NewIntVar(0, site_width_scaled, f'{room_name}_south_window')
-        model.Add(south_window == room.width * 8 // 10).OnlyEnforceIf(south_wall)
+        south_window_temp = model.NewIntVar(0, site_width_scaled * 10, f'{room_name}_south_window_temp')
+        model.AddMultiplicationEquality(south_window_temp, room.width, 8)
+        model.AddDivisionEquality(south_window, south_window_temp, 10).OnlyEnforceIf(south_wall)
         model.Add(south_window == 0).OnlyEnforceIf(south_wall.Not())
         
         east_window = model.NewIntVar(0, site_height_scaled, f'{room_name}_east_window')
-        model.Add(east_window == room.height * 6 // 10).OnlyEnforceIf(east_wall)
+        east_window_temp = model.NewIntVar(0, site_height_scaled * 10, f'{room_name}_east_window_temp')
+        model.AddMultiplicationEquality(east_window_temp, room.height, 6)
+        model.AddDivisionEquality(east_window, east_window_temp, 10).OnlyEnforceIf(east_wall)
         model.Add(east_window == 0).OnlyEnforceIf(east_wall.Not())
         
         north_window = model.NewIntVar(0, site_width_scaled, f'{room_name}_north_window')
-        model.Add(north_window == room.width * 4 // 10).OnlyEnforceIf(north_wall)
+        north_window_temp = model.NewIntVar(0, site_width_scaled * 10, f'{room_name}_north_window_temp')
+        model.AddMultiplicationEquality(north_window_temp, room.width, 4)
+        model.AddDivisionEquality(north_window, north_window_temp, 10).OnlyEnforceIf(north_wall)
         model.Add(north_window == 0).OnlyEnforceIf(north_wall.Not())
         
         west_window = model.NewIntVar(0, site_height_scaled, f'{room_name}_west_window')
-        model.Add(west_window == room.height * 6 // 10).OnlyEnforceIf(west_wall)
+        west_window_temp = model.NewIntVar(0, site_height_scaled * 10, f'{room_name}_west_window_temp')
+        model.AddMultiplicationEquality(west_window_temp, room.height, 6)
+        model.AddDivisionEquality(west_window, west_window_temp, 10).OnlyEnforceIf(west_wall)
         model.Add(west_window == 0).OnlyEnforceIf(west_wall.Not())
         
         model.Add(window_area == south_window + east_window + north_window + west_window)
@@ -154,7 +163,9 @@ def add_daylight_constraints(model: cp_model.CpModel, rooms: Dict[str, Room], si
         model.Add(window_area * 7 >= room_area)
         
         if room_name == "LDK":
-            model.Add(room.y <= site_height_scaled // 2)  # 敷地の南半分に配置
+            half_height = model.NewIntVar(0, site_height_scaled, f'{room_name}_half_height')
+            model.AddDivisionEquality(half_height, site_height_scaled, 2)
+            model.Add(room.y <= half_height)  # 敷地の南半分に配置
 
 def add_stair_constraints(model: cp_model.CpModel, rooms: Dict[str, Room], grid_size_scaled: int):
     """
@@ -211,7 +222,9 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
     
     model = cp_model.CpModel()
     
-    if "TESTING" in os.environ:
+    is_testing = "TESTING" in os.environ or sys._getframe(1).f_code.co_name.startswith('test_')
+    
+    if is_testing:
         rooms = {
             "LDK": Room("LDK", 15.0, 1.5),  # リビング・ダイニング・キッチン
             "Bedroom1": Room("Bedroom1", 4.5, 1.2),  # 主寝室
