@@ -126,12 +126,27 @@ source venv/bin/activate  # Linuxの場合
 pip install -r requirements.txt
 ```
 
-4. 開発用依存関係のインストール（開発者の場合）:
+### 依存関係の競合について
+
+本プロジェクトでは、ortoolsとその他のパッケージ間でprotobufのバージョン要求に競合があります：
+- ortools: protobuf >=5.26.1,<5.27 を要求
+- その他のパッケージ（streamlit, google-cloud等）: protobuf 4.x系を要求
+
+この競合を解決するため、以下の方法で仮想環境を分離することを推奨します：
+
 ```bash
-pip install -r requirements-dev.txt
+# メイン環境（streamlit, YOLOなど用）
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# ortools用の分離環境
+python -m venv venv_ortools
+source venv_ortools/bin/activate
+pip install ortools>=9.12.0
 ```
 
-注意: requirements.txtには既に一部の開発用依存関係（pytest、ruff、black）が含まれています。開発環境のセットアップに問題がある場合は、requirements.txtのみをインストールしても基本的な開発作業は可能です。
+最適化機能（CP-SAT）を使用する場合は、venv_ortools環境を使用してください。
 
 ## 使用方法
 
