@@ -63,7 +63,7 @@ class BuildingConstraints:
         grid_size: グリッドサイズ（mm）
     """
     def __init__(self):
-        self.min_room_size = 4500  # 居室の最小面積（mm²）
+        self.min_room_size = 4.5  # 居室の最小面積（m²）
         self.min_ceiling_height = 2100  # 最小天井高（mm）
         self.min_corridor_width = 780  # 最小廊下幅（mm）
         self.min_door_width = 750  # 最小ドア幅（mm）
