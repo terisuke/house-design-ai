@@ -98,6 +98,97 @@ class LayoutResult(BaseModel):
     building_coverage_ratio: float
     floor_area_ratio: float
 
+def add_daylight_constraints(model: cp_model.CpModel, rooms: Dict[str, Room], site_width_scaled: int, site_height_scaled: int):
+    """
+    採光条件に関する制約を追加
+    建築基準法では、居室の窓面積は床面積の1/7以上が必要
+    
+    Args:
+        model: CP-SATモデル
+        rooms: 部屋の辞書
+        site_width_scaled: 敷地幅（スケール済み）
+        site_height_scaled: 敷地高さ（スケール済み）
+    """
+    living_rooms = ["LDK", "Bedroom1", "Bedroom2"]
+    
+    for room_name in living_rooms:
+        if room_name not in rooms:
+            continue
+            
+        room = rooms[room_name]
+        
+        room_area = room.area
+        
+        window_area = model.NewIntVar(0, site_width_scaled * site_height_scaled, f'{room_name}_window_area')
+        
+        south_wall = model.NewBoolVar(f'{room_name}_south_wall')  # 南壁が外気に面する
+        east_wall = model.NewBoolVar(f'{room_name}_east_wall')    # 東壁が外気に面する
+        north_wall = model.NewBoolVar(f'{room_name}_north_wall')  # 北壁が外気に面する
+        west_wall = model.NewBoolVar(f'{room_name}_west_wall')    # 西壁が外気に面する
+        
+        model.Add(room.y == 0).OnlyEnforceIf(south_wall)                     # 南端
+        model.Add(room.x + room.width == site_width_scaled).OnlyEnforceIf(east_wall) # 東端
+        model.Add(room.y + room.height == site_height_scaled).OnlyEnforceIf(north_wall) # 北端
+        model.Add(room.x == 0).OnlyEnforceIf(west_wall)                      # 西端
+        
+        model.AddBoolOr([south_wall, east_wall, north_wall, west_wall])
+        
+        south_window = model.NewIntVar(0, site_width_scaled, f'{room_name}_south_window')
+        model.Add(south_window == room.width * 8 // 10).OnlyEnforceIf(south_wall)
+        model.Add(south_window == 0).OnlyEnforceIf(south_wall.Not())
+        
+        east_window = model.NewIntVar(0, site_height_scaled, f'{room_name}_east_window')
+        model.Add(east_window == room.height * 6 // 10).OnlyEnforceIf(east_wall)
+        model.Add(east_window == 0).OnlyEnforceIf(east_wall.Not())
+        
+        north_window = model.NewIntVar(0, site_width_scaled, f'{room_name}_north_window')
+        model.Add(north_window == room.width * 4 // 10).OnlyEnforceIf(north_wall)
+        model.Add(north_window == 0).OnlyEnforceIf(north_wall.Not())
+        
+        west_window = model.NewIntVar(0, site_height_scaled, f'{room_name}_west_window')
+        model.Add(west_window == room.height * 6 // 10).OnlyEnforceIf(west_wall)
+        model.Add(west_window == 0).OnlyEnforceIf(west_wall.Not())
+        
+        model.Add(window_area == south_window + east_window + north_window + west_window)
+        
+        model.Add(window_area * 7 >= room_area)
+        
+        if room_name == "LDK":
+            model.Add(room.y <= site_height_scaled // 2)  # 敷地の南半分に配置
+
+def add_stair_constraints(model: cp_model.CpModel, rooms: Dict[str, Room], grid_size_scaled: int):
+    """
+    階段寸法に関する制約を追加
+    
+    Args:
+        model: CP-SATモデル
+        rooms: 部屋の辞書
+        grid_size_scaled: グリッドサイズ(スケール済み)
+    """
+    if "Stair" not in rooms:
+        return
+    
+    stair = rooms["Stair"]
+    
+    min_width_grids = (75 + grid_size_scaled - 1) // grid_size_scaled  # 切り上げ除算
+    model.Add(stair.width >= min_width_grids * grid_size_scaled)
+    
+    min_depth_grids = (288 + grid_size_scaled - 1) // grid_size_scaled
+    model.Add(stair.height >= min_depth_grids * grid_size_scaled)
+    
+    min_area = min_width_grids * min_depth_grids * grid_size_scaled * grid_size_scaled
+    model.Add(stair.area >= min_area)
+    
+    if "Stair_1F" in rooms and "Stair_2F" in rooms:
+        stair_1f = rooms["Stair_1F"]
+        stair_2f = rooms["Stair_2F"]
+        
+        model.Add(stair_1f.x == stair_2f.x)
+        model.Add(stair_1f.y == stair_2f.y)
+        
+        model.Add(stair_1f.width == stair_2f.width)
+        model.Add(stair_1f.height == stair_2f.height)
+
 def create_3ldk_model(site_width: float, site_height: float, constraints: Optional[BuildingConstraints] = None) -> Tuple[cp_model.CpModel, Dict[str, Room], cp_model.CpSolver]:
     """
     3LDKの間取りを生成するためのCP-SATモデルを構築
@@ -139,6 +230,7 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
             "Bathroom": Room("Bathroom", 3.0, 1.0),  # 浴室
             "Toilet": Room("Toilet", 1.5, 1.0),  # トイレ
             "Corridor": Room("Corridor", 2.0, 3.0),  # 廊下
+            "Stair": Room("Stair", 3.0, 1.0),  # 階段
         }
     
     grid_size_scaled = int(constraints.grid_size * 100)  # mからcmへ変換
@@ -195,6 +287,13 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
         add_adjacency_constraint(model, rooms["Corridor"], rooms["Bathroom"], "adjacent")
         add_adjacency_constraint(model, rooms["Corridor"], rooms["Toilet"], "adjacent")
         add_adjacency_constraint(model, rooms["Corridor"], rooms["LDK"], "adjacent")
+        if "Stair" in rooms:
+            add_adjacency_constraint(model, rooms["Corridor"], rooms["Stair"], "adjacent")
+    
+    add_daylight_constraints(model, rooms, site_width_scaled, site_height_scaled)
+    
+    if "Stair" in rooms:
+        add_stair_constraints(model, rooms, grid_size_scaled)
     
     total_area = model.NewIntVar(0, site_width_scaled * site_height_scaled, "total_area")
     area_vars = [room.area for room in rooms.values()]
@@ -226,6 +325,11 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
         model.AddAbsEquality(ratio_diff, width_minus_target)
         
         objective_terms.append(-ratio_diff)
+    
+    if "LDK" in rooms:
+        ldk_y_penalty = model.NewIntVar(0, site_height_scaled, "ldk_y_penalty")
+        model.Add(ldk_y_penalty == rooms["LDK"].y)
+        objective_terms.append(-ldk_y_penalty * 2)  # 南側配置の重みを2倍に
     
     model.Maximize(sum(objective_terms))
     
