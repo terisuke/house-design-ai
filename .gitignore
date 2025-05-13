@@ -33,6 +33,7 @@ htmlcov/
 .env
 .venv
 venv/
+venv_ortools/
 ENV/
 .python-version
 

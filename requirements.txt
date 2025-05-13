@@ -9,10 +9,14 @@ matplotlib==3.7.5
 pillow==10.2.0
 requests==2.31.0
 
-protobuf==4.25.1
+protobuf==4.21.6
 google-api-core==2.17.0
+googleapis-common-protos==1.70.0
+grpcio==1.62.1
+grpcio-status==1.62.1
 google-auth==2.26.1
 google-auth-oauthlib==1.2.0
+proto-plus==1.26.1
 
 pytest==7.4.3
 ruff==0.1.14
@@ -22,7 +26,7 @@ ipython==8.12.3
 pydantic==2.5.3
 
 # 最適化関連の依存関係
-ortools>=9.12.0
+ortools==9.7.2996
 
 setuptools>=65.5.0
 wheel
