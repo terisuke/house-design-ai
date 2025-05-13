@@ -141,7 +141,7 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
             "Corridor": Room("Corridor", 2.0, 3.0),  # 廊下
         }
     
-    grid_size_scaled = int(constraints.grid_size / 10)  # mmからcmへ変換
+    grid_size_scaled = int(constraints.grid_size * 100)  # mからcmへ変換
     
     for room_name, room in rooms.items():
         room.x = model.NewIntVar(0, site_width_scaled, f"{room_name}_x")
