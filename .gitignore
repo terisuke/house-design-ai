@@ -130,6 +130,9 @@ freecad_api/temp/
 freecad_api/output/
 freecad_api/cache/
 freecad_api/logs/
+house_design_app/src/
+house_design_app/.streamlit/
+house_design_app/config/
 
 # 一時ファイル
 *.tmp

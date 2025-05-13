@@ -4,7 +4,7 @@ PROJECT_ID="yolov8environment"
 REGION="asia-northeast1"
 REPOSITORY="house-design-ai"
 STREAMLIT_IMAGE="streamlit"
-SERVICE_NAME="house-design-ai-streamlit"
+SERVICE_NAME="streamlit-web"
 MEMORY="1Gi"
 
 handle_error() {
@@ -38,19 +38,36 @@ REPO_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${STREAMLIT_IMAG
 echo "Streamlitアプリのイメージをビルドします..."
 cd house_design_app || handle_error "house_design_appディレクトリに移動できませんでした"
 
+# 必要なディレクトリを作成
+mkdir -p config public/img .streamlit
+
+# サービスアカウントキーをコピー
 if [ -f "../config/service_account.json" ]; then
     echo "サービスアカウントキーをhouse_design_appディレクトリにコピーしています..."
-    mkdir -p config
     cp ../config/service_account.json config/ || echo "警告: サービスアカウントキーのコピーに失敗しました"
-    
-    if [ -f "config/service_account.json" ]; then
-        echo "サービスアカウントキーのコピーに成功しました"
-    else
-        echo "警告: サービスアカウントキーのコピー後の確認に失敗しました"
-    fi
-else
-    echo "警告: サービスアカウントキーが見つからないため、コピーをスキップします"
 fi
+
+# data.yamlをコピー
+if [ -f "../config/data.yaml" ]; then
+    echo "data.yamlをコピーしています..."
+    cp ../config/data.yaml config/ || echo "警告: data.yamlのコピーに失敗しました"
+fi
+
+# ロゴファイルをコピー
+if [ -f "../public/img/logo.png" ]; then
+    echo "ロゴファイルをコピーしています..."
+    cp ../public/img/logo.png public/img/ || echo "警告: ロゴファイルのコピーに失敗しました"
+fi
+
+# .streamlit/secrets.tomlをコピー
+if [ -f "../.streamlit/secrets.toml" ]; then
+    echo ".streamlit/secrets.tomlをコピーしています..."
+    cp ../.streamlit/secrets.toml .streamlit/ || echo "警告: .streamlit/secrets.tomlのコピーに失敗しました"
+fi
+
+# srcディレクトリをコピー
+echo "srcディレクトリをコピーしています..."
+cp -r ../src . || handle_error "srcディレクトリのコピーに失敗しました"
 
 echo "Dockerイメージをビルドしています..."
 docker buildx build --platform linux/amd64 -t ${REPO_PATH} -f Dockerfile . --push || handle_error "Dockerイメージのビルドに失敗しました"
@@ -63,9 +80,10 @@ gcloud run deploy ${SERVICE_NAME} \
     --platform managed \
     --region ${REGION} \
     --allow-unauthenticated \
-    --memory ${MEMORY} \
+    --memory 8Gi \
+    --cpu 2 \
     --timeout 3600 \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,FREECAD_API_URL=https://freecad-api-513507930971.asia-northeast1.run.app" || handle_error "Cloud Runへのデプロイに失敗しました"
+    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,FREECAD_API_URL=https://freecad-api-513507930971.asia-northeast1.run.app,BUCKET_NAME=house-design-ai-bucket,SECRET_MANAGER_SERVICE_ACCOUNT=house-design-ai@yolov8environment.iam.gserviceaccount.com,LOGO_GCS_PATH=gs://house-design-ai-bucket/logo.png,TORCH_WARN_ONLY=1,PYTHONPATH=/app" || handle_error "Cloud Runへのデプロイに失敗しました"
 
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)') || handle_error "サービスURLの取得に失敗しました"
 
