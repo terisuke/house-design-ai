@@ -64,13 +64,13 @@ class BuildingConstraints:
     """
     def __init__(self):
         self.min_room_size = 4.5  # 居室の最小面積（m²）
-        self.min_ceiling_height = 2100  # 最小天井高（mm）
-        self.min_corridor_width = 780  # 最小廊下幅（mm）
-        self.min_door_width = 750  # 最小ドア幅（mm）
-        self.wall_thickness = 120  # 壁の厚さ（mm）
-        self.first_floor_height = 2900  # 1階の高さ（mm）
-        self.second_floor_height = 2800  # 2階の高さ（mm）
-        self.grid_size = 910  # グリッドサイズ（mm）
+        self.min_ceiling_height = 2.1  # 最小天井高（m）
+        self.min_corridor_width = 0.78  # 最小廊下幅（m）
+        self.min_door_width = 0.75  # 最小ドア幅（m）
+        self.wall_thickness = 0.12  # 壁の厚さ（m）
+        self.first_floor_height = 2.9  # 1階の高さ（m）
+        self.second_floor_height = 2.8  # 2階の高さ（m）
+        self.grid_size = 0.91  # グリッドサイズ（m）
         
         self.building_coverage_ratio = 0.6  # 建蔽率（敷地面積に対する建築面積の割合）
         self.floor_area_ratio = 2.0  # 容積率（敷地面積に対する延床面積の割合）
