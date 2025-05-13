@@ -1,0 +1,7 @@
+# CP-SAT最適化ソルバー
+ortools>=9.12.0
+
+# 基本的な依存関係
+numpy>=1.24.0
+setuptools>=65.5.0
+wheel

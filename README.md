@@ -39,7 +39,7 @@ House Design AIは、建物のセグメンテーションと間取り生成を�
 ## 技術スタック
 
 - **Python バージョン:** Python 3.9+
-- **依存関係管理:** pip (requirements.txt)
+- **依存関係管理:** pip (requirements_base.txt, requirements_gcp.txt, requirements_ortools.txt)
 - **コード整形:** Ruff (black併用)
 - **型ヒント:** typingモジュールを厳格に使用
 - **テストフレームワーク:** pytest
@@ -97,8 +97,11 @@ house-design-ai/
 ├── terraform/                # Terraformインフラストラクチャコード
 ├── tests/                    # テストコード
 ├── Dockerfile                # メインDockerfile
-├── requirements.txt          # 依存関係
+├── requirements_base.txt     # 基本的な依存関係
+├── requirements_gcp.txt      # Google Cloud関連の依存関係
+├── requirements_ortools.txt  # 最適化関連の依存関係
 ├── requirements-dev.txt      # 開発用依存関係
+├── requirements.txt          # 旧依存関係ファイル（非推奨）
 ├── README.md                 # プロジェクト説明
 ├── directorystructure.md     # ディレクトリ構造
 └── technologystack.md        # 技術スタック
@@ -152,11 +155,17 @@ source venv/bin/activate
 3. 依存関係のインストール:
 ```bash
 # 基本的な依存関係のインストール
-pip install -r requirements.txt
+pip install --upgrade pip
+pip install -r requirements_base.txt
+
+# Google Cloud関連の依存関係のインストール（必要に応じて）
+pip install -r requirements_gcp.txt
 
 # 開発用依存関係のインストール（開発者向け）
 pip install -r requirements-dev.txt
 ```
+
+注意: CP-SAT最適化機能を使用する場合は、別の仮想環境を作成し、`requirements_ortools.txt`をインストールしてください。詳細は「依存関係の競合について」セクションを参照してください。
 
 4. 環境変数の設定:
 ```bash
@@ -176,18 +185,46 @@ set PYTHONPATH=.
 - ortools: protobuf >=5.26.1,<5.27 を要求
 - その他のパッケージ（streamlit, google-cloud等）: protobuf 4.x系を要求
 
-この競合を解決するため、以下の方法で仮想環境を分離することを推奨します：
+この競合により、`pip install -r requirements.txt`を実行すると「resolution-too-deep」エラーが発生する場合があります。
+
+この問題を解決するため、requirements.txtを以下の3つのファイルに分割しました：
+- `requirements_base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
+- `requirements_gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
+- `requirements_ortools.txt`: 最適化関連のパッケージ（ortools等）
+
+以下の方法で仮想環境を分離して使用することを推奨します：
 
 ```bash
-# メイン環境（streamlit, YOLOなど用）
+# 基本環境のセットアップ
 python -m venv venv
 source venv/bin/activate  # Linuxの場合
-pip install -r requirements.txt
+# または
+.\venv\Scripts\Activate.ps1  # Windowsの場合（PowerShell）
+# または
+.\venv\Scripts\activate.bat  # Windowsの場合（コマンドプロンプト）
 
+# 基本パッケージのインストール
+pip install --upgrade pip
+pip install -r requirements_base.txt
+
+# 必要に応じてGoogle Cloud関連パッケージをインストール
+pip install -r requirements_gcp.txt
+```
+
+CP-SAT最適化機能を使用する場合は、別の仮想環境を作成してください：
+
+```bash
 # ortools用の分離環境
 python -m venv venv_ortools
 source venv_ortools/bin/activate  # Linuxの場合
-pip install ortools>=9.12.0
+# または
+.\venv_ortools\Scripts\Activate.ps1  # Windowsの場合（PowerShell）
+# または
+.\venv_ortools\Scripts\activate.bat  # Windowsの場合（コマンドプロンプト）
+
+# ortoolsのインストール
+pip install --upgrade pip
+pip install -r requirements_ortools.txt
 ```
 
 最適化機能（CP-SAT）を使用する場合は、venv_ortools環境を使用してください。
