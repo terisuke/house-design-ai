@@ -181,40 +181,57 @@ set PYTHONPATH=.
 
 ### 依存関係の競合について
 
-本プロジェクトでは、ortoolsとその他のパッケージ間でprotobufのバージョン要求に競合があります：
-- ortools: protobuf >=5.26.1,<5.27 を要求
-- その他のパッケージ（streamlit, google-cloud等）: protobuf 4.x系を要求
+> **⚠️ 重要な警告**: 本プロジェクトでは、ortoolsとGoogle Cloud関連パッケージ間で**深刻なprotobufバージョン競合**があります。これらのパッケージを同じ環境にインストールしないでください。必ず別々の仮想環境を使用してください。
 
-この競合により、`pip install -r requirements.txt`を実行すると「resolution-too-deep」エラーが発生する場合があります。
+#### 競合の詳細
 
-この問題を解決するため、requirements.txtを以下の3つのファイルに分割しました：
+本プロジェクトでは、以下のようなprotobufバージョン要求の競合があります：
+- **ortools**: protobuf 5.x系（>=5.26.1,<5.27）を要求
+- **Google Cloud関連パッケージ**: protobuf 4.x系を要求
+- **Streamlit**: protobuf <5,>=3.20 を要求
+
+この競合により、`pip install -r requirements.txt`を実行すると「resolution-too-deep」エラーが発生します。また、Google Cloud関連パッケージとortoolsを同じ環境にインストールすると、どちらかのパッケージが正常に動作しなくなります。
+
+#### 解決策：完全に分離された仮想環境
+
+この問題を解決するため、requirements.txtを以下の3つのファイルに分割し、**完全に分離された仮想環境**で使用します：
+
 - `requirements_base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
 - `requirements_gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
 - `requirements_ortools.txt`: 最適化関連のパッケージ（ortools等）
 
-以下の方法で仮想環境を分離して使用することを推奨します：
+#### 環境セットアップ手順
+
+##### 1. 基本環境 + Google Cloud（Streamlit UI、クラウド連携機能用）
 
 ```bash
 # 基本環境のセットアップ
-python -m venv venv
-source venv/bin/activate  # Linuxの場合
+python -m venv venv_base
+source venv_base/bin/activate  # Linuxの場合
 # または
-.\venv\Scripts\Activate.ps1  # Windowsの場合（PowerShell）
+.\venv_base\Scripts\Activate.ps1  # Windowsの場合（PowerShell）
 # または
-.\venv\Scripts\activate.bat  # Windowsの場合（コマンドプロンプト）
+.\venv_base\Scripts\activate.bat  # Windowsの場合（コマンドプロンプト）
 
 # 基本パッケージのインストール
 pip install --upgrade pip
 pip install -r requirements_base.txt
 
-# 必要に応じてGoogle Cloud関連パッケージをインストール
+# Google Cloud関連パッケージをインストール
 pip install -r requirements_gcp.txt
+
+# 環境変数の設定
+export PYTHONPATH=.  # Linuxの場合
+# または
+$env:PYTHONPATH="."  # Windowsの場合（PowerShell）
+# または
+set PYTHONPATH=.  # Windowsの場合（コマンドプロンプト）
 ```
 
-CP-SAT最適化機能を使用する場合は、別の仮想環境を作成してください：
+##### 2. 最適化環境（CP-SAT最適化機能用）
 
 ```bash
-# ortools用の分離環境
+# ortools用の完全に分離された環境
 python -m venv venv_ortools
 source venv_ortools/bin/activate  # Linuxの場合
 # または
@@ -222,12 +239,29 @@ source venv_ortools/bin/activate  # Linuxの場合
 # または
 .\venv_ortools\Scripts\activate.bat  # Windowsの場合（コマンドプロンプト）
 
-# ortoolsのインストール
+# 基本パッケージとortoolsのインストール
 pip install --upgrade pip
-pip install -r requirements_ortools.txt
+pip install -r requirements_base.txt  # 基本パッケージ（Google Cloud関連を除く）
+pip install -r requirements_ortools.txt  # ortools関連パッケージ
+
+# 環境変数の設定
+export PYTHONPATH=.  # Linuxの場合
+# または
+$env:PYTHONPATH="."  # Windowsの場合（PowerShell）
+# または
+set PYTHONPATH=.  # Windowsの場合（コマンドプロンプト）
 ```
 
-最適化機能（CP-SAT）を使用する場合は、venv_ortools環境を使用してください。
+#### 環境の使い分け
+
+- **Streamlit UI、クラウド連携機能**: `venv_base`環境を使用
+- **CP-SAT最適化機能**: `venv_ortools`環境を使用
+
+#### トラブルシューティング
+
+- **「resolution-too-deep」エラー**: 依存関係の解決に失敗しています。上記の分離された環境セットアップ手順に従ってください。
+- **protobufバージョン競合エラー**: Google Cloud関連パッケージとortoolsを同じ環境にインストールしないでください。
+- **ImportError: cannot import name ...**: 適切な環境が有効化されているか確認してください。
 
 ## 使用方法
 
