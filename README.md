@@ -271,7 +271,11 @@ docker run -p 8000:8000 freecad-api
 
 3. GCP Artifact Registryへのビルド＆プッシュ:
 ```bash
-bash scripts/build_and_push_docker.sh
+# FreeCAD APIのビルド＆プッシュ
+bash scripts/build_and_push_freecad.sh
+
+# Streamlitアプリケーションのビルド＆プッシュ
+bash scripts/build_and_push_streamlit.sh
 ```
 
 4. Cloud Runへのデプロイ:
