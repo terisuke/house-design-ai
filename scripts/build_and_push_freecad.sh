@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail -u
 
 # 環境変数の設定
 PROJECT_ID="yolov8environment"
@@ -44,22 +44,21 @@ REPO_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FREECAD_API_IM
 echo "FreeCAD APIイメージをbuildxでビルド＆プッシュします..."
 cd freecad_api || handle_error "freecad_apiディレクトリに移動できませんでした"
 
-if [ -f "../config/service_account.json" ]; then
-    echo "サービスアカウントキーをfreecad_apiディレクトリにコピーしています..."
-    mkdir -p config
-    cp ../config/service_account.json config/ || echo "警告: サービスアカウントキーのコピーに失敗しました"
-    
-    if [ -f "config/service_account.json" ]; then
-        echo "サービスアカウントキーのコピーに成功しました"
-    else
-        echo "警告: サービスアカウントキーのコピー後の確認に失敗しました"
-    fi
+SERVICE_ACCOUNT_KEY_PATH="../config/service_account.json"
+if [ -f "${SERVICE_ACCOUNT_KEY_PATH}" ]; then
+    echo "サービスアカウントキーが見つかりました: ${SERVICE_ACCOUNT_KEY_PATH}"
 else
-    echo "警告: サービスアカウントキーが見つからないため、コピーをスキップします"
+    echo "警告: サービスアカウントキーが見つかりません: ${SERVICE_ACCOUNT_KEY_PATH}"
+    echo "署名付きURLの生成に失敗する可能性があります。"
 fi
 
 echo "Dockerイメージをビルドしています..."
-docker buildx build --platform linux/amd64 -t ${REPO_PATH} -f Dockerfile.freecad . --push || handle_error "Dockerイメージのビルドに失敗しました"
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg PROJECT_ID=${PROJECT_ID} \
+  --secret id=gcp_credentials,src=${SERVICE_ACCOUNT_KEY_PATH} \
+  -t ${REPO_PATH} \
+  -f Dockerfile.freecad . --push || handle_error "Dockerイメージのビルドに失敗しました"
 
 cd .. || handle_error "親ディレクトリに戻れませんでした"
 
@@ -82,4 +81,4 @@ echo "================================================"
 echo "デプロイが正常に完了しました！"
 echo "新しいタグ: ${IMAGE_TAG}"
 echo "デプロイされたサービスURL: ${SERVICE_URL}"
-echo "================================================"    
+echo "================================================"                

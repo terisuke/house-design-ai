@@ -39,7 +39,12 @@ def export_to_freecad(floor_plan_json, output_path, wall_height=2400, wall_thick
         wall_thickness: 壁の厚さ (mm)
     
     Returns:
-        FreeCADドキュメントオブジェクト
+        bool: 変換が成功した場合はTrue、失敗した場合はFalse
+    
+    Raises:
+        ImportError: FreeCADのインポートに失敗した場合
+        ValueError: 入力JSONが無効な場合
+        IOError: ファイルの読み書きに失敗した場合
     """
     # JSONの読み込み
     with open(floor_plan_json, 'r') as f:

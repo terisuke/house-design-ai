@@ -154,7 +154,7 @@ with tab3:
     st.subheader("API設定")
     
     # YOLOモデルの選択
-    yolo_model_options = ["YOLO v10", "YOLO v11", "YOLO v11l (デフォルト)", "YOLO v11x"]
+    yolo_model_options = ["YOLO v12n", "YOLO v12s", "YOLO v12m (デフォルト)", "YOLO v12l", "YOLO v12x"]
     selected_yolo_model = st.selectbox(
         "YOLOモデル",
         options=yolo_model_options,
@@ -165,7 +165,7 @@ with tab3:
     # APIエンドポイント設定
     freecad_api_url = st.text_input(
         "FreeCAD API URL",
-        value=os.environ.get("FREECAD_API_URL", "https://freecad-api-513507930971.asia-northeast1.run.app"),
+        value=os.environ.get("FREECAD_API_URL", "https://your-freecad-api-endpoint.com"),
         help="FreeCAD APIのエンドポイントURLを設定します"
     )
 

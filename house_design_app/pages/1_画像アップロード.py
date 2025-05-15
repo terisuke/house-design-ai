@@ -23,6 +23,7 @@ logger = logging.getLogger("streamlit-app")
 
 # PyTorchのクラスパス問題を解決
 import torch
+from torch.nn import functional as F
 from PIL import Image
 from ultralytics import YOLO
 
@@ -30,102 +31,10 @@ from ultralytics import YOLO
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # ユーティリティをインポート
-from utils.style import apply_custom_css, display_logo, display_footer, section_divider
-
-def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, Any]:
-    """2D図面を生成する
-
-    Args:
-        grid_data (Union[Dict[str, Any], str]): グリッドデータまたはFreeCADファイルのパス
-
-    Returns:
-        Dict[str, Any]: APIレスポンス
-    """
-    # グローバル変数 freecad_api_available をチェック
-    if not globals().get('freecad_api_available', False):
-        logger.warning("FreeCAD APIが利用できないため、2D図面生成をスキップします")
-        return {
-            "success": False,
-            "error": "FreeCAD APIが利用できません。APIモードのみをサポートしています。"
-        }
-    
-    if isinstance(grid_data, str) and os.path.exists(grid_data):
-        file_path = grid_data
-        grid_data = {"file_path": file_path}
-    try:
-        # FreeCAD APIのエンドポイントを取得
-        freecad_api_url = os.environ.get(
-            "FREECAD_API_URL", "http://freecad-api-service:8080"
-        )
-        logger.info(f"FreeCAD API URL: {freecad_api_url}")
-
-        # 一時ファイルを作成
-        with tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False) as temp_file:
-            temp_file_path = temp_file.name
-
-            # モデルファイルをダウンロード
-            if isinstance(grid_data, dict) and "url" in grid_data:
-                model_url = grid_data["url"]
-
-                # Cloud Storageからファイルをダウンロード
-                bucket_name = os.environ.get("BUCKET_NAME", "house-design-ai-data")
-                file_name = model_url.split("/")[-1]
-
-                # Google Cloud Storageからダウンロード
-                try:
-                    import google.cloud.storage as gcs_storage
-
-                    storage_client = gcs_storage.Client()
-                    bucket = storage_client.bucket(bucket_name)
-                    blob = bucket.blob(f"models/{file_name}")
-                except ImportError:
-                    logger.error(
-                        "Google Cloud Storageライブラリのインポートに失敗しました"
-                    )
-                    return {
-                        "success": False,
-                        "error": "Google Cloud Storageライブラリのインポートに失敗しました",
-                    }
-                blob.download_to_filename(temp_file_path)
-
-                # ファイルをアップロードして2D変換をリクエスト
-                with open(temp_file_path, "rb") as f:
-                    files = {"file": (file_name, f, "application/octet-stream")}
-                    
-                    try:
-                        response = requests.post(
-                            f"{freecad_api_url}/convert/2d", files=files, timeout=60
-                        )
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"FreeCAD APIリクエストエラー: {e}")
-                        return {
-                            "success": False,
-                            "error": f"APIリクエストエラー: {e}",
-                        }
-
-                # 一時ファイルを削除
-                os.unlink(temp_file_path)
-
-                # レスポンスを確認
-                if response.status_code == 200:
-                    return response.json()
-                else:
-                    logger.error(
-                        f"FreeCAD APIエラー: {response.status_code} - {response.text}"
-                    )
-                    return {
-                        "success": False,
-                        "error": f"APIエラー: {response.status_code}",
-                    }
-            else:
-                logger.error("モデルURLが指定されていません")
-                return {"success": False, "error": "モデルURLが指定されていません"}
-
-    except Exception as e:
-        logger.error(f"2D図面生成エラー: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {"success": False, "error": str(e)}
+try:
+    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, section_divider, convert_to_2d_drawing
+except ImportError:
+    from utils.style import apply_custom_css, display_logo, display_footer, section_divider, convert_to_2d_drawing
 
 # CAD表示モジュールのインポート
 try:
@@ -156,7 +65,7 @@ from src.cloud.storage import (
 )
 
 # PyTorchとStreamlitの互換性問題の解決
-import torch
+# import torch - 上部で既にインポート済み
 if not hasattr(torch, 'classes'):
     torch.classes = type('', (), {'__path__': []})()
 else:
@@ -289,7 +198,7 @@ def send_to_freecad_api(grid_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # FreeCAD APIのエンドポイントを取得
         freecad_api_url = os.environ.get(
-            "FREECAD_API_URL", "https://freecad-api-513507930971.asia-northeast1.run.app"
+            "FREECAD_API_URL", "https://your-freecad-api-endpoint.com"
         )
 
         # グリッドデータをFreeCAD APIの形式に変換

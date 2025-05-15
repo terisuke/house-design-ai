@@ -24,6 +24,16 @@ RUN pip3 install --no-cache-dir trimesh[easy] pyglet
 ENV PYTHONPATH=/usr/lib/freecad/lib
 ENV QT_QPA_PLATFORM=offscreen
 
+# アプリケーションディレクトリの作成
+RUN mkdir -p /app/config
+
+# Use secret mount for service account key
+RUN --mount=type=secret,id=gcp_credentials \
+    if [ -f "/run/secrets/gcp_credentials" ]; then \
+      mkdir -p /app/config && \
+      cp /run/secrets/gcp_credentials /app/config/service_account.json; \
+    fi
+
 # APIコードをコピー
 COPY ./main.py /app/
 

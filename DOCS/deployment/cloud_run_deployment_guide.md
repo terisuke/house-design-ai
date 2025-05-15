@@ -41,7 +41,7 @@ gcloud run deploy house-design-ai-streamlit \
   --image gcr.io/yolov8environment/house-design-ai-streamlit \
   --platform managed \
   --region asia-northeast1 \
-  --memory 2Gi \
+  --memory 8Gi \
   --allow-unauthenticated
 ```
 
