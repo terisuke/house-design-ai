@@ -9,6 +9,7 @@ touch /app/.streamlit/secrets.toml
 if [ -f "/tmp/build/config/service_account.json" ]; then
   cp /tmp/build/config/service_account.json /app/config/service_account.json
   cp /tmp/build/config/service_account.json /app/.streamlit/secrets.toml
+  echo "サービスアカウントキーをコピーしました"
 fi
 
 if [ -f "/tmp/build/config/data.yaml" ]; then
@@ -17,6 +18,7 @@ fi
 
 if [ -f "/tmp/build/public/img/logo.png" ]; then
   cp /tmp/build/public/img/logo.png /app/house_design_app/logo.png
+  echo "ロゴファイルをコピーしました"
 fi
 
 if [ -d "/tmp/build/src" ]; then

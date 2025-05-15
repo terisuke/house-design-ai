@@ -132,32 +132,3 @@ EXPOSE \${PORT:-8080}
 
 # Streamlitアプリを起動
 CMD ["streamlit", "run", "main.py", "--server.port=8080", "--server.address=0.0.0.0"]
-EOF
-
-echo "Dockerイメージをビルドしています..."
-# ビルドキャッシュを活用するために--no-cacheフラグを削除
-docker buildx build --platform linux/amd64 -t ${REPO_PATH} -f house_design_app/Dockerfile.temp . --push || handle_error "Dockerイメージのビルドに失敗しました"
-
-# 一時Dockerfileとビルドディレクトリを削除
-rm house_design_app/Dockerfile.temp
-rm -rf house_design_app/tmp_build
-
-echo "Cloud Runにデプロイします..."
-gcloud run deploy ${SERVICE_NAME} \
-    --project=${PROJECT_ID} \
-    --image ${REPO_PATH} \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --memory ${MEMORY} \
-    --cpu ${CPU} \
-    --timeout 3600 \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,FREECAD_API_URL=https://freecad-api-513507930971.asia-northeast1.run.app,BUCKET_NAME=house-design-ai-bucket,SECRET_MANAGER_SERVICE_ACCOUNT=house-design-ai@yolov8environment.iam.gserviceaccount.com,LOGO_GCS_PATH=gs://house-design-ai-bucket/logo.png,TORCH_WARN_ONLY=1,PYTHONPATH=/app" || handle_error "Cloud Runへのデプロイに失敗しました"
-
-SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)') || handle_error "サービスURLの取得に失敗しました"
-
-echo "================================================"
-echo "デプロイが正常に完了しました！"
-echo "新しいタグ: ${IMAGE_TAG}"
-echo "デプロイされたサービスURL: ${SERVICE_URL}"
-echo "================================================"
