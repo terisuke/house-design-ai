@@ -17,14 +17,15 @@ from pathlib import Path
 import torch
 import streamlit.components.v1 as components
 
-# 親ディレクトリをPythonパスに追加
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# ユーティリティをインポート
+# --- スタイルユーティリティのimportを多重tryで確実に ---
 try:
     from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, convert_to_2d_drawing
-except ImportError as e:
-    st.error(f"スタイルユーティリティのインポート失敗: {e}")
+except ImportError:
+    try:
+        from utils.style import apply_custom_css, display_logo, display_footer, convert_to_2d_drawing
+    except ImportError as e:
+        st.error(f"スタイルユーティリティのインポート失敗: {e}")
+        st.stop()
 
 # ロギング設定
 logging.basicConfig(level=logging.INFO)

@@ -6,7 +6,11 @@
 import streamlit as st
 import base64
 import os
+import tempfile
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 def apply_custom_css():
     """アプリケーションに白基調のカスタムCSSを適用"""
@@ -297,15 +301,16 @@ def apply_custom_css():
 
 def display_logo():
     """サイドバーにロゴを表示(左上に配置)"""
-    # ロゴのパスを取得
+    import base64
+    import os
+    import tempfile
+    from pathlib import Path
     try:
-        # ディレクトリパスを取得
-        file_path = Path(__file__)
-        parent_dir = file_path.parent.parent
-        logo_path = parent_dir / "logo.png"
-        
-        if logo_path.exists():
-            with open(logo_path, "rb") as f:
+        logo_gcs_path = os.environ.get("LOGO_GCS_PATH", "")
+        logo_local_path = os.environ.get("LOGO_LOCAL_PATH", "")
+        # 1. LOGO_LOCAL_PATHが指定されていればそれを使う
+        if logo_local_path and Path(logo_local_path).exists():
+            with open(logo_local_path, "rb") as f:
                 data = f.read()
                 b64 = base64.b64encode(data).decode()
                 html = f"""
@@ -314,8 +319,52 @@ def display_logo():
                 </div>
                 """
                 st.sidebar.markdown(html, unsafe_allow_html=True)
-        else:
-            st.sidebar.warning("ロゴファイル (logo.png) が見つかりません。")
+            return
+        # 2. GCSパスが指定されていれば従来通り取得
+        if logo_gcs_path and logo_gcs_path.startswith("gs://"):
+            try:
+                from src.cloud.storage import initialize_gcs_client
+                client = initialize_gcs_client()
+                if client:
+                    bucket_name = logo_gcs_path.split("/")[2]
+                    blob_path = "/".join(logo_gcs_path.split("/")[3:])
+                    bucket = client.bucket(bucket_name)
+                    blob = bucket.blob(blob_path)
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                        blob.download_to_filename(tmp.name)
+                        with open(tmp.name, "rb") as f:
+                            data = f.read()
+                            b64 = base64.b64encode(data).decode()
+                            html = f"""
+                            <div style="text-align: left; margin-bottom: 20px; padding: 0;">
+                                <img src="data:image/png;base64,{b64}" style="max-width: 100%; max-height: 80px;">
+                            </div>
+                            """
+                            st.sidebar.markdown(html, unsafe_allow_html=True)
+                        os.unlink(tmp.name)
+                    return
+            except Exception as e:
+                logger.warning(f"GCSからのロゴ取得エラー: {e}")
+        # 3. 従来通りのパス探索
+        file_path = Path(__file__)
+        parent_dir = file_path.parent.parent
+        logo_path_candidates = [
+            parent_dir / "logo.png",
+            parent_dir / "public" / "img" / "logo.png"
+        ]
+        for logo_path in logo_path_candidates:
+            if logo_path.exists():
+                with open(logo_path, "rb") as f:
+                    data = f.read()
+                    b64 = base64.b64encode(data).decode()
+                    html = f"""
+                    <div style="text-align: left; margin-bottom: 20px; padding: 0;">
+                        <img src="data:image/png;base64,{b64}" style="max-width: 100%; max-height: 80px;">
+                    </div>
+                    """
+                    st.sidebar.markdown(html, unsafe_allow_html=True)
+                return
+        st.sidebar.warning("ロゴファイル (logo.png) が見つかりません。")
     except Exception as e:
         st.sidebar.warning(f"ロゴ表示エラー: {e}")
 

@@ -427,9 +427,18 @@ gcloud run deploy streamlit-web \
 ### Streamlitアプリケーション
 - URL: https://streamlit-web-513507930971.asia-northeast1.run.app
 - 設定:
-  - メモリ: 1GB
-  - CPU: 1
-  - タイムアウト: 300秒
+  - メモリ: 8GB
+  - CPU: 2
+  - タイムアウト: 3600秒
+- 環境変数:
+  - GOOGLE_APPLICATION_CREDENTIALS: サービスアカウント認証用
+  - USE_GCP_DEFAULT_CREDENTIALS: Cloud Run環境での認証用
+  - FREECAD_API_URL: FreeCAD APIのURL
+  - BUCKET_NAME: Cloud Storageバケット名
+  - SECRET_MANAGER_SERVICE_ACCOUNT: Secret Managerアクセス用
+  - LOGO_GCS_PATH: ロゴファイルのGCSパス
+  - TORCH_WARN_ONLY: PyTorch警告の制御
+  - PYTHONPATH: Pythonパスの設定
 
 ## FreeCAD API実装の詳細
 
@@ -438,7 +447,7 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 - 一階の壁の高さ: 2900mm (2.9m)
 - 二階の壁の高さ: 2800mm (2.8m)
 
-## 開発状況（2025年5月11日時点）
+## 開発状況（2025年5月15日時点）
 
 ### 完了した機能
 - ✅ 環境セットアップ
@@ -455,6 +464,8 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 - ✅ セグメンテーション結果からの建築可能エリア計算
 - ✅ 基本的な間取り生成アルゴリズム
 - ✅ Terraformによるインフラストラクチャのコード化
+- ✅ ロゴ表示とモデルロード問題の修正
+- ✅ デプロイスクリプトの最適化
 
 ### 進行中の機能
 - 🟡 FreeCAD APIの完全実装

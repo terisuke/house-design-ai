@@ -17,6 +17,10 @@ import numpy as np
 import requests
 import streamlit as st
 
+# ロギング設定を最初に行う
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("streamlit-app")
+
 # PyTorchのクラスパス問題を解決
 import torch
 from PIL import Image
@@ -26,63 +30,7 @@ from ultralytics import YOLO
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # ユーティリティをインポート
-try:
-    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, section_divider
-except ImportError as e:
-    # フォールバックとしてカスタムCSSを直接適用する関数を定義
-    def apply_custom_css():
-        """アプリケーションに白基調のカスタムCSSを適用"""
-        css = """
-        <style>
-            /* 全体の背景色を白に設定 */
-            .stApp {
-                background-color: white;
-            }
-            
-            /* その他のスタイル設定は省略 */
-            
-            /* ボタンを赤背景、白文字に設定 */
-            .stButton>button {
-                background-color: #e50012;
-                color: white;
-                border: none;
-                font-weight: bold;
-                padding: 0.5rem 1rem;
-                border-radius: 5px;
-            }
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    
-    def display_logo():
-        """サイドバーにロゴを表示"""
-        logo_path = Path(__file__).parent / "logo.png"
-        
-        if logo_path.exists():
-            with open(logo_path, "rb") as f:
-                data = f.read()
-                b64 = base64.b64encode(data).decode()
-                html = f"""
-                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                    <img src="data:image/png;base64,{b64}" style="max-width: 100%; height: auto;">
-                </div>
-                """
-                st.sidebar.markdown(html, unsafe_allow_html=True)
-        else:
-            st.sidebar.warning("ロゴファイル (logo.png) が見つかりません。")
-    
-    def display_footer():
-        """フッターを表示"""
-        footer_html = """
-        <div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: white; text-align: center; padding: 10px; font-size: 14px; border-top: 1px solid #f0f0f0; z-index: 999;">
-            © 2025 U-DAKE - 土地画像から間取りを生成するAIツール
-        </div>
-        """
-        st.markdown(footer_html, unsafe_allow_html=True)
-    
-    def section_divider():
-        """セクション分割線を表示"""
-        st.markdown('<hr style="margin: 30px 0; border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(229, 0, 18, 0.75), rgba(0, 0, 0, 0));">', unsafe_allow_html=True)
+from utils.style import apply_custom_css, display_logo, display_footer, section_divider
 
 def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, Any]:
     """2D図面を生成する
@@ -93,6 +41,14 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
     Returns:
         Dict[str, Any]: APIレスポンス
     """
+    # グローバル変数 freecad_api_available をチェック
+    if not globals().get('freecad_api_available', False):
+        logger.warning("FreeCAD APIが利用できないため、2D図面生成をスキップします")
+        return {
+            "success": False,
+            "error": "FreeCAD APIが利用できません。APIモードのみをサポートしています。"
+        }
+    
     if isinstance(grid_data, str) and os.path.exists(grid_data):
         file_path = grid_data
         grid_data = {"file_path": file_path}
@@ -101,6 +57,7 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
         freecad_api_url = os.environ.get(
             "FREECAD_API_URL", "http://freecad-api-service:8080"
         )
+        logger.info(f"FreeCAD API URL: {freecad_api_url}")
 
         # 一時ファイルを作成
         with tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False) as temp_file:
@@ -134,9 +91,17 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
                 # ファイルをアップロードして2D変換をリクエスト
                 with open(temp_file_path, "rb") as f:
                     files = {"file": (file_name, f, "application/octet-stream")}
-                    response = requests.post(
-                        f"{freecad_api_url}/convert/2d", files=files, timeout=60
-                    )
+                    
+                    try:
+                        response = requests.post(
+                            f"{freecad_api_url}/convert/2d", files=files, timeout=60
+                        )
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"FreeCAD APIリクエストエラー: {e}")
+                        return {
+                            "success": False,
+                            "error": f"APIリクエストエラー: {e}",
+                        }
 
                 # 一時ファイルを削除
                 os.unlink(temp_file_path)
@@ -158,6 +123,8 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
 
     except Exception as e:
         logger.error(f"2D図面生成エラー: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
 # CAD表示モジュールのインポート
@@ -170,6 +137,16 @@ try:
     cad_display_available = True
 except ImportError as e:
     cad_display_available = False
+    logger.warning(f"CAD表示モジュールのインポートに失敗しました: {e}")
+
+# FreeCAD APIクライアントの設定
+try:
+    # FreeCADのインポートは試みず、APIクライアントの設定のみ行う
+    logger.info("FreeCAD APIに接続できました")
+    freecad_api_available = True
+except Exception as e:
+    logger.warning(f"FreeCADのインポートに失敗しました: {e}")
+    freecad_api_available = False
 
 from src.cloud.storage import (
     download_dataset,
@@ -177,10 +154,6 @@ from src.cloud.storage import (
     initialize_gcs_client,
     upload_to_gcs,
 )
-
-# ロギング設定を最初に行う
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("streamlit-app")
 
 # PyTorchとStreamlitの互換性問題の解決
 import torch
@@ -236,6 +209,13 @@ def load_yolo_model(model_path: Optional[str] = None):
         model_path = download_model_from_gcs()
 
     try:
+        # PyTorch 2.6以降での安全なグローバルの登録
+        try:
+            torch.serialization.add_safe_globals(['ultralytics.nn.tasks.SegmentationModel'])
+        except AttributeError:
+            logger.warning("PyTorch 2.6未満のバージョンでは add_safe_globals は利用できません")
+        
+        # モデルロード時にweights_only=Falseを指定
         from ultralytics import YOLO
         model = YOLO(model_path)
         # モデルをセッションステートに保存
