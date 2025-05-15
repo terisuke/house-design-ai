@@ -14,11 +14,14 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # 依存関係をコピーしてインストール
-COPY requirements-streamlit.txt .
+COPY house_design_app/requirements-streamlit.txt /app/
 RUN pip install --no-cache-dir -r requirements-streamlit.txt
 
 # アプリケーションコードをコピー
-COPY . .
+COPY house_design_app /app/house_design_app
+COPY house_design_app/pages /app/pages
+COPY src /app/src
+COPY house_design_app/main.py /app/
 
 # 環境変数を設定
 ENV PYTHONUNBUFFERED=1
@@ -30,4 +33,4 @@ ENV TORCH_WARN_ONLY=1
 EXPOSE ${PORT:-8080}
 
 # Streamlitアプリを起動
-CMD streamlit run main.py --server.port=${PORT:-8080} --server.address=0.0.0.0 
+CMD ["env", "PYTHONPATH=/app", "streamlit", "run", "main.py", "--server.port=${PORT:-8080}", "--server.address=0.0.0.0"] 

@@ -31,9 +31,10 @@ from ultralytics import YOLO
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # ユーティリティをインポート
-from utils.style import apply_custom_css, display_logo, display_footer, section_divider
-
-from house_design_app.utils.style import convert_to_2d_drawing
+try:
+    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, section_divider, convert_to_2d_drawing
+except ImportError:
+    from utils.style import apply_custom_css, display_logo, display_footer, section_divider, convert_to_2d_drawing
 
 # CAD表示モジュールのインポート
 try:

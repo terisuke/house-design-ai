@@ -131,7 +131,7 @@ ENV TORCH_WARN_ONLY=1
 EXPOSE \${PORT:-8080}
 
 # Streamlitアプリを起動
-CMD ["streamlit", "run", "main.py", "--server.port=8080", "--server.address=0.0.0.0"]
+CMD ["env", "PYTHONPATH=/app", "streamlit", "run", "main.py", "--server.port=8080", "--server.address=0.0.0.0"]
 EOF
 
 echo "Dockerイメージをビルドしています..."
