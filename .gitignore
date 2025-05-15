@@ -33,6 +33,7 @@ htmlcov/
 .env
 .venv
 venv/
+venv_ortools/
 ENV/
 .python-version
 
@@ -90,6 +91,8 @@ runs/
 
 # クラウド関連
 config/service_account.json
+freecad_api/config/service_account.json
+house_design_app/config/service_account.json
 service-account-key.json
 .streamlit/secrets.toml
 .gcloud/
@@ -127,6 +130,7 @@ freecad_api/temp/
 freecad_api/output/
 freecad_api/cache/
 freecad_api/logs/
+house_design_app/tmp_build/
 
 # 一時ファイル
 *.tmp

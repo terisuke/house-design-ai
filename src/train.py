@@ -256,7 +256,7 @@ def train_model(args: argparse.Namespace) -> int:
 if __name__ == "__main__":
     # 引数パーサーの設定
     parser = argparse.ArgumentParser(
-        description="YOLOv8セグメンテーションモデルのトレーニング"
+        description="YOLOv11セグメンテーションモデルのトレーニング"
     )
 
     parser.add_argument(
