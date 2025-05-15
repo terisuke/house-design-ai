@@ -105,10 +105,10 @@ class CADDocument:
 class CADGrid:
     """CADグリッドを管理するクラス。"""
 
-    def __init__(self, spacing: float = 910.0):
+    def __init__(self, spacing: float = 1000.0):
         """
         Args:
-            spacing (float, optional): グリッド間隔(mm). Defaults to 910.0.
+            spacing (float, optional): グリッド間隔(mm). Defaults to 1000.0.
         """
         self.spacing = spacing
 

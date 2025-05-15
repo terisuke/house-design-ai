@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 House Design AI プロジェクトのコマンドラインインターフェース
-このモジュールは、トレーニング、推論、Vertex AI操作、間取り生成などのサブコマンドを提供します。
+このモジュールは、トレーニング、推論、Vertex AI操作などのサブコマンドを提供します。
 """
 import argparse
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 # ロギング設定
 logging.basicConfig(
@@ -282,38 +282,6 @@ def setup_visualize_parser(subparsers):
     return parser
 
 
-def setup_layout_parser(subparsers):
-    """間取り生成関連の引数パーサーを設定"""
-    parser = subparsers.add_parser("layout-generate", help="CP-SATを使用して3LDK間取りを生成")
-
-    parser.add_argument(
-        "--site-width", type=float, default=15.0, help="敷地の幅（m）"
-    )
-    parser.add_argument(
-        "--site-height", type=float, default=12.0, help="敷地の高さ（m）"
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="layout_results",
-        help="生成結果を保存するディレクトリ",
-    )
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        default=True,
-        help="生成された間取りを視覚化する",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=30,
-        help="ソルバーのタイムアウト（秒）",
-    )
-
-    return parser
-
-
 def main(args: Optional[List[str]] = None) -> int:
     """メインエントリポイント"""
     parser = argparse.ArgumentParser(
@@ -337,7 +305,6 @@ def main(args: Optional[List[str]] = None) -> int:
     setup_app_parser(subparsers)
     setup_inference_parser(subparsers)
     setup_visualize_parser(subparsers)
-    setup_layout_parser(subparsers)
 
     parsed_args = parser.parse_args(args)
 
@@ -472,28 +439,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 parsed_args.data_yaml, parsed_args.num_samples, parsed_args.output_dir
             )
             return 0 if success else 1
-            
-        elif parsed_args.command == "layout-generate":
-            from src.optimization.cp_sat_solver import generate_3ldk_layout
-            import os
-            
-            if not os.path.exists(parsed_args.output_dir):
-                os.makedirs(parsed_args.output_dir)
-                
-            result = generate_3ldk_layout(
-                site_width=parsed_args.site_width,
-                site_height=parsed_args.site_height,
-                output_dir=parsed_args.output_dir,
-                timeout_sec=parsed_args.timeout
-            )
-            
-            if result:
-                print(f"間取り生成に成功しました: 総面積 {result.total_area:.1f}m²")
-                print(f"結果は {parsed_args.output_dir} に保存されました")
-                return 0
-            else:
-                print("間取り生成に失敗しました")
-                return 1
 
         else:
             print(f"未実装のコマンド: {parsed_args.command}")

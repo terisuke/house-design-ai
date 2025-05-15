@@ -72,10 +72,8 @@ def initialize_gcs_client():
         use_default_creds = os.environ.get("USE_GCP_DEFAULT_CREDENTIALS", "").lower() == "true"
         if use_default_creds:
             try:
-                from google.auth import default
-                credentials, project = default()
-                client = storage.Client(credentials=credentials, project=project)
-                logger.info(f"Cloud Runのデフォルト認証でGCSクライアントを初期化（プロジェクト: {project}）")
+                client = storage.Client()
+                logger.info("Cloud Runのデフォルト認証でGCSクライアントを初期化")
                 return client
             except Exception as e:
                 logger.warning(f"Cloud Runのデフォルト認証に失敗しました: {e}")
