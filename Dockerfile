@@ -66,8 +66,8 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
 # 必要なディレクトリを作成
 RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/img/
 
-# 必須ディレクトリを作成（重複しているので統合）
-RUN mkdir -p /tmp/build
+# 必須ディレクトリを作成
+RUN mkdir -p /app/config /app/house_design_app /app/.streamlit /tmp/build
 
 # コピースクリプトをコピー
 COPY scripts/copy_files.sh /tmp/
