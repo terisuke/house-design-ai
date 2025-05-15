@@ -65,7 +65,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --allow-unauthenticated \
     --memory ${MEMORY} \
     --timeout 3600 \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,FREECAD_API_URL=https://freecad-api-513507930971.asia-northeast1.run.app" || handle_error "Cloud Runへのデプロイに失敗しました"
+    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,FREECAD_API_URL=https://freecad-api-513507930971.asia-northeast1.run.app,LOGO_GCS_PATH=gs://house-design-ai-dev-bucket/assets/logo.png" || handle_error "Cloud Runへのデプロイに失敗しました"
 
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)') || handle_error "サービスURLの取得に失敗しました"
 
