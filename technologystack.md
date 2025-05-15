@@ -2,7 +2,7 @@
 
 ## コア技術
 - **Python バージョン:** Python 3.9+
-- **依存関係管理:** pip (requirements.txt)
+- **依存関係管理:** pip (requirements_base.txt, requirements_gcp.txt, requirements_ortools.txt)
 - **コード整形:** Ruff (black併用)
 - **型ヒント:** typingモジュールを厳格に使用
 - **テストフレームワーク:** pytest

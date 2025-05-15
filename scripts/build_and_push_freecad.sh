@@ -73,7 +73,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --memory 2Gi \
     --cpu 2 \
     --timeout 3600 \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,BUCKET_NAME=house-design-ai-data" || handle_error "Cloud Runへのデプロイに失敗しました"
+    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json,USE_GCP_DEFAULT_CREDENTIALS=true,BUCKET_NAME=house-design-ai-data" || handle_error "Cloud Runへのデプロイに失敗しました"
 
 # デプロイ完了後の情報表示
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)') || handle_error "サービスURLの取得に失敗しました"
@@ -82,4 +82,4 @@ echo "================================================"
 echo "デプロイが正常に完了しました！"
 echo "新しいタグ: ${IMAGE_TAG}"
 echo "デプロイされたサービスURL: ${SERVICE_URL}"
-echo "================================================"  
+echo "================================================"    

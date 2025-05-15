@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # ユーティリティをインポート
 try:
-    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer
+    from utils.style import apply_custom_css, display_logo, display_footer
 except ImportError as e:
     st.error(f"スタイルユーティリティのインポート失敗: {e}")
 

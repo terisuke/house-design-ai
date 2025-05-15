@@ -53,9 +53,9 @@ class Site:
         grid,
         positions,
         target_name: str,
-        neighbor_name=None,
-        madori_choices: dict = None,
-        valid_mask: np.ndarray = None,
+        neighbor_name: Optional[str] = None,
+        madori_choices: Optional[Dict[str, List[Tuple[int, int]]]] = None,
+        valid_mask: Optional[np.ndarray] = None,
     ):
         """
         指定した target_name の部屋を配置する。
@@ -87,14 +87,14 @@ class Site:
                     # 左隣
                     if (
                         x + target_w == neighbor_x
-                        and (neighbor_y - target_h) < y < (neighbor_y + neighbor_h)
+                        and (neighbor_y - target_h) < y < (neighbor_y + neighbor_h if neighbor_h is not None else 0)
                         and (y + target_h) <= self.grid_h
                     ):
                         madori_choice_list.append((x, y))
                     # 右隣
                     elif (
-                        x == neighbor_x + neighbor_w
-                        and (neighbor_y - target_h) < y < (neighbor_y + neighbor_h)
+                        x == neighbor_x + (neighbor_w if neighbor_w is not None else 0)
+                        and (neighbor_y - target_h) < y < (neighbor_y + (neighbor_h if neighbor_h is not None else 0))
                         and (y + target_h) <= self.grid_h
                         and (x + target_w) <= self.grid_w
                     ):
@@ -102,14 +102,14 @@ class Site:
                     # 上隣
                     elif (
                         y + target_h == neighbor_y
-                        and (neighbor_x - target_w) < x < (neighbor_x + neighbor_w)
+                        and (neighbor_x - target_w) < x < (neighbor_x + (neighbor_w if neighbor_w is not None else 0))
                         and (x + target_w) <= self.grid_w
                     ):
                         madori_choice_list.append((x, y))
                     # 下隣
                     elif (
-                        y == neighbor_y + neighbor_h
-                        and (neighbor_x - target_w) < x < (neighbor_x + neighbor_w)
+                        y == neighbor_y + (neighbor_h if neighbor_h is not None else 0)
+                        and (neighbor_x - target_w) < x < (neighbor_x + (neighbor_w if neighbor_w is not None else 0))
                         and (x + target_w) <= self.grid_w
                         and (y + target_h) <= self.grid_h
                     ):
@@ -160,7 +160,7 @@ class Site:
 
 
 # 廊下（Corridor）用の定義
-corridor = Madori(name="C", code=7, width=1, height=1, neighbor_name=None)
+corridor = Madori(name="C", code=7, width=1, height=1, neighbor_name="")
 
 
 def create_madori_odict(L_size=(4, 3), D_size=(3, 2), K_size=(2, 2), UT_size=(2, 2)):
@@ -169,7 +169,7 @@ def create_madori_odict(L_size=(4, 3), D_size=(3, 2), K_size=(2, 2), UT_size=(2,
     トイレ(T)は 幅1 x 高さ2 (2マス) で固定。
     """
     return OrderedDict(
-        E=Madori("E", 1, 2, 2, None),  # 玄関（2×2固定）
+        E=Madori("E", 1, 2, 2, ""),  # 玄関（2×2固定）
         L=Madori("L", 2, L_size[0], L_size[1], "E"),
         K=Madori("K", 4, K_size[0], K_size[1], "L"),
         D=Madori("D", 3, D_size[0], D_size[1], "K"),
@@ -347,7 +347,7 @@ def find_largest_empty_rectangle(grid):
 
 
 madori_odict = OrderedDict(
-    E=Madori("E", 1, 2, 2, None),  # 玄関
+    E=Madori("E", 1, 2, 2, ""),  # 玄関
     L=Madori("L", 2, 5, 3, "E"),
     K=Madori("K", 4, 2, 1, "L"),
     D=Madori("D", 3, 3, 2, "K"),

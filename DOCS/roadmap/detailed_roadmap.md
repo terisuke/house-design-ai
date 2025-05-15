@@ -43,7 +43,8 @@
 - [x] CP-SAT最小PoCの開発
   - [x] 3LDKの基本レイアウト生成
   - [x] 910mmグリッド + 採光条件 + 階段寸法の基本制約実装
-  - [ ] 建築基準法チェック機能の基本実装
+  - [x] 建築基準法チェック機能の基本実装（採光条件、階段寸法）
+  - [ ] 建築基準法チェック機能の拡張（建ぺい率・容積率、日影規制、高さ制限）
 
 ### 2. 建築基準法チェック機能
 - [ ] 基本チェック機能の実装
@@ -299,4 +300,4 @@
 - [Google Cloud Platform](https://cloud.google.com/)
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [FreeCAD Documentation](https://wiki.freecadweb.org/)
-- [Streamlit Documentation](https://docs.streamlit.io/)                                                                                                                                                                                                                                                                                                                                                                                                
+- [Streamlit Documentation](https://docs.streamlit.io/)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
