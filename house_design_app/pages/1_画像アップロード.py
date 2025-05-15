@@ -17,6 +17,10 @@ import numpy as np
 import requests
 import streamlit as st
 
+# ロギング設定を最初に行う
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("streamlit-app")
+
 # PyTorchのクラスパス問題を解決
 import torch
 from PIL import Image
@@ -206,10 +210,6 @@ from src.cloud.storage import (
     initialize_gcs_client,
     upload_to_gcs,
 )
-
-# ロギング設定を最初に行う
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("streamlit-app")
 
 # PyTorchとStreamlitの互換性問題の解決
 import torch
