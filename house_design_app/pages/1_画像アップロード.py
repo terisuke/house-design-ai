@@ -17,6 +17,10 @@ import numpy as np
 import requests
 import streamlit as st
 
+# ロギング設定を最初に行う
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("streamlit-app")
+
 # PyTorchのクラスパス問題を解決
 import torch
 from PIL import Image
@@ -93,6 +97,14 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
     Returns:
         Dict[str, Any]: APIレスポンス
     """
+    # グローバル変数 freecad_api_available をチェック
+    if not globals().get('freecad_api_available', False):
+        logger.warning("FreeCAD APIが利用できないため、2D図面生成をスキップします")
+        return {
+            "success": False,
+            "error": "FreeCAD APIが利用できません。APIモードのみをサポートしています。"
+        }
+    
     if isinstance(grid_data, str) and os.path.exists(grid_data):
         file_path = grid_data
         grid_data = {"file_path": file_path}
@@ -101,6 +113,7 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
         freecad_api_url = os.environ.get(
             "FREECAD_API_URL", "http://freecad-api-service:8080"
         )
+        logger.info(f"FreeCAD API URL: {freecad_api_url}")
 
         # 一時ファイルを作成
         with tempfile.NamedTemporaryFile(suffix=".fcstd", delete=False) as temp_file:
@@ -134,9 +147,17 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
                 # ファイルをアップロードして2D変換をリクエスト
                 with open(temp_file_path, "rb") as f:
                     files = {"file": (file_name, f, "application/octet-stream")}
-                    response = requests.post(
-                        f"{freecad_api_url}/convert/2d", files=files, timeout=60
-                    )
+                    
+                    try:
+                        response = requests.post(
+                            f"{freecad_api_url}/convert/2d", files=files, timeout=60
+                        )
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"FreeCAD APIリクエストエラー: {e}")
+                        return {
+                            "success": False,
+                            "error": f"APIリクエストエラー: {e}",
+                        }
 
                 # 一時ファイルを削除
                 os.unlink(temp_file_path)
@@ -158,6 +179,8 @@ def convert_to_2d_drawing(grid_data: Union[Dict[str, Any], str]) -> Dict[str, An
 
     except Exception as e:
         logger.error(f"2D図面生成エラー: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
 # CAD表示モジュールのインポート
@@ -170,6 +193,16 @@ try:
     cad_display_available = True
 except ImportError as e:
     cad_display_available = False
+    logger.warning(f"CAD表示モジュールのインポートに失敗しました: {e}")
+
+# FreeCAD APIクライアントの設定
+try:
+    # FreeCADのインポートは試みず、APIクライアントの設定のみ行う
+    logger.info("FreeCAD APIに接続できました")
+    freecad_api_available = True
+except Exception as e:
+    logger.warning(f"FreeCADのインポートに失敗しました: {e}")
+    freecad_api_available = False
 
 from src.cloud.storage import (
     download_dataset,
@@ -177,10 +210,6 @@ from src.cloud.storage import (
     initialize_gcs_client,
     upload_to_gcs,
 )
-
-# ロギング設定を最初に行う
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("streamlit-app")
 
 # PyTorchとStreamlitの互換性問題の解決
 import torch
@@ -236,6 +265,13 @@ def load_yolo_model(model_path: Optional[str] = None):
         model_path = download_model_from_gcs()
 
     try:
+        # PyTorch 2.6以降での安全なグローバルの登録
+        try:
+            torch.serialization.add_safe_globals(['ultralytics.nn.tasks.SegmentationModel'])
+        except AttributeError:
+            logger.warning("PyTorch 2.6未満のバージョンでは add_safe_globals は利用できません")
+        
+        # モデルロード時にweights_only=Falseを指定
         from ultralytics import YOLO
         model = YOLO(model_path)
         # モデルをセッションステートに保存
