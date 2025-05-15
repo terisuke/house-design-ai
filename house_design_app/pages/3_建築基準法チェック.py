@@ -10,15 +10,7 @@ import pandas as pd
 import sys
 from pathlib import Path
 from PIL import Image
-
-# 親ディレクトリをPythonパスに追加
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# ユーティリティをインポート
-try:
-    from house_design_app.utils.style import apply_custom_css, display_logo, display_footer, section_divider
-except ImportError as e:
-    st.error(f"スタイルユーティリティのインポート失敗: {e}")
+from utils.style import apply_custom_css, display_logo, display_footer, section_divider
 
 # ロギング設定
 logging.basicConfig(level=logging.INFO)
