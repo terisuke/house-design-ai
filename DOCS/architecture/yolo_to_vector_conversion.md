@@ -227,7 +227,16 @@ def convert_yolo_to_vector_graph(yolo_annotation_path, output_path, plot=False):
     # 910mmグリッドへのスナップ準備
     # 実際の縮尺は図面によって異なるため、ここでは仮の変換係数を使用
     # 本番実装では、図面の実寸情報から変換係数を算出する必要がある
-    pixels_per_meter = 50  # 仮の値: 1メートルあたり50ピクセル
+    def calculate_pixels_per_meter(drawing_data):
+        """実際の図面の実世界寸法からスケーリング係数を動的に計算します"""
+        # 図面データからスケールを抽出
+        real_width_meters = drawing_data.get("width_meters", 20.0)  # デフォルト値
+        image_width_pixels = drawing_data.get("width_pixels", 1000)  # デフォルト値
+        
+        return image_width_pixels / real_width_meters
+    
+    # 固定値 '50' の代わりに関数からの出力を使用
+    pixels_per_meter = calculate_pixels_per_meter(drawing_data)
     grid_size_mm = 910     # グリッドサイズ（mm）
     grid_size_pixels = grid_size_mm / 1000 * pixels_per_meter
     

@@ -34,7 +34,7 @@ FreeCAD APIは以下のように実装されています：
 - `/convert/3d`: FCStdファイルをSTL形式に変換
 - `/convert/stl-to-gltf`: STLファイルをglTF形式に変換
 - `/process/drawing`: 3DモデルからCAD図面を生成
-- `/generate`: 指定されたパラメータに基づいて建物の3Dモデルを生成
+- `/generate/model`: 指定されたパラメータに基づいて建物の3Dモデルを生成
 
 ## 依存関係
 

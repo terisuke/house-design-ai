@@ -249,20 +249,22 @@ def create_3ldk_model(site_width: float, site_height: float, constraints: Option
     grid_size_scaled = int(constraints.grid_size * 100)  # mからcmへ変換
     
     for room_name, room in rooms.items():
+        zero_var = model.NewConstant(0)
+        
         room.x = model.NewIntVar(0, site_width_scaled, f"{room_name}_x")
-        model.AddModuloEquality(0, room.x, grid_size_scaled)
+        model.AddModuloEquality(zero_var, room.x, grid_size_scaled)
         
         room.y = model.NewIntVar(0, site_height_scaled, f"{room_name}_y")
-        model.AddModuloEquality(0, room.y, grid_size_scaled)
+        model.AddModuloEquality(zero_var, room.y, grid_size_scaled)
         
         min_dim = int(np.sqrt(room.min_area * SCALE * SCALE / room.preferred_ratio))
         min_dim = ((min_dim + grid_size_scaled - 1) // grid_size_scaled) * grid_size_scaled
         
         room.width = model.NewIntVar(min_dim, site_width_scaled, f"{room_name}_width")
-        model.AddModuloEquality(0, room.width, grid_size_scaled)
+        model.AddModuloEquality(zero_var, room.width, grid_size_scaled)
         
         room.height = model.NewIntVar(min_dim, site_height_scaled, f"{room_name}_height")
-        model.AddModuloEquality(0, room.height, grid_size_scaled)
+        model.AddModuloEquality(zero_var, room.height, grid_size_scaled)
         
         room.area = model.NewIntVar(
             int(room.min_area * SCALE * SCALE),
@@ -436,12 +438,12 @@ def solve_and_convert(model: cp_model.CpModel, rooms: Dict[str, Room], solver: c
             assert room.width is not None and room.height is not None
             assert room.area is not None
             
-            x = solver.Value(room.x)
-            y = solver.Value(room.y)
-            width = solver.Value(room.width)
-            height = solver.Value(room.height)
-            area = solver.Value(room.area)
-            total_area += area
+            x_meters = solver.Value(room.x) / 100.0
+            y_meters = solver.Value(room.y) / 100.0
+            width_meters = solver.Value(room.width) / 100.0
+            height_meters = solver.Value(room.height) / 100.0
+            area_sq_meters = solver.Value(room.area) / 10000.0  # 平方メートル
+            total_area += area_sq_meters
             
             room_type = "other"
             if room_name == "LDK":
@@ -459,11 +461,11 @@ def solve_and_convert(model: cp_model.CpModel, rooms: Dict[str, Room], solver: c
             
             room_layout = RoomLayout(
                 name=room_name,
-                x=x,
-                y=y,
-                width=width,
-                height=height,
-                area=area,
+                x=x_meters,
+                y=y_meters,
+                width=width_meters,
+                height=height_meters,
+                area=area_sq_meters,
                 room_type=room_type
             )
             room_layouts.append(room_layout)

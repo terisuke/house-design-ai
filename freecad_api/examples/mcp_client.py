@@ -73,7 +73,7 @@ class MCPClient:
         width: float,
         length: float,
         height: float,
-        position: List[float] = [0, 0, 0],
+        position: Optional[List[float]] = None,
         name: str = "Box",
     ) -> Dict[str, Any]:
         """
@@ -91,6 +91,9 @@ class MCPClient:
         """
         if not self.session_id:
             await self.initialize()
+
+        if position is None:
+            position = [0, 0, 0]
 
         async with aiohttp.ClientSession() as session:
             async with session.post(

@@ -17,7 +17,7 @@ try:
 except ImportError:
     logging.error("google-cloud-storage package is not installed. Cloud Storage functionality will be disabled.")
     gcs_storage = None
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 
 try:
     import trimesh
@@ -134,10 +134,39 @@ class ModelParameters(BaseModel):
 
 
 class ModelRequest(BaseModel):
-    width: float = 10.0
-    length: float = 10.0
-    height: float = 3.0
+    width: float = Field(10.0, description="建物の幅（メートル）", gt=0)
+    length: float = Field(10.0, description="建物の長さ（メートル）", gt=0)
+    height: float = Field(3.0, description="建物の高さ（メートル）", gt=0)
     parameters: ModelParameters = ModelParameters()
+    
+    @validator('width', 'length', 'height')
+    def validate_dimensions(cls, v):
+        if v <= 0:
+            raise ValueError("寸法は0より大きい値である必要があります")
+        if v > 100:
+            raise ValueError("寸法は100メートル以下である必要があります")
+        return v
+
+class GenerateModelRequest(BaseModel):
+    layout: List[Dict[str, Any]] = Field(..., description="間取り情報の配列")
+    settings: Optional[Dict[str, Any]] = Field(None, description="生成設定")
+    
+    @validator('layout')
+    def validate_layout(cls, v):
+        if not v:
+            raise ValueError("間取り情報は空であってはなりません")
+        for room in v:
+            if 'name' not in room:
+                raise ValueError("各部屋には'name'が必要です")
+            if 'x' not in room or 'y' not in room or 'width' not in room or 'height' not in room:
+                raise ValueError("各部屋には座標(x,y)と寸法(width,height)が必要です")
+        return v
+    
+    @validator('settings')
+    def validate_settings(cls, v):
+        if v is None:
+            return {"wall_thickness": 0.12, "floor_height": 0.1}
+        return v
 
 
 class ModelResponse(BaseModel):
@@ -920,22 +949,44 @@ async def process_drawing(
         )
 
 
-@app.post("/generate")
-async def generate_model(request: ModelRequest):
+@app.post("/generate/model")
+async def generate_model(request: GenerateModelRequest):
     """
     指定されたパラメータに基づいて建物の3Dモデルを生成します。
     """
     try:
         # 新しいドキュメントを作成
         doc = FreeCAD.newDocument("HouseModel")
-
-        # 基本形状を作成
-        box = Part.makeBox(request.width, request.length, request.height, 
-                       FreeCAD.Vector(0, 0, 0))
-
-        # オブジェクトを追加
-        obj = doc.addObject("Part::Feature", "House")
-        obj.Shape = box
+        
+        settings = request.settings or {}
+        wall_thickness = settings.get("wall_thickness", 0.12)  # デフォルト: 120mm
+        floor_height = settings.get("floor_height", 0.1)  # デフォルト: 100mm
+        wall_height = settings.get("wall_height", 2.9)  # デフォルト: 2900mm
+        
+        for room in request.layout:
+            name = room.get("name", "Room")
+            x = room.get("x", 0)
+            y = room.get("y", 0)
+            width = room.get("width", 1)
+            height = room.get("height", 1)
+            
+            box = Part.makeBox(width, height, wall_height)
+            box.translate(FreeCAD.Vector(x, y, 0))
+            
+            room_obj = doc.addObject("Part::Feature", name)
+            room_obj.Shape = box
+            
+            room_type = room.get("room_type", "other")
+            if room_type == "living":
+                room_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.2)  # 黄色
+            elif room_type == "bedroom":
+                room_obj.ViewObject.ShapeColor = (0.2, 0.8, 0.8)  # 水色
+            elif room_type == "kitchen":
+                room_obj.ViewObject.ShapeColor = (0.8, 0.2, 0.2)  # 赤色
+            elif room_type == "bathroom":
+                room_obj.ViewObject.ShapeColor = (0.2, 0.2, 0.8)  # 青色
+            else:
+                room_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8)  # グレー
 
         # ドキュメントを再計算
         doc.recompute()

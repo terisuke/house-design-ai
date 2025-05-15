@@ -45,15 +45,15 @@ class TestYoloToVector(unittest.TestCase):
         """YOLOアノテーションの読み込みテスト"""
         annotations = load_yolo_annotations(self.annotations_path)
         
-        self.assertIn(0, annotations)
-        self.assertIn(1, annotations)
-        self.assertEqual(len(annotations[0]), 1)
-        self.assertEqual(len(annotations[1]), 1)
+        self.assertIn('0', annotations)
+        self.assertIn('1', annotations)
+        self.assertEqual(len(annotations['0']), 1)
+        self.assertEqual(len(annotations['1']), 1)
         
-        self.assertAlmostEqual(annotations[0][0]['x_center'], 0.5)
-        self.assertAlmostEqual(annotations[0][0]['y_center'], 0.5)
-        self.assertAlmostEqual(annotations[0][0]['width'], 0.6)
-        self.assertAlmostEqual(annotations[0][0]['height'], 0.6)
+        self.assertAlmostEqual(annotations['0'][0]['x_center'], 0.5)
+        self.assertAlmostEqual(annotations['0'][0]['y_center'], 0.5)
+        self.assertAlmostEqual(annotations['0'][0]['width'], 0.6)
+        self.assertAlmostEqual(annotations['0'][0]['height'], 0.6)
         
     def test_convert_yolo_to_mask(self):
         """YOLOアノテーションからマスク画像への変換テスト"""
@@ -229,9 +229,75 @@ class TestYoloToVector(unittest.TestCase):
         result = visualize_vector_data(site, vis_path)
         self.assertTrue(result)
 
+def create_test_data():
+    """多様なテストケースを含むテストデータを作成します"""
+    test_data = [
+        "0 0.5 0.5 0.3 0.4\n",
+        "0 0.05 0.05 0.1 0.1\n",
+        "0 0.95 0.95 0.1 0.1\n",
+        "0 0.5 0.5 0.9 0.9\n",
+        "0 0.5 0.5 0.01 0.01\n",
+        "0 0.3 0.3 0.2 0.2\n",
+        "0 0.4 0.4 0.2 0.2\n",
+        "1 0.7 0.7 0.2 0.2\n"
+    ]
+    return "".join(test_data)
+
 @pytest.fixture
 def test_annotations_path():
-    return Path(__file__).parent / "test_data" / "yolo_annotations.txt"
+    """テストアノテーションファイルのパスを返すフィクスチャ"""
+    path = Path(__file__).parent / "test_data" / "yolo_annotations.txt"
+    
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+        
+    if not os.path.exists(path):
+        with open(path, "w") as f:
+            f.write(create_test_data())
+            
+    if not os.path.exists(path):
+        pytest.skip(f"テストデータファイルが存在しません: {path}")
+        
+    return path
+
+def test_end_to_end_conversion(test_annotations_path, tmp_path):
+    """エンドツーエンドのYOLO-to-Vector変換テスト"""
+    input_image = str(tmp_path / "test_image.jpg")
+    input_annotations = str(test_annotations_path)
+    output_json = str(tmp_path / "test_output.json")
+    output_visualization = str(tmp_path / "test_visualization.png")
+    
+    img = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.imwrite(input_image, img)
+    
+    site = convert_yolo_to_vector(
+        annotations_path=input_annotations,
+        image_width=640,
+        image_height=480
+    )
+    
+    assert site is not None
+    assert len(site.building.rooms) > 0
+    
+    serialize_to_json(site, output_json)
+    assert os.path.exists(output_json)
+    
+    with open(output_json, 'r') as f:
+        json_data = json.load(f)
+        
+    assert 'building' in json_data
+    assert 'rooms' in json_data['building']
+    assert isinstance(json_data['building']['rooms'], list)
+    
+    visualize_vector_data(site, output_visualization)
+    assert os.path.exists(output_visualization)
+    
+    with pytest.raises(Exception):
+        convert_yolo_to_vector(
+            annotations_path="nonexistent.txt",
+            image_width=640,
+            image_height=480
+        )
 
 def test_yolo_to_vector_conversion(test_annotations_path):
     # 変換のテスト

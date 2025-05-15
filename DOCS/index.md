@@ -64,7 +64,12 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 詳細なAPIドキュメントは[こちら](../freecad_api/docs/api_documentation.md)を参照してください。
 
 ### Model Context Protocol (MCP)統合
-FreeCAD MCPを使用した効率的なCAD操作の例は[こちら](../freecad_api/examples/mcp_client.py)を参照してください。
+
+Model Context Protocol (MCP)は、大規模言語モデルと外部ツールを統合するためのオープンスタンダードプロトコルです。MCPを実装することで、AIアシスタントがCAD操作を理解し、実行できるようになります。
+
+FreeCAD MCPはこのプロトコルを実装し、AI支援によるCAD操作を可能にします。これにより、自然言語による3Dモデリング指示が実現し、設計プロセスが大幅に効率化されます。
+
+詳細は [examples/mcp_example.py](../freecad_api/examples/mcp_client.py) を参照してください。
 
 ## Streamlit実行方法
 
