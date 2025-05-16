@@ -39,7 +39,7 @@ House Design AIは、建物のセグメンテーションと間取り生成を�
 ## 技術スタック
 
 - **Python バージョン:** Python 3.9+
-- **依存関係管理:** pip (requirements_base.txt, requirements_gcp.txt, requirements_ortools.txt)
+- **依存関係管理:** pip (requirements-base.txt, requirements-gcp.txt, requirements-ortools.txt)
 - **コード整形:** Ruff (black併用)
 - **型ヒント:** typingモジュールを厳格に使用
 - **テストフレームワーク:** pytest
@@ -97,9 +97,9 @@ house-design-ai/
 ├── terraform/                # Terraformインフラストラクチャコード
 ├── tests/                    # テストコード
 ├── Dockerfile                # メインDockerfile
-├── requirements_base.txt     # 基本的な依存関係
-├── requirements_gcp.txt      # Google Cloud関連の依存関係
-├── requirements_ortools.txt  # 最適化関連の依存関係
+├── requirements-base.txt     # 基本的な依存関係
+├── requirements-gcp.txt      # Google Cloud関連の依存関係
+├── requirements-ortools.txt  # 最適化関連の依存関係
 ├── requirements-dev.txt      # 開発用依存関係
 ├── requirements.txt          # 旧依存関係ファイル（非推奨）
 ├── README.md                 # プロジェクト説明
@@ -156,16 +156,16 @@ source venv/bin/activate
 ```bash
 # 基本的な依存関係のインストール
 pip install --upgrade pip
-pip install -r requirements_base.txt
+pip install -r requirements-base.txt
 
 # Google Cloud関連の依存関係のインストール（必要に応じて）
-pip install -r requirements_gcp.txt
+pip install -r requirements-gcp.txt
 
 # 開発用依存関係のインストール（開発者向け）
 pip install -r requirements-dev.txt
 ```
 
-注意: CP-SAT最適化機能を使用する場合は、別の仮想環境を作成し、`requirements_ortools.txt`をインストールしてください。詳細は「依存関係の競合について」セクションを参照してください。
+注意: CP-SAT最適化機能を使用する場合は、別の仮想環境を作成し、`requirements-ortools.txt`をインストールしてください。詳細は「依存関係の競合について」セクションを参照してください。
 
 4. 環境変数の設定:
 ```bash
@@ -196,9 +196,9 @@ set PYTHONPATH=.
 
 この問題を解決するため、requirements.txtを以下の3つのファイルに分割し、**完全に分離された仮想環境**で使用します：
 
-- `requirements_base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
-- `requirements_gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
-- `requirements_ortools.txt`: 最適化関連のパッケージ（ortools等）
+- `requirements-base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
+- `requirements-gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
+- `requirements-ortools.txt`: 最適化関連のパッケージ（ortools等）
 
 #### 環境セットアップ手順
 
@@ -215,10 +215,10 @@ source venv_base/bin/activate  # Linuxの場合
 
 # 基本パッケージのインストール
 pip install --upgrade pip
-pip install -r requirements_base.txt
+pip install -r requirements-base.txt
 
 # Google Cloud関連パッケージをインストール
-pip install -r requirements_gcp.txt
+pip install -r requirements-gcp.txt
 
 # 環境変数の設定
 export PYTHONPATH=.  # Linuxの場合
@@ -241,8 +241,8 @@ source venv_ortools/bin/activate  # Linuxの場合
 
 # 基本パッケージとortoolsのインストール
 pip install --upgrade pip
-pip install -r requirements_base.txt  # 基本パッケージ（Google Cloud関連を除く）
-pip install -r requirements_ortools.txt  # ortools関連パッケージ
+pip install -r requirements-base.txt  # 基本パッケージ（Google Cloud関連を除く）
+pip install -r requirements-ortools.txt  # ortools関連パッケージ
 
 # 環境変数の設定
 export PYTHONPATH=.  # Linuxの場合
