@@ -41,9 +41,9 @@
 
 本プロジェクトでは依存関係の競合（特にprotobufのバージョン）を解決するために、以下の3つの分離された依存関係ファイルを使用しています：
 
-- `requirements_base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
-- `requirements_gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
-- `requirements_ortools.txt`: 最適化関連のパッケージ（ortools等）
+- `requirements-base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
+- `requirements-gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
+- `requirements-ortools.txt`: 最適化関連のパッケージ（ortools等）
 
 これらのファイルは、異なる仮想環境で使用することで、依存関係の競合を回避しています。詳細は[README](../README.md)の「依存関係の競合について」セクションを参照してください。
 

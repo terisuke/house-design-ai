@@ -50,9 +50,9 @@ house-design-ai/
 ├── terraform/                # Terraformインフラストラクチャコード
 ├── tests/                    # テストコード
 ├── Dockerfile                # メインDockerfile
-├── requirements_base.txt     # 基本的な依存関係
-├── requirements_gcp.txt      # Google Cloud関連の依存関係
-├── requirements_ortools.txt  # 最適化関連の依存関係
+├── requirements-base.txt     # 基本的な依存関係
+├── requirements-gcp.txt      # Google Cloud関連の依存関係
+├── requirements-ortools.txt  # 最適化関連の依存関係
 ├── requirements-dev.txt      # 開発用依存関係
 ├── README.md                 # プロジェクト説明
 ├── directorystructure.md     # ディレクトリ構造
