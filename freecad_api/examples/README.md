@@ -62,6 +62,25 @@ chmod +x curl_examples.sh
        - wall_thickness: 壁の厚さ（0.1m ～ 1.0m）
        - window_size: 窓のサイズ（0.5m ～ 3.0m）
 
+- 本番APIエンドポイント例: `https://freecad-api-513507930971.asia-northeast1.run.app/generate`
+
+## テスト方法
+
+- Cloud Run本番APIの動作確認は、プロジェクトルートで
+```bash
+python3 scripts/test_freecad_api.py
+```
+- テスト成功例:
+```
+✅ FreeCAD APIテスト成功
+レスポンス: {
+  "status": "success",
+  "message": "モデルを生成しました",
+  "file": "/tmp/model.FCStd",
+  "storage_url": "gs://house-design-ai-data/models/model.FCStd"
+}
+```
+
 ## レスポンス例
 
 ```json
@@ -81,4 +100,4 @@ chmod +x curl_examples.sh
 2. 無効なパラメータ
 3. サーバーエラー
 
-エラーが発生した場合は、適切なエラーメッセージが表示されます。 
+エラーが発生した場合は、適切なエラーメッセージが表示されます。  

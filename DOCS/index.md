@@ -37,6 +37,16 @@
 - ✅ ロゴ表示とモデルロード問題の修正
 - ✅ デプロイスクリプトの最適化
 
+## 依存関係管理
+
+本プロジェクトでは依存関係の競合（特にprotobufのバージョン）を解決するために、以下の3つの分離された依存関係ファイルを使用しています：
+
+- `requirements-base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
+- `requirements-gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
+- `requirements-ortools.txt`: 最適化関連のパッケージ（ortools等）
+
+これらのファイルは、異なる仮想環境で使用することで、依存関係の競合を回避しています。詳細は[README](../README.md)の「依存関係の競合について」セクションを参照してください。
+
 ## FreeCAD API実装の詳細
 
 FreeCAD APIは以下のエンドポイントで利用可能です：

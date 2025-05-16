@@ -17,15 +17,28 @@ RUN apt-get update && apt-get install -y \
 COPY ./requirements-freecad-api.txt /app/
 RUN pip3 install --no-cache-dir -r /app/requirements-freecad-api.txt
 
+# trimeshとその依存関係をインストール
+RUN pip3 install --no-cache-dir trimesh[easy] pyglet
+
 # FreeCADのPythonパスを環境変数に設定
 ENV PYTHONPATH=/usr/lib/freecad/lib
 ENV QT_QPA_PLATFORM=offscreen
 
-# APIコードとスクリプトをコピー
-COPY ./scripts/run_freecad.py /app/
+# アプリケーションディレクトリの作成
+RUN mkdir -p /app/config
+
+# Use secret mount for service account key
+RUN --mount=type=secret,id=gcp_credentials \
+    if [ -f "/run/secrets/gcp_credentials" ]; then \
+      mkdir -p /app/config && \
+      cp /run/secrets/gcp_credentials /app/config/service_account.json; \
+    fi
+
+# APIコードをコピー
+COPY ./main.py /app/
 
 # 実行権限を設定
-RUN chmod +x /app/run_freecad.py
+RUN chmod +x /app/main.py
 
 # FastAPIアプリケーションを実行
-CMD ["python3", "/app/run_freecad.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

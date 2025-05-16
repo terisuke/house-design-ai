@@ -30,12 +30,60 @@ source venv/bin/activate  # Linuxの場合
 
 3. 依存関係のインストール:
 ```bash
-pip install -r requirements.txt
+# 基本的な依存関係のインストール
+pip install -r requirements-base.txt
+
+# Google Cloud関連の依存関係のインストール（必要に応じて）
+pip install -r requirements-gcp.txt
+
+# 開発用依存関係のインストール（開発者向け）
+pip install -r requirements-dev.txt
 ```
 
-4. 開発用依存関係のインストール:
+注意: CP-SAT最適化機能を使用する場合は、別の仮想環境を作成し、`requirements-ortools.txt`をインストールしてください。詳細は以下の「依存関係の競合について」セクションを参照してください。
+
+### 依存関係の競合について
+
+本プロジェクトでは、ortoolsとGoogle Cloud関連パッケージ間で深刻なprotobufバージョン競合があります。これらのパッケージを同じ環境にインストールすると正常に動作しません。そのため、依存関係を以下の3つのファイルに分割しています：
+
+- `requirements-base.txt`: 基本的なパッケージ（ultralytics, streamlit, テスト・開発ツールなど）
+- `requirements-gcp.txt`: Google Cloud関連のパッケージ（google-cloud-storage, google-cloud-aiplatform等）
+- `requirements-ortools.txt`: 最適化関連のパッケージ（ortools等）
+
+#### 環境セットアップ手順
+
+##### 1. 基本環境 + Google Cloud（Streamlit UI、クラウド連携機能用）
+
 ```bash
-pip install -r requirements-dev.txt
+# 基本環境のセットアップ
+python -m venv venv_base
+source venv_base/bin/activate  # Linux / macOS
+# または
+.\venv_base\Scripts\Activate.ps1  # Windows PowerShell
+# または
+.\venv_base\Scripts\activate.bat  # Windows CMD
+
+# 基本パッケージのインストール
+pip install -r requirements-base.txt
+
+# Google Cloud関連パッケージをインストール
+pip install -r requirements-gcp.txt
+```
+
+##### 2. 最適化環境（CP-SAT最適化機能用）
+
+```bash
+# ortools用の完全に分離された環境
+python -m venv venv_ortools
+source venv_ortools/bin/activate  # Linux / macOS
+# または
+.\venv_ortools\Scripts\Activate.ps1  # Windows PowerShell
+# または
+.\venv_ortools\Scripts\activate.bat  # Windows CMD
+
+# 基本パッケージとortoolsのインストール
+pip install -r requirements-base.txt
+pip install -r requirements-ortools.txt
 ```
 
 ## 開発ワークフロー
@@ -135,4 +183,4 @@ pytest --cov=src tests/
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で公開されています。貢献する際は、このライセンスに同意したものとみなされます。 
+このプロジェクトはMITライセンスの下で公開されています。貢献する際は、このライセンスに同意したものとみなされます。                

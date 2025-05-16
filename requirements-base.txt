@@ -1,0 +1,23 @@
+ultralytics==8.3.81
+streamlit==1.30.0
+PyYAML==6.0.1
+opencv-python-headless==4.9.0.80
+matplotlib==3.7.5
+pillow==10.2.0
+requests==2.31.0
+
+# テスト・開発ツール
+pytest==7.4.3
+ruff==0.1.14
+black==23.12.1
+ipython==8.12.3
+pydantic==2.5.3
+
+# CAD関連の依存関係
+pythreejs>=2.4.2
+numpy-stl>=3.0.1
+shapely>=2.0.2
+numpy>=1.24.0
+
+setuptools>=65.5.0
+wheel
