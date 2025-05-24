@@ -318,6 +318,9 @@ def main():
     parser.add_argument(
         "--update-yaml", action="store_true",
         help="data.yamlファイルを更新するかどうか")
+    parser.add_argument(
+        "--skip-upload", action="store_true",
+        help="GCSへのアップロードをスキップする")
 
     args = parser.parse_args()
 
@@ -351,14 +354,17 @@ def main():
         logger.error("ファイルのコピーに失敗しました")
         return 1
 
-    if not upload_to_gcs():
-        logger.error("GCSへのアップロードに失敗しました")
-        return 1
-
-    if args.update_yaml:
-        if not update_data_yaml():
-            logger.error("data.yamlの更新に失敗しました")
+    if not args.skip_upload:
+        if not upload_to_gcs():
+            logger.error("GCSへのアップロードに失敗しました")
             return 1
+
+        if args.update_yaml:
+            if not update_data_yaml():
+                logger.error("data.yamlの更新に失敗しました")
+                return 1
+    else:
+        logger.info("GCSアップロードをスキップしました")
 
     logger.info("データセット分割・アップロード処理が完了しました")
     return 0

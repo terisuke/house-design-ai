@@ -12,19 +12,31 @@ cd "$PROJECT_ROOT"
 
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
-if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-  export GOOGLE_APPLICATION_CREDENTIALS="$PROJECT_ROOT/config/service_account.json"
-  echo "GOOGLE_APPLICATION_CREDENTIALS環境変数を設定: $GOOGLE_APPLICATION_CREDENTIALS"
+TEST_MODE=0
+if [[ "$*" == *"--skip-upload"* ]]; then
+  TEST_MODE=1
+  echo "テストモード: GCSアップロードをスキップします"
 fi
 
-if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-  echo "エラー: GCP認証情報ファイルが見つかりません: $GOOGLE_APPLICATION_CREDENTIALS"
-  echo "認証情報ファイルを配置するか、GOOGLE_APPLICATION_CREDENTIALS環境変数を設定してください。"
-  exit 1
+if [ $TEST_MODE -eq 0 ]; then
+  if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    export GOOGLE_APPLICATION_CREDENTIALS="$PROJECT_ROOT/config/service_account.json"
+    echo "GOOGLE_APPLICATION_CREDENTIALS環境変数を設定: $GOOGLE_APPLICATION_CREDENTIALS"
+  fi
+
+  if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    echo "エラー: GCP認証情報ファイルが見つかりません: $GOOGLE_APPLICATION_CREDENTIALS"
+    echo "認証情報ファイルを配置するか、GOOGLE_APPLICATION_CREDENTIALS環境変数を設定してください。"
+    exit 1
+  fi
 fi
 
 echo "データセット分割・アップロードスクリプトを実行します..."
-python scripts/split_and_upload_dataset.py --update-yaml
+if [ $TEST_MODE -eq 1 ]; then
+  python scripts/split_and_upload_dataset.py --skip-upload
+else
+  python scripts/split_and_upload_dataset.py --update-yaml
+fi
 
 if [ $? -eq 0 ]; then
   echo "データセット分割・アップロードが正常に完了しました。"
