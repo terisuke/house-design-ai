@@ -101,10 +101,10 @@ def update_data_yaml(yaml_path: str, train_dir: str, val_dir: str) -> bool:
 
         # クラス情報があることを確認
         if "nc" not in data_config:
-            data_config["nc"] = 5  # デフォルト値
+            data_config["nc"] = 27  # デフォルト値
 
         if "names" not in data_config:
-            data_config["names"] = ["Direction", "Direction2", "House", "Road", "Space"]
+            data_config["names"] = ['1F', '2F', 'CL1', 'CL2', 'CL3', 'CL4', 'CO', 'D', 'DN', 'DR', 'E', 'H', 'House', 'K', 'L', 'North', 'R1', 'R2', 'R3', 'R4', 'Road', 'ST', 'South', 'Space', 'UB', 'UP', 'WC']
         # 更新したYAMLを書き込み
         with open(yaml_path, "w") as f:
             yaml.dump(data_config, f)
