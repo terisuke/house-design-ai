@@ -9,8 +9,10 @@
 3. [コーディング規約](#コーディング規約)
 4. [テスト](#テスト)
 5. [ドキュメント](#ドキュメント)
-6. [プルリクエストプロセス](#プルリクエストプロセス)
-7. [コミュニケーション](#コミュニケーション)
+6. [セキュリティガイドライン](#セキュリティガイドライン)
+7. [クロスプラットフォーム開発](#クロスプラットフォーム開発)
+8. [プルリクエストプロセス](#プルリクエストプロセス)
+9. [コミュニケーション](#コミュニケーション)
 
 ## 開発環境のセットアップ
 
@@ -151,6 +153,107 @@ pytest --cov=src tests/
 3. **READMEの更新**
    - 新機能の追加時はREADMEを更新
    - セットアップ手順の変更を反映
+
+## セキュリティガイドライン
+
+セキュリティは最優先事項です。以下のガイドラインに従ってください。
+
+### 認証情報の取り扱い
+
+1. **Gitリポジトリには認証情報を含めない**
+   - `config/service_account.json`は`.gitignore`で除外済み
+   - API キー、パスワード、トークンをコードに含めない
+   - 環境変数やシークレット管理サービスを使用
+
+2. **Docker Secret Mount の使用**
+   ```bash
+   # 安全なDockerビルド例
+   docker buildx build \
+     --secret id=gcp_credentials,src=config/service_account.json \
+     -t myimage \
+     .
+   ```
+
+3. **ローカル開発での認証情報管理**
+   ```bash
+   # 認証情報の確認
+   ls -la config/service_account.json
+   
+   # ファイル権限の設定
+   chmod 600 config/service_account.json
+   ```
+
+### セキュリティベストプラクティス
+
+- **最小権限の原則**: 必要最小限の権限のみを付与
+- **定期的な認証情報のローテーション**: 90日ごとの更新を推奨
+- **依存関係の脆弱性チェック**: `pip audit`の定期実行
+- **コードスキャン**: セキュリティスキャンツールの活用
+
+## クロスプラットフォーム開発
+
+ARM64 Mac（M1/M2/M3/M4）からAMD64 Linux向けの開発について説明します。
+
+### Docker buildx の使用
+
+1. **buildx の設定**
+   ```bash
+   # multiarchビルダーの作成
+   docker buildx create --name multiarch --use
+   
+   # ビルダーの確認
+   docker buildx ls
+   ```
+
+2. **クロスプラットフォームビルド**
+   ```bash
+   # AMD64向けビルド（GCP用）
+   docker buildx build \
+     --platform linux/amd64 \
+     --push \
+     -t asia-northeast1-docker.pkg.dev/project/repo/image:tag \
+     .
+   ```
+
+### プラットフォーム別の考慮事項
+
+1. **パフォーマンスの違い**
+   - ARM64での開発: ネイティブ速度
+   - AMD64エミュレーション: 約50-70%の速度
+
+2. **依存関係の互換性**
+   - Python wheels の可用性確認
+   - ネイティブライブラリの対応状況
+
+3. **テスト戦略**
+   ```bash
+   # ローカル（ARM64）でのテスト
+   python -m pytest tests/
+   
+   # AMD64環境でのテスト（Docker内）
+   docker run --platform linux/amd64 myimage python -m pytest tests/
+   ```
+
+### 推奨ツール
+
+- **Docker Desktop**: buildx 標準搭載
+- **Colima**: 軽量なDocker環境（macOS）
+- **QEMU**: マルチアーキテクチャエミュレーション
+
+### トラブルシューティング
+
+1. **buildx エラー**
+   ```bash
+   # ビルダーの再作成
+   docker buildx rm multiarch
+   docker buildx create --name multiarch --use
+   ```
+
+2. **プラットフォーム不一致エラー**
+   ```bash
+   # 明示的なプラットフォーム指定
+   docker buildx build --platform linux/amd64 ...
+   ```
 
 ## プルリクエストプロセス
 

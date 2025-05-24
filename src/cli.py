@@ -37,7 +37,7 @@ def setup_vertex_parser(subparsers):
     parser.add_argument(
         "--container_uri",
         type=str,
-        default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov11-training-image:v1",
+        default="asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov11-training-image:v2",
         help="コンテナイメージURI",
     )
     parser.add_argument(

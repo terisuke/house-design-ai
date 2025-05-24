@@ -57,19 +57,25 @@ def get_image_and_label_files(
     image_files = {}
     label_files = {}
 
-    for filename in os.listdir(source_dir):
-        file_path = os.path.join(source_dir, filename)
+    # images/ディレクトリから画像ファイルを取得
+    images_dir = os.path.join(source_dir, "images")
+    if os.path.exists(images_dir):
+        for filename in os.listdir(images_dir):
+            file_path = os.path.join(images_dir, filename)
+            
+            if os.path.isfile(file_path) and filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                base_name = os.path.splitext(filename)[0]
+                image_files[base_name] = file_path
 
-        if os.path.isdir(file_path):
-            continue
-
-        if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-            base_name = os.path.splitext(filename)[0]
-            image_files[base_name] = file_path
-
-        elif filename.lower().endswith('.txt'):
-            base_name = os.path.splitext(filename)[0]
-            label_files[base_name] = file_path
+    # labels/ディレクトリからラベルファイルを取得
+    labels_dir = os.path.join(source_dir, "labels")
+    if os.path.exists(labels_dir):
+        for filename in os.listdir(labels_dir):
+            file_path = os.path.join(labels_dir, filename)
+            
+            if os.path.isfile(file_path) and filename.lower().endswith('.txt'):
+                base_name = os.path.splitext(filename)[0]
+                label_files[base_name] = file_path
 
     return image_files, label_files
 

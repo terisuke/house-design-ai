@@ -1,14 +1,31 @@
-
-# Vertex AI用パス 
-train: /app/house/train
-val: /app/house/val
-
-# ローカルでのディレクトリパス
-# train: datasets/house/train
-# val: datasets/house/val
-
-
-# number of classes
+names:
+- 1F
+- 2F
+- CL1
+- CL2
+- CL3
+- CL4
+- CO
+- D
+- DN
+- DR
+- E
+- H
+- House
+- K
+- L
+- North
+- R1
+- R2
+- R3
+- R4
+- Road
+- ST
+- South
+- Space
+- UB
+- UP
+- WC
 nc: 27
-# class names
-names: ['1F', '2F', 'CL1', 'CL2', 'CL3', 'CL4', 'CO', 'D', 'DN', 'DR', 'E', 'H', 'House', 'K', 'L', 'North', 'R1', 'R2', 'R3', 'R4', 'Road', 'ST', 'South', 'Space', 'UB', 'UP', 'WC']
+train: house/train/images
+val: house/val/images
