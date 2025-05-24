@@ -154,7 +154,7 @@ with tab3:
     st.subheader("API設定")
     
     # YOLOモデルの選択
-    yolo_model_options = ["YOLO v12n", "YOLO v12s", "YOLO v12m (デフォルト)", "YOLO v12l", "YOLO v12x"]
+    yolo_model_options = ["YOLO v11n", "YOLO v11s", "YOLO v11m (デフォルト)", "YOLO v11l", "YOLO v11x"]
     selected_yolo_model = st.selectbox(
         "YOLOモデル",
         options=yolo_model_options,

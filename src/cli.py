@@ -152,7 +152,7 @@ def setup_vertex_parser(subparsers):
 
 def setup_train_parser(subparsers):
     """トレーニング関連の引数パーサーを設定"""
-    parser = subparsers.add_parser("train", help="YOLOv8モデルをローカルでトレーニング")
+    parser = subparsers.add_parser("train", help="YOLOv11モデルをローカルでトレーニング")
 
     # 基本パラメータ
     parser.add_argument(

@@ -1,5 +1,5 @@
 """
-YOLOv8データセットの可視化モジュール。
+YOLOv11データセットの可視化モジュール。
 データセット内の画像とアノテーションを視覚的に確認するための機能を提供します。
 """
 import os
@@ -147,7 +147,7 @@ def visualize_dataset(
         
         # 画像とラベルのディレクトリ構造を検出
         possible_img_dirs = [
-            os.path.join(train_dir, 'images'),  # 標準的なYOLOv8構造
+            os.path.join(train_dir, 'images'),  # 標準的なYOLOv11構造
             train_dir,                           # 直接画像がある場合
         ]
         
@@ -163,7 +163,7 @@ def visualize_dataset(
         
         # 対応するラベルディレクトリを探す
         possible_label_dirs = [
-            os.path.join(os.path.dirname(img_dir), 'labels'),  # 標準的なYOLOv8構造
+            os.path.join(os.path.dirname(img_dir), 'labels'),  # 標準的なYOLOv11構造
             os.path.join(train_dir, 'labels'),                 # 別の一般的な構造
             os.path.join(os.path.dirname(train_dir), 'labels') # さらに別の可能性
         ]
@@ -275,7 +275,7 @@ def main() -> int:
     Returns:
         成功時は0、失敗時は1
     """
-    parser = argparse.ArgumentParser(description="YOLOv8データセットを視覚化")
+    parser = argparse.ArgumentParser(description="YOLOv11データセットを視覚化")
     parser.add_argument("--data_yaml", type=str, default="data.yaml", help="data.yamlファイルのパス")
     parser.add_argument("--num_samples", type=int, default=5, help="表示するサンプル数")
     parser.add_argument("--output_dir", type=str, default="visualization_results", help="出力ディレクトリ")
