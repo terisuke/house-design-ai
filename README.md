@@ -483,6 +483,9 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 - ✅ ロゴ表示とモデルロード問題の修正
 - ✅ デプロイスクリプトの最適化
 - ✅ データセット分割・GCSアップロードスクリプトの実装（7:3分割）
+- ✅ Vertex AI統合（Docker secret mount、ARM64→AMD64クロスビルド対応）
+- ✅ セキュリティ改善（サービスアカウント認証情報の安全な処理）
+- ✅ 統合ビルド＆デプロイスクリプト（build_and_run_vertex_training.sh）
 
 ### 進行中の機能
 - 🟡 FreeCAD APIの完全実装
@@ -533,3 +536,55 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 ## 連絡先
 
 プロジェクトに関する質問や提案がある場合は、Issueを作成してください。
+
+### Vertex AI統合（YOLO学習）
+
+1. Vertex AIカスタムジョブでのYOLO学習（推奨）:
+```bash
+# 仮想環境を有効化していることを確認
+source venv_base/bin/activate  # Linuxの場合
+
+# 環境変数の設定
+export PYTHONPATH=.  # Linuxの場合
+
+# 基本実行（デフォルト設定：エポック50、バッチサイズ2、画像サイズ416）
+./scripts/build_and_run_vertex_training.sh
+
+# カスタムパラメータで実行
+./scripts/build_and_run_vertex_training.sh \
+  --epochs 100 \
+  --batch-size 4 \
+  --image-size 640 \
+  --model yolo11l-seg.pt \
+  --lr0 0.01 \
+  --optimizer AdamW
+
+# ビルドをスキップして既存イメージで学習のみ実行
+./scripts/build_and_run_vertex_training.sh --skip-build --epochs 200
+```
+
+2. 利用可能なオプション:
+- `--epochs NUM`: エポック数 (デフォルト: 50)
+- `--batch-size NUM`: バッチサイズ (デフォルト: 2)
+- `--image-size NUM`: 画像サイズ (デフォルト: 416)
+- `--model STRING`: モデル名 (デフォルト: yolo11m-seg.pt)
+- `--lr0 FLOAT`: 学習率 (デフォルト: 0.001)
+- `--optimizer STRING`: オプティマイザ (デフォルト: AdamW)
+- `--iou-threshold FLOAT`: IoU閾値 (デフォルト: 0.5)
+- `--data-yaml STRING`: データセット設定ファイル (デフォルト: data.yaml)
+- `--skip-build`: ビルドをスキップして既存イメージを使用
+- `--help`: ヘルプを表示
+
+#### セキュリティとクロスプラットフォーム対応
+
+本プロジェクトでは以下の最新技術を採用しています：
+
+**セキュリティ改善:**
+- サービスアカウント認証情報をGitリポジトリに含めない
+- Docker secret mountを使用した安全な認証情報の処理
+- ビルド時のみ認証情報にアクセス、最終イメージには含まれない
+
+**クロスプラットフォーム対応:**
+- ARM64 Mac (M1/M2/M3/M4)からAMD64 Linux用イメージのビルド
+- Docker buildxを使用したマルチアーキテクチャビルド
+- Google Cloud Platform (AMD64)での確実な動作保証

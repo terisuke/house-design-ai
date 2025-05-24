@@ -27,5 +27,5 @@ names:
 - UP
 - WC
 nc: 27
-train: gs://yolo-v11-training/house/train/images/
-val: gs://yolo-v11-training/house/val/images/
+train: house/train/images
+val: house/val/images

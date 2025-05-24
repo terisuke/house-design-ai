@@ -7,8 +7,35 @@
 - Google Cloudアカウントとプロジェクト
 - Google Cloud CLIのインストールと設定
 - Terraformのインストール
-- Dockerのインストール
+- Dockerのインストール（ARM64 Mac の場合は Docker buildx も推奨）
 - サービスアカウント認証情報（`service_account.json`）
+
+## 新機能（2025年5月25日追加）
+
+### Vertex AI統合とセキュリティ改善
+
+**Vertex AI YOLO学習統合:**
+- 統合されたビルド・デプロイ・学習スクリプト（`build_and_run_vertex_training.sh`）
+- カスタマイズ可能な学習パラメータ（エポック数、バッチサイズ、モデルサイズ等）
+- ARM64 Mac（M1/M2/M3/M4）からAMD64 Linux向けクロスプラットフォームビルド
+
+**セキュリティ強化:**
+- サービスアカウント認証情報をGitリポジトリに含めない設計
+- Docker secret mountを使用した安全な認証情報処理
+- ビルド時のみアクセス、最終イメージには認証情報を含まない
+
+**新しいスクリプト:**
+```bash
+# Vertex AI統合YOLO学習の実行
+./scripts/build_and_run_vertex_training.sh
+
+# カスタムパラメータでの実行例
+./scripts/build_and_run_vertex_training.sh \
+  --epochs 100 \
+  --batch-size 4 \
+  --image-size 640 \
+  --model yolo11l-seg.pt
+```
 
 ## デプロイの概要
 

@@ -144,7 +144,7 @@ def train_model(args: argparse.Namespace) -> int:
             logger.info(f"GCSからデータセットをダウンロードします: {args.bucket_name}")
 
             # トレーニングデータのダウンロード
-            train_dir = "/app/house/train"
+            train_dir = args.train_dir
             # train_dir が存在し、空でない場合は削除 (Vertex AI 環境を想定)
             if os.path.exists(train_dir) and os.listdir(train_dir):
                 logger.warning(f"{train_dir} は空ではありません。削除します。")
@@ -159,7 +159,7 @@ def train_model(args: argparse.Namespace) -> int:
                 return 1
 
             # 検証データのダウンロード
-            val_dir = "/app/house/val"
+            val_dir = args.val_dir
             # val_dir が存在し、空でない場合は削除
             if os.path.exists(val_dir) and os.listdir(val_dir):
                 logger.warning(f"{val_dir} は空ではありません。削除します。")
@@ -176,11 +176,11 @@ def train_model(args: argparse.Namespace) -> int:
             logger.info("GCSからのデータセットダウンロードが完了しました")
 
         # data.yamlのパス
-        data_yaml_path = "/app/config/data.yaml"
+        data_yaml_path = args.data_yaml
 
         # データ設定ファイルの更新
         if not update_data_yaml(
-            data_yaml_path, "/app/house/train/images", "/app/house/val/images"
+            data_yaml_path, f"{args.train_dir}/images", f"{args.val_dir}/images"
         ):
             logger.error("data.yamlの更新に失敗しました")
             return 1
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="gs://yolo-v11-training/runs/segment/train_20250311-143512/weights/best.pt",
+        default="yolo11n-seg.pt",
         help="ベースYOLOv11モデル",
     )
     parser.add_argument(
@@ -284,6 +284,39 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--val_dir", type=str, default="house/val", help="検証データディレクトリのパス"
+    )
+    parser.add_argument(
+        "--optimizer", type=str, default="AdamW", help="オプティマイザー"
+    )
+    parser.add_argument(
+        "--lr0", type=float, default=0.01, help="初期学習率"
+    )
+    parser.add_argument(
+        "--iou_threshold", type=float, default=0.7, help="IoU閾値"
+    )
+    parser.add_argument(
+        "--conf_threshold", type=float, default=0.25, help="信頼度閾値"
+    )
+    parser.add_argument(
+        "--rect", action="store_true", help="矩形トレーニングを使用するかどうか"
+    )
+    parser.add_argument(
+        "--cos_lr", action="store_true", help="コサイン学習率スケジューラーを使用するかどうか"
+    )
+    parser.add_argument(
+        "--mosaic", type=float, default=1.0, help="モザイク確率"
+    )
+    parser.add_argument(
+        "--degrees", type=float, default=0.0, help="回転角度（度）"
+    )
+    parser.add_argument(
+        "--scale", type=float, default=0.5, help="スケール範囲"
+    )
+    parser.add_argument(
+        "--upload_bucket", type=str, default=None, help="結果をアップロードするGCSバケット名"
+    )
+    parser.add_argument(
+        "--save_dir", type=str, default="runs/train", help="GCS上の保存ディレクトリパス"
     )
 
     args = parser.parse_args()
