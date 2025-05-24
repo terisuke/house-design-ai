@@ -33,7 +33,7 @@ usage() {
 }
 
 # デフォルト値
-EPOCHS=50
+EPOCHS=600
 BATCH_SIZE=2
 IMAGE_SIZE=416
 MODEL="yolo11m-seg.pt"
