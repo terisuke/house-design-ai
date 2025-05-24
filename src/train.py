@@ -263,7 +263,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         default="gs://yolo-v11-training/runs/segment/train_20250311-143512/weights/best.pt",
-        help="ベースYOLOv8モデル",
+        help="ベースYOLOv11モデル",
     )
     parser.add_argument(
         "--epochs", type=int, default=100, help="トレーニングエポック数"

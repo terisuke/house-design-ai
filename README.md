@@ -303,7 +303,23 @@ export PYTHONPATH=.  # Linuxの場合
 python src/inference.py --image path/to/image.jpg
 ```
 
-4. テストの実行:
+4. データセット分割・アップロード:
+```bash
+# 仮想環境を有効化していることを確認
+source venv_base/bin/activate  # Linuxの場合
+
+# 環境変数の設定
+export PYTHONPATH=.  # Linuxの場合
+export GOOGLE_APPLICATION_CREDENTIALS="config/service_account.json"  # GCP認証情報
+
+# スクリプトの実行
+bash scripts/run_split_and_upload.sh
+
+# アップロードをスキップしてローカルでの分割のみを実行（テスト用）
+bash scripts/run_split_and_upload.sh --skip-upload
+```
+
+5. テストの実行:
 ```bash
 # 仮想環境を有効化していることを確認
 source venv/bin/activate  # Linuxの場合
@@ -447,7 +463,7 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 - 一階の壁の高さ: 2900mm (2.9m)
 - 二階の壁の高さ: 2800mm (2.8m)
 
-## 開発状況（2025年5月15日時点）
+## 開発状況（2025年5月24日時点）
 
 ### 完了した機能
 - ✅ 環境セットアップ
@@ -466,6 +482,7 @@ FreeCAD APIでは以下のデフォルト値を使用しています：
 - ✅ Terraformによるインフラストラクチャのコード化
 - ✅ ロゴ表示とモデルロード問題の修正
 - ✅ デプロイスクリプトの最適化
+- ✅ データセット分割・GCSアップロードスクリプトの実装（7:3分割）
 
 ### 進行中の機能
 - 🟡 FreeCAD APIの完全実装
