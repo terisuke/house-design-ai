@@ -8,6 +8,8 @@ REPOSITORY="house-design-ai"
 IMAGE_NAME="yolo-training"
 SERVICE_ACCOUNT="yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
 BUCKET_NAME="yolo-v11-training"
+# Vertex AI のステージングバケット (存在しない場合は事前に作成しておく)
+STAGING_BUCKET="gs://${BUCKET_NAME}-staging"
 
 # エラーハンドリング関数
 handle_error() {
@@ -26,7 +28,7 @@ usage() {
     echo "  --lr0 FLOAT          学習率 (デフォルト: 0.001)"
     echo "  --optimizer STRING    オプティマイザ (デフォルト: AdamW)"
     echo "  --iou-threshold FLOAT IoU閾値 (デフォルト: 0.5)"
-    echo "  --data-yaml STRING    データセット設定ファイル (デフォルト: data.yaml)"
+    echo "  --data-yaml STRING    データセット設定ファイル (デフォルト: config/data.yaml)"
     echo "  --skip-build         ビルドをスキップしてジョブのみ実行"
     echo "  --help              このヘルプを表示"
     exit 1
@@ -40,7 +42,7 @@ MODEL="yolo11m-seg.pt"
 LR0=0.001
 OPTIMIZER="AdamW"
 IOU_THRESHOLD=0.5
-DATA_YAML="data.yaml"
+DATA_YAML="config/data.yaml"
 SKIP_BUILD=false
 
 # 引数の解析
@@ -108,13 +110,14 @@ echo "IoU閾値: $IOU_THRESHOLD"
 echo "データ設定: $DATA_YAML"
 echo "================================================"
 
-# 仮想環境の確認
-if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo "警告: 仮想環境が有効化されていません。venv_baseを有効化することを推奨します。"
-    read -p "続行しますか？ (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "中止します。"
+# 自動的にvenv_baseをアクティブ化
+if [[ -z "${VIRTUAL_ENV:-}" ]]; then
+    if [[ -d "venv_base" ]]; then
+        echo "仮想環境 venv_base を自動的にアクティブ化します..."
+        # shellcheck disable=SC1091
+        source venv_base/bin/activate
+    else
+        echo "venv_base ディレクトリがありません。python -m venv venv_base && source venv_base/bin/activate で作成してください。"
         exit 1
     fi
 fi
@@ -134,22 +137,9 @@ gcloud config set project ${PROJECT_ID} || handle_error "プロジェクトの�
 echo "Docker認証を設定します..."
 gcloud auth configure-docker ${REGION}-docker.pkg.dev || handle_error "Docker認証の設定に失敗しました"
 
-# サービスアカウントキーの確認
-echo "サービスアカウントキーの存在を確認しています..."
-if [ -f "config/service_account.json" ]; then
-    echo "サービスアカウントキーが見つかりました: config/service_account.json"
-    # ファイルサイズとJSONの形式チェック
-    file_size=$(wc -c < "config/service_account.json" | tr -d ' ')
-    if [ "$file_size" -lt 100 ]; then
-        handle_error "サービスアカウントファイルが小さすぎます（${file_size}バイト）"
-    fi
-    if ! grep -q "client_email" "config/service_account.json" || ! grep -q "private_key" "config/service_account.json"; then
-        handle_error "サービスアカウントファイルに必要なフィールドが含まれていません"
-    fi
-    echo "サービスアカウントファイルの検証に成功しました"
-else
-    handle_error "サービスアカウントキーが見つかりません: config/service_account.json"
-fi
+# ──────────────────────────────────────────────
+# ▼ Workload Identity を使用するため、鍵ファイルチェックは不要
+# ──────────────────────────────────────────────
 
 # タイムスタンプベースのタグ生成
 IMAGE_TAG="v$(date +%Y%m%d-%H%M%S)"
@@ -177,7 +167,7 @@ if [ "$SKIP_BUILD" = false ]; then
     docker buildx build \
         --platform linux/amd64 \
         --no-cache \
-        --secret id=gcp_credentials,src=config/service_account.json \
+        -f Dockerfile.train \
         -t ${REPO_PATH} \
         --push \
         . || handle_error "Dockerイメージのビルドまたはプッシュに失敗しました"
@@ -214,6 +204,7 @@ python scripts/run_vertex_job.py \
     --job_name "$JOB_NAME" \
     --container_image_uri "$REPO_PATH" \
     --service_account "$SERVICE_ACCOUNT" \
+    --staging_bucket "$STAGING_BUCKET" \
     --epochs "$EPOCHS" \
     --batch_size "$BATCH_SIZE" \
     --imgsz "$IMAGE_SIZE" \

@@ -71,25 +71,13 @@ RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/im
 COPY src/ /app/src/
 COPY config/data.yaml /app/config/data.yaml
 
-# サービスアカウントキーをsecret mountから安全にコピー
-RUN --mount=type=secret,id=gcp_credentials,target=/run/secrets/gcp_credentials \
-  if [ -f /run/secrets/gcp_credentials ]; then \
-  cp /run/secrets/gcp_credentials /app/config/service_account.json && \
-  chmod 600 /app/config/service_account.json && \
-  echo "サービスアカウント認証情報をセットしました"; \
-  else \
-  echo "警告: サービスアカウント認証情報が見つかりません" && \
-  touch /app/config/service_account.json; \
-  fi
-
-# Cloud Run環境でのGCP認証を設定
+# Vertex AI環境でのワークロード認証を有効化
 ENV USE_GCP_DEFAULT_CREDENTIALS=true
 
 # ポートを公開
 EXPOSE 8080
 
 # 環境変数を設定
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json
 ENV PYTHONPATH=/app
 ENV PATH="/usr/local/bin:${PATH}"
 ENV CLOUDSDK_PYTHON_SITEPACKAGES=1
