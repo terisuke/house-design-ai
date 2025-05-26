@@ -175,9 +175,24 @@ if [ "$SKIP_BUILD" = false ]; then
     echo "Dockerイメージのビルド＆プッシュが完了しました: $REPO_PATH"
 else
     echo "ビルドをスキップして既存のイメージを使用します"
-    # 最新のイメージタグを取得（簡易実装）
-    IMAGE_TAG="v$(date +%Y%m%d)-latest"
-    REPO_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
+    # Artifact Registryから最新のイメージタグを取得
+    echo "Artifact Registryから最新のイメージタグを取得しています..."
+    
+    # gcloud artifacts docker images listを使用して最新のタグを取得
+    LATEST_IMAGE=$(gcloud artifacts docker images list \
+        "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}" \
+        --limit=1 \
+        --sort-by=~CREATE_TIME \
+        --format="value(package)" 2>/dev/null | head -n1)
+    
+    if [ -z "$LATEST_IMAGE" ]; then
+        echo "エラー: Artifact Registryに既存のイメージが見つかりません"
+        echo "最初にイメージをビルドする必要があります（--skip-buildを削除してください）"
+        exit 1
+    fi
+    
+    REPO_PATH="$LATEST_IMAGE"
+    echo "最新のイメージを使用します: $REPO_PATH"
 fi
 
 echo "================================================"
