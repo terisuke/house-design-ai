@@ -6,12 +6,14 @@
 import logging
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
 import Arch
 import Draft
 import FreeCAD as App
-import Part
+
+if TYPE_CHECKING:
+    from src.visualization.freecad_utils import CADDocument
 
 
 @dataclass
@@ -151,6 +153,7 @@ class WallGenerator:
             wall2 = self.walls[wall2_index]
 
             # 接続点の座標を計算
+            connection_point = None
             if wall1.end_point == wall2.start_point:
                 connection_point = wall1.end_point
             elif wall1.start_point == wall2.end_point:
@@ -158,7 +161,15 @@ class WallGenerator:
             else:
                 raise ValueError("壁が接続できません")
 
-            # 接続部分の処理（必要に応じて実装）
+            # 接続部分の処理
+            if connection_point:
+                # 接続点をログに記録
+                logging.info(f"壁 {wall1_index} と壁 {wall2_index} を点 {connection_point} で接続しました")
+                
+                # TODO: 将来的には以下の機能を実装
+                # - 接続部の補強処理
+                # - T字接続やL字接続の判定
+                # - 接続部の材質調整
 
             return True
 
