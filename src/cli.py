@@ -168,7 +168,7 @@ def setup_train_parser(subparsers):
     parser.add_argument(
         "--data_yaml",
         type=str,
-        default="config/data.yaml",
+        default="/app/config/data.yaml",
         help="data.yamlファイルのパス",
     )
 
@@ -176,13 +176,13 @@ def setup_train_parser(subparsers):
     parser.add_argument(
         "--train_dir",
         type=str,
-        default="house/train",
+        default="/app/house/train",
         help="トレーニングデータディレクトリのローカルパス",
     )
     parser.add_argument(
         "--val_dir",
         type=str,
-        default="house/val",
+        default="/app/house/val",
         help="検証データディレクトリのローカルパス",
     )
 

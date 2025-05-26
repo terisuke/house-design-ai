@@ -62,7 +62,7 @@ def create_custom_training_job(
     
     if accelerator_type:
         machine_spec["accelerator_type"] = accelerator_type
-        machine_spec["accelerator_count"] = str(accelerator_count)
+        machine_spec["accelerator_count"] = accelerator_count
 
     job = aiplatform.CustomJob(
         display_name=display_name,
@@ -73,7 +73,7 @@ def create_custom_training_job(
                 "container_spec": {
                     "image_uri": container_image_uri,
                     "command": [],
-                    "args": ["train"] + args,
+                    "args": args,
                     "env": [{"name": "AIP_DISABLE_HEALTH_CHECK", "value": "true"}],
                 },
             }

@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import shutil  # 追加
+import sys
 from typing import List
 
 import yaml
@@ -124,6 +125,19 @@ def train_model(args: argparse.Namespace) -> int:
         成功時は0、失敗時は1
     """
     try:
+        import sys  # Ensure sys is imported within the function scope
+        
+        # ログレベルを詳細に設定
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        
+        # 実行環境の確認
+        logger.info("=== Training Script Started ===")
+        logger.info(f"Working directory: {os.getcwd()}")
+        logger.info(f"Python path: {sys.path}")
+        logger.info(f"Arguments: {args}")
         # 環境変数とGCP認証情報を確認
         logger.info("環境変数とGCP認証情報を確認")
         cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
@@ -140,7 +154,12 @@ def train_model(args: argparse.Namespace) -> int:
             logger.info(f"GCSからデータセットをダウンロードします: {args.bucket_name}")
 
             # トレーニングデータのダウンロード
-            train_dir = args.train_dir
+            # 絶対パスに変換
+            if not os.path.isabs(args.train_dir):
+                train_dir = os.path.abspath(args.train_dir)
+            else:
+                train_dir = args.train_dir
+                
             # train_dir が存在し、空でない場合は削除 (Vertex AI 環境を想定)
             if os.path.exists(train_dir) and os.listdir(train_dir):
                 logger.warning(f"{train_dir} は空ではありません。削除します。")
@@ -155,7 +174,12 @@ def train_model(args: argparse.Namespace) -> int:
                 return 1
 
             # 検証データのダウンロード
-            val_dir = args.val_dir
+            # 絶対パスに変換
+            if not os.path.isabs(args.val_dir):
+                val_dir = os.path.abspath(args.val_dir)
+            else:
+                val_dir = args.val_dir
+                
             # val_dir が存在し、空でない場合は削除
             if os.path.exists(val_dir) and os.listdir(val_dir):
                 logger.warning(f"{val_dir} は空ではありません。削除します。")
@@ -175,8 +199,28 @@ def train_model(args: argparse.Namespace) -> int:
         data_yaml_path = args.data_yaml
 
         # データ設定ファイルの更新
+        # パスの正規化 - コンテナ内での絶対パスを使用
+        logger.info(f"Current working directory: {os.getcwd()}")
+        
+        # args.train_dir と args.val_dir が既に絶対パスの場合はそのまま使用
+        # そうでない場合は絶対パスに変換
+        if not os.path.isabs(args.train_dir):
+            train_dir_abs = os.path.abspath(args.train_dir)
+        else:
+            train_dir_abs = args.train_dir
+            
+        if not os.path.isabs(args.val_dir):
+            val_dir_abs = os.path.abspath(args.val_dir)
+        else:
+            val_dir_abs = args.val_dir
+            
+        train_images_path = os.path.join(train_dir_abs, "images")
+        val_images_path = os.path.join(val_dir_abs, "images")
+        
+        logger.info(f"データパスを設定: train={train_images_path}, val={val_images_path}")
+        
         if not update_data_yaml(
-            data_yaml_path, f"{args.train_dir}/images", f"{args.val_dir}/images"
+            data_yaml_path, train_images_path, val_images_path
         ):
             logger.error("data.yamlの更新に失敗しました")
             return 1
@@ -184,13 +228,49 @@ def train_model(args: argparse.Namespace) -> int:
         # モデルのインポート
         try:
             from ultralytics import YOLO
-        except ImportError:
-            logger.error("ultralyticsパッケージがインストールされていません")
+        except ImportError as e:
+            logger.error(f"ultralyticsパッケージのインポートエラー: {e}")
+            logger.error(f"Python version: {sys.version}")
+            logger.error(f"Python path: {sys.path}")
+            try:
+                import ultralytics
+                logger.error(f"ultralytics module found at: {ultralytics.__file__}")
+            except:
+                logger.error("ultralytics module not found in sys.modules")
             return 1
 
+        # GPU availability check
+        import torch
+        if torch.cuda.is_available():
+            logger.info(f"GPU detected: {torch.cuda.get_device_name(0)}")
+            logger.info(f"CUDA version: {torch.version.cuda}")
+            logger.info(f"Number of GPUs: {torch.cuda.device_count()}")
+            device = 0
+        else:
+            logger.warning("No GPU detected, will use CPU for training")
+            device = 'cpu'
+        
         # モデルのロード
         logger.info(f"モデルをロード中: {args.model}")
-        model = YOLO(args.model)
+        
+        # GCSパスの場合はダウンロード
+        if args.model.startswith("gs://"):
+            from src.cloud.storage import download_file
+            local_model_path = "/tmp/model.pt"
+            logger.info(f"GCSからモデルをダウンロード: {args.model} -> {local_model_path}")
+            
+            # GCS URLをパース
+            gcs_parts = args.model.replace("gs://", "").split("/", 1)
+            bucket_name = gcs_parts[0]
+            blob_name = gcs_parts[1] if len(gcs_parts) > 1 else ""
+            
+            if download_file(bucket_name, blob_name, local_model_path):
+                model = YOLO(local_model_path)
+            else:
+                logger.error(f"GCSからのモデルダウンロードに失敗: {args.model}")
+                return 1
+        else:
+            model = YOLO(args.model)
 
         # トレーニングパラメータの設定
         train_params = {
@@ -209,6 +289,7 @@ def train_model(args: argparse.Namespace) -> int:
             "scale": args.scale,
             "single_cls": getattr(args, "single_cls", False),
             "exist_ok": True,  # 既存のトレーニング結果を上書き
+            "device": device,  # 検出されたデバイスを使用
         }
 
         # トレーニングの実行
@@ -269,17 +350,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_yaml",
         type=str,
-        default="config/data.yaml",
+        default="/app/config/data.yaml",
         help="data.yamlファイルのパス",
     )
     parser.add_argument(
         "--train_dir",
         type=str,
-        default="house/train",
+        default="/app/house/train",
         help="トレーニングデータディレクトリのパス",
     )
     parser.add_argument(
-        "--val_dir", type=str, default="house/val", help="検証データディレクトリのパス"
+        "--val_dir", type=str, default="/app/house/val", help="検証データディレクトリのパス"
     )
     parser.add_argument(
         "--optimizer", type=str, default="AdamW", help="オプティマイザー"
@@ -319,6 +400,4 @@ if __name__ == "__main__":
 
     # トレーニングの実行
     exit_code = train_model(args)
-    import sys
-
     sys.exit(exit_code)

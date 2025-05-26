@@ -40,6 +40,48 @@ def initialize_gcs_client():
         return None
 
 
+def download_file(
+    bucket_name: str,
+    blob_name: str,
+    destination_path: str,
+) -> bool:
+    """
+    Google Cloud Storage から単一のファイルをダウンロードします。
+
+    Args:
+        bucket_name: GCSバケット名
+        blob_name: ダウンロードするファイルのGCS内パス
+        destination_path: ローカルの保存先パス
+
+    Returns:
+        ダウンロード成功時はTrue、失敗時はFalse
+    """
+    try:
+        client = initialize_gcs_client()
+        if not client:
+            logger.error("GCSクライアントの初期化に失敗しました")
+            return False
+
+        # バケットとBlobの取得
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        # ディレクトリが存在しない場合は作成
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+        # ファイルをダウンロード
+        logger.info(
+            f"ファイルをダウンロード中: gs://{bucket_name}/{blob_name} → {destination_path}"
+        )
+        blob.download_to_filename(destination_path)
+        logger.info(f"ダウンロード完了: {destination_path}")
+        return True
+
+    except Exception as e:
+        logger.error(f"ファイルダウンロードエラー: {e}")
+        return False
+
+
 def download_model_from_gcs(
     bucket_name: str = "yolo-v11-training",
     blob_name: str = "runs/segment/train_20250311-143512/weights/best.pt",
