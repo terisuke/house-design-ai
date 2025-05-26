@@ -139,7 +139,7 @@ wc -c config/service_account.json
 | `--lr0`           | 浮動小数点 | 0.001          | 初期学習率           |
 | `--optimizer`     | 文字列     | AdamW          | オプティマイザ              |
 | `--iou-threshold` | 浮動小数点 | 0.5            | IoU閾値              |
-| `--data-yaml`     | 文字列     | data.yaml      | データセット設定ファイル       |
+| `--data-yaml`     | 文字列     | config/data.yaml | データセット設定ファイル       |
 | `--skip-build`    | フラグ        | false          | ビルドをスキップ             |
 | `--help`          | フラグ        | -              | ヘルプ表示              |
 
