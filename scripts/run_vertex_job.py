@@ -15,7 +15,7 @@ PROJECT_ID = os.environ.get("PROJECT_ID", "yolov8environment")
 REGION = os.environ.get("REGION", "asia-northeast1")
 JOB_NAME = os.environ.get("JOB_NAME", "yolo11-custom-training-job")
 # 最新のイメージタグを使用するか、環境変数で指定する
-CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov11-training-image:v1") # 例：v4部分は適宜変更
+CONTAINER_IMAGE_URI = os.environ.get("CONTAINER_IMAGE_URI", "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov11-training-image:v2") # v1→v2に更新
 SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT", "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com")
 STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://yolo-v11-training-staging")
 
@@ -28,7 +28,7 @@ save_dir = f"runs/segment/train_{now}" #  /app/ は自動的に付与される
 args = [
     "train", # trainコマンドを追加
     "--bucket_name", "yolo-v11-training",
-    "--model", "yolo11l-seg.pt",
+    "--model", "yolo11m-seg.pt",
     "--epochs", "600",
     "--batch_size", "16",
     "--imgsz", "640",
@@ -56,8 +56,8 @@ job = run_vertex_job(
     service_account=SERVICE_ACCOUNT,
     staging_bucket=STAGING_BUCKET,
     args=args,
-    machine_type="n1-highmem-8",  # CPUマシンの例
-    accelerator_type= "NVIDIA_TESLA_T4",  # GPUを使用する場合 (NoneでCPUのみ)
+    machine_type="n1-highmem-8",
+    accelerator_type= "NVIDIA_TESLA_T4",
     accelerator_count= 1 # GPUの数
 )
 

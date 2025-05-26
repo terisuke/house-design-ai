@@ -1,6 +1,51 @@
 # House Design AI ドキュメント
 
-## 最終更新日: 2025年5月15日
+House Design AIプロジェクトの包括的なドキュメントへようこそ。
+
+## 📚 ドキュメント構成
+
+### 🏗️ アーキテクチャ
+- [システム概要](architecture/system_overview.md)
+- [技術スタック](architecture/tech_stack.md)
+
+### 🚀 デプロイメント
+- [Google Cloud デプロイメントガイド](deployment/google_cloud_deployment.md)
+- [Cloud Run デプロイメントガイド](deployment/cloud_run_deployment_guide.md)
+- [**Vertex AI 学習ガイド**](deployment/vertex_ai_training_guide.md) 🆕
+- [GCP デプロイメントガイド](deployment/gcp_deployment_guide.md)
+- [クラウドデプロイ計画](deployment/cloud_deployment_plan.md)
+- [Cloud Run メモリガイド](deployment/cloud_run_memory_guide.md)
+
+### 👩‍💻 開発
+- [貢献ガイド](development/contributing.md)
+- [実装計画](development/implementation_plan.md)
+
+### 🛣️ ロードマップ
+- [開発ロードマップ](roadmap/development_roadmap.md)
+
+## 🆕 最新アップデート（2025年5月25日）
+
+### Vertex AI統合とセキュリティ強化
+
+プロジェクトに以下の重要な機能が追加されました：
+
+- **🤖 Vertex AI統合**: 統合された学習パイプライン
+- **🔒 セキュリティ強化**: Docker secret mount による安全な認証情報処理
+- **🏗️ クロスプラットフォーム対応**: ARM64 MacからAMD64 Linux向けビルド
+- **📜 統合スクリプト**: `build_and_run_vertex_training.sh`による一括処理
+
+詳細は[Vertex AI 学習ガイド](deployment/vertex_ai_training_guide.md)をご覧ください。
+
+## 🔗 関連リンク
+
+- [プロジェクトリポジトリ](https://github.com/terisuke/house-design-ai)
+- [README.md](../README.md)
+- [技術スタック詳細](../technologystack.md)
+
+## 📝 ドキュメント更新履歴
+
+- **2025年5月25日**: Vertex AI統合ガイド追加、セキュリティガイドライン更新
+- **2025年5月24日**: 初期ドキュメント構造作成
 
 ## ドキュメント構造
 
@@ -22,7 +67,7 @@
 - [プロジェクトロードマップ](roadmap/roadmap.md): 短期・中期・長期の開発計画
 - [詳細ロードマップ](roadmap/detailed_roadmap.md): より詳細な開発ロードマップ
 
-## 実装状況 (2025-05-15更新)
+## 実装状況 (2025-05-24更新)
 
 - ✅ FreeCAD APIのCloud Runデプロイ成功
 - ✅ Streamlitアプリケーションの実行確認
@@ -36,6 +81,7 @@
 - ✅ 単位の統一（m）
 - ✅ ロゴ表示とモデルロード問題の修正
 - ✅ デプロイスクリプトの最適化
+- ✅ データセット分割・GCSアップロードスクリプトの実装（7:3分割）
 
 ## 依存関係管理
 
@@ -102,5 +148,6 @@ https://streamlit-web-513507930971.asia-northeast1.run.app
 - 建築基準法チェック機能の実装
 - Terraformによるデプロイプロセスの完全自動化
 - マルチリージョンデプロイメントの実装
+- データセット管理システムの拡張
 
 詳細については、[プロジェクトロードマップ](roadmap/roadmap.md)を参照してください。

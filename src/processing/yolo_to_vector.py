@@ -310,7 +310,7 @@ def convert_to_pydantic_models(polygons: List[Polygon], graph: nx.Graph,
     return site
 
 def convert_yolo_to_vector(annotations_path: str, image_width: int, image_height: int, 
-                          house_class_id: int = 0, road_class_id: int = 1,
+                          house_class_id: int = 12, road_class_id: int = 20,
                           north_direction: float = 0.0) -> Site:
     """
     YOLOアノテーションをベクターデータに変換

@@ -17,81 +17,24 @@ logger = logging.getLogger(__name__)
 def initialize_gcs_client():
     """
     Google Cloud Storage クライアントを初期化します。
+    google.auth.default() を使用して認証を行います。
 
     Returns:
         初期化されたStorageClientオブジェクト、失敗時はNone
     """
     try:
         from google.cloud import storage
+        # google.auth は storage.Client() が内部で使用するため、ここでは直接呼び出しません。
 
-        # Streamlit環境で実行されているか確認
-        is_streamlit = False
-        try:
-            import streamlit as st
-
-            is_streamlit = True
-        except ImportError:
-            pass
-
-        # 認証方法の優先順位:
-        # 1. Streamlit secretsの使用（Streamlit環境の場合）
-        # 2. 指定されたサービスアカウントファイル
-        # 3. Cloud Run環境でのデフォルト認証（USE_GCP_DEFAULT_CREDENTIALS=true）
-        # 4. 環境変数 GOOGLE_APPLICATION_CREDENTIALS
-        # 5. デフォルトの認証
-
-        # 1. Streamlit secretsが利用可能かチェック
-        if is_streamlit:
-            try:
-                from google.oauth2 import service_account
-
-                # st.secretsからGCP認証情報を読み込む
-                if "gcp_service_account" in st.secrets:
-                    logger.info("Streamlit secretsからGCP認証情報を使用します")
-                    credentials = service_account.Credentials.from_service_account_info(
-                        st.secrets["gcp_service_account"]
-                    )
-                    client = storage.Client(credentials=credentials)
-                    return client
-            except Exception as e:
-                logger.warning(f"Streamlit secretsからの認証に失敗しました: {e}")
-                # 他の認証方法にフォールバック
-
-        # 2. 指定されたサービスアカウントファイルを使用
-        service_account_path = os.path.join("config", "service_account.json")
-
-        if os.path.exists(service_account_path):
-            # 指定されたパスのサービスアカウントキーを使用
-            client = storage.Client.from_service_account_json(service_account_path)
-            logger.info(
-                f"サービスアカウントファイルからGCSクライアントを初期化: {service_account_path}"
-            )
-            return client
-        
-        # 3. Cloud Run環境でのデフォルト認証を使用
-        use_default_creds = os.environ.get("USE_GCP_DEFAULT_CREDENTIALS", "").lower() == "true"
-        if use_default_creds:
-            try:
-                from google.auth import default
-                credentials, project = default()
-                client = storage.Client(credentials=credentials, project=project)
-                logger.info(f"Cloud Runのデフォルト認証でGCSクライアントを初期化（プロジェクト: {project}）")
-                return client
-            except Exception as e:
-                logger.warning(f"Cloud Runのデフォルト認証に失敗しました: {e}")
-                # 他の認証方法にフォールバック
-        
-        # 4. デフォルト認証を使用
-        try:
-            client = storage.Client()
-            logger.info("デフォルト認証でGCSクライアントを初期化")
-            return client
-        except Exception as e:
-            logger.error(f"デフォルト認証でのGCS初期化エラー: {e}")
-            return None
+        # storage.Client() を引数なしで呼び出すことで、
+        # 環境変数、well-knownファイル、GCE/GKE/Cloud Run/Cloud Functionsのメタデータサーバーなど、
+        # 標準的な方法で認証情報を自動的に検出します。
+        client = storage.Client()
+        logger.info("GCSクライアントをデフォルト認証で初期化しました")
+        return client
 
     except ImportError:
-        logger.error("google-cloud-storageがインストールされていません")
+        logger.error("google-cloud-storage がインストールされていません")
         return None
     except Exception as e:
         logger.error(f"GCSクライアント初期化エラー: {e}")

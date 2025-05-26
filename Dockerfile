@@ -49,10 +49,11 @@ RUN gsutil --version
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
 # 依存関係のファイルをコピー
-COPY requirements.txt /app/
+COPY requirements-base.txt requirements-gcp.txt /app/
 
 # 依存関係のインストール
-RUN pip3 install --default-timeout=1000 --no-cache-dir -r requirements.txt
+RUN pip3 install --default-timeout=1000 --no-cache-dir -r requirements-base.txt && \
+  pip3 install --default-timeout=1000 --no-cache-dir -r requirements-gcp.txt
 
 # YOLOモデルをダウンロード
 # ultralyticsのモデルディレクトリを作成
@@ -66,34 +67,17 @@ RUN wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-
 # 必要なディレクトリを作成
 RUN mkdir -p /app/house_design_app/ /app/.streamlit/ /app/config/ /app/public/img/
 
-# 必須ディレクトリを作成（重複しているので統合）
-RUN mkdir -p /tmp/build
+# プロジェクトファイルをコピー
+COPY src/ /app/src/
+COPY config/data.yaml /app/config/data.yaml
 
-# コピースクリプトをコピー
-COPY scripts/copy_files.sh /tmp/
-RUN chmod +x /tmp/copy_files.sh
-
-# ビルドコンテキストをコピー
-COPY . /tmp/build/
-
-# ファイルコピースクリプトを実行
-RUN /tmp/copy_files.sh
-
-# 必須ファイルをコピー（存在する場合）
-COPY scripts/check_required_files.sh /app/
-RUN chmod +x /app/check_required_files.sh
-
-# その他のプロジェクトファイルをコピー
-COPY . /app/
-
-# Cloud Run環境でのGCP認証を設定
+# Vertex AI環境でのワークロード認証を有効化
 ENV USE_GCP_DEFAULT_CREDENTIALS=true
 
 # ポートを公開
 EXPOSE 8080
 
 # 環境変数を設定
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/service_account.json
 ENV PYTHONPATH=/app
 ENV PATH="/usr/local/bin:${PATH}"
 ENV CLOUDSDK_PYTHON_SITEPACKAGES=1

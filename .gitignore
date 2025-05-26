@@ -34,6 +34,7 @@ htmlcov/
 .venv
 venv/
 venv_ortools/
+venv_base/
 ENV/
 .python-version
 
@@ -85,7 +86,9 @@ runs/
 *.tif
 *.tiff
 *.txt
-!requirements.txt
+!requirements-ortools.txt
+!requirements-base.txt
+!requirements-gcp.txt
 !data.yaml
 !requirements.yaml
 
