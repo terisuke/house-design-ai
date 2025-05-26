@@ -1,4 +1,4 @@
-"""������"""
+"""推論モジュール"""
 
 import argparse
 import logging
@@ -11,61 +11,41 @@ logger = logging.getLogger(__name__)
 
 
 def run_inference(args: argparse.Namespace) -> int:
-    """�֒�LY�
+    """YOLOモデルを使用して推論を実行
     
     Args:
-        args: ������p
+        args: コマンドライン引数
         
     Returns:
-        B����
+        終了コード（成功: 0、失敗: 1）
     """
     try:
-        # ������
-        model = YOLO(args.model)
+        # モデルをロード
+        model = YOLO(args.model_path)
         
-        # ;�ѹ�֗
-        image_path = Path(args.image)
+        # 画像パスの検証
+        image_path = Path(args.image_path)
         if not image_path.exists():
-            logger.error(f";�ա��L�dK�~[�: {image_path}")
+            logger.error(f"画像ファイルが見つかりません: {image_path}")
             return 1
         
-        # �֒�L
+        # 推論を実行
         results = model.predict(
             source=str(image_path),
-            save=args.save,
-            save_txt=args.save_txt,
-            save_conf=args.save_conf,
-            save_crop=args.save_crop,
-            hide_labels=args.hide_labels,
-            hide_conf=args.hide_conf,
-            conf=args.conf,
-            iou=args.iou,
-            max_det=args.max_det,
-            device=args.device,
-            visualize=args.visualize,
-            augment=args.augment,
-            agnostic_nms=args.agnostic_nms,
-            classes=args.classes,
-            retina_masks=args.retina_masks,
-            boxes=not args.no_boxes,
-            show=args.show,
-            line_width=args.line_width,
-            imgsz=args.imgsz,
-            project=args.project,
-            name=args.name,
-            exist_ok=args.exist_ok,
+            save=True,
+            project=args.output_dir,
         )
         
-        # P��h:
+        # 結果を表示
         for result in results:
             if hasattr(result, "boxes") and result.boxes is not None:
-                logger.info(f"�U�_�ָ���p: {len(result.boxes)}")
+                logger.info(f"検出されたオブジェクト数: {len(result.boxes)}")
             if hasattr(result, "masks") and result.masks is not None:
-                logger.info(f"���������޹�p: {len(result.masks)}")
+                logger.info(f"検出されたマスク数: {len(result.masks)}")
         
-        logger.info("��L��W~W_")
+        logger.info("推論が正常に完了しました")
         return 0
         
     except Exception as e:
-        logger.error(f"��-k���LzW~W_: {e}")
+        logger.error(f"推論中にエラーが発生しました: {e}")
         return 1
