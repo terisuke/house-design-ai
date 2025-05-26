@@ -4,18 +4,15 @@ CP-SATソルバーを使用した3LDK間取り生成モジュール
 このモジュールは、Google OR-ToolsのCP-SATソルバーを使用して、
 日本の建築基準法に準拠した3LDKの基本レイアウトを生成します。
 """
-from typing import List, Dict, Tuple, Optional, Union, Any
+from typing import List, Dict, Tuple, Optional, Any
 from ortools.sat.python import cp_model
 import numpy as np
-import json
-import cv2
 import logging
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import os
 import sys
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -628,7 +625,7 @@ def generate_3ldk_layout(site_width: float, site_height: float, output_dir: Opti
         solver.parameters.log_search_progress = True  # 検索の進捗をログに出力
         
         logger.info(f"間取り生成を開始します: 敷地サイズ {site_width}x{site_height}m, タイムアウト {timeout_sec}秒")
-        result = solve_and_convert(model, rooms, solver, site_width, site_height)
+        result: Optional[LayoutResult] = solve_and_convert(model, rooms, solver, site_width, site_height)
     
     if result:
         logger.info(f"間取り生成に成功しました: 総面積 {result.total_area:.1f}m²")

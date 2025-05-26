@@ -5,7 +5,6 @@
 import numpy as np
 import cv2
 import tempfile
-import io
 from typing import Optional, Tuple, Dict, Any
 from PIL import Image
 import logging
@@ -13,12 +12,9 @@ import yaml
 import os
 import requests
 import random
-import sys
-from collections import OrderedDict
 
 from src.processing.arrangement import (
     Site,
-    Madori,
     create_madori_odict,
     arrange_rooms_with_constraints,
     fill_corridor,
@@ -310,7 +306,7 @@ def draw_floorplan_on_mask_with_mask(
     floorplan_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
     # マスク領域を半透明着色(青)
-    overlay = out.copy()
+    # overlay = out.copy()  # Not used
     mask_area = np.zeros_like(out)
     mask_area[final_mask == 1] = (255, 0, 0)
     cv2.addWeighted(mask_area, 0.4, out, 1, 0, out)
@@ -609,7 +605,7 @@ def draw_random_alphabet_on_mask(
     alphabet_stats["bounding_box"] = {"x": x, "y": y, "width": w, "height": h}
 
     # マスク領域を半透明着色(青)
-    overlay = out.copy()
+    # overlay = out.copy()  # Not used
     mask_area = np.zeros_like(out)
     mask_area[final_mask == 1] = (255, 0, 0)
     cv2.addWeighted(mask_area, 0.4, out, 1, 0, out)

@@ -6,10 +6,13 @@
 import logging
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import Draft
 import FreeCAD as App
+
+if TYPE_CHECKING:
+    from src.visualization.freecad_utils import CADDocument
 
 
 @dataclass

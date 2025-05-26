@@ -3,18 +3,14 @@ FreeCADを使用した間取り図のCAD風表示のためのStreamlitコンポ�
 """
 import streamlit as st
 import os
-import sys
-import tempfile
 import numpy as np
 import cv2
 from PIL import Image
 import io
 import logging
-import base64
 import requests
 
 # FreeCADの環境設定をインポート
-from src.utils.setup_freecad import setup_freecad_environment
 
 # FreeCAD APIの設定
 FREECAD_API_URL = os.getenv(
@@ -121,7 +117,7 @@ def display_floorplan_details(floorplan_stats):
         for name, info in floorplan_stats["madori_info"].items():
             width = info.get("width", 0)
             height = info.get("height", 0)
-            neighbor = info.get("neighbor", "なし")
+            # neighbor = info.get("neighbor", "なし")  # Not used
             
             # 1マス = 910mm (91.0cm)として計算
             width_mm = width * 910

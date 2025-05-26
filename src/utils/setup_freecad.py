@@ -3,7 +3,6 @@
 import logging
 import os
 import requests
-from typing import Optional
 
 # ロギングの設定
 logging.basicConfig(
