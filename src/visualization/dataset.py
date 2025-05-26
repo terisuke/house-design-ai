@@ -10,7 +10,7 @@ import yaml
 import argparse
 import random
 import logging
-from typing import List, Dict, Any, Union, Optional, Tuple
+from typing import List, Dict, Any, Optional
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -222,16 +222,16 @@ def visualize_dataset(
             
             # 各アノテーションを処理
             for line in lines:
-                line = line.strip().split()
-                if len(line) < 5:  # 最小でもクラスIDとx,y,w,hが必要
+                parts = line.strip().split()
+                if len(parts) < 5:  # 最小でもクラスIDとx,y,w,hが必要
                     continue
                     
-                class_id = int(line[0])
+                class_id = int(parts[0])
                 class_name = class_names[class_id] if class_id < len(class_names) else f"Unknown-{class_id}"
                 
                 # YOLOフォーマットの座標をピクセル座標に変換
-                if len(line) == 5:  # バウンディングボックス形式
-                    x_center, y_center, width, height = map(float, line[1:5])
+                if len(parts) == 5:  # バウンディングボックス形式
+                    x_center, y_center, width, height = map(float, parts[1:5])
                     x1 = int((x_center - width / 2) * w)
                     y1 = int((y_center - height / 2) * h)
                     x2 = int((x_center + width / 2) * w)
@@ -240,10 +240,10 @@ def visualize_dataset(
                 else:  # セグメンテーション形式
                     # セグメントポイントをピクセル座標に変換
                     segments = []
-                    for i in range(1, len(line), 2):
-                        if i+1 < len(line):
-                            x = float(line[i]) * w
-                            y = float(line[i+1]) * h
+                    for i in range(1, len(parts), 2):
+                        if i+1 < len(parts):
+                            x = float(parts[i]) * w
+                            y = float(parts[i+1]) * h
                             segments.append([x, y])
                     
                     if segments:

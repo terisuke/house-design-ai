@@ -6,8 +6,7 @@
 import logging
 import os
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from pydantic import BaseModel
@@ -46,7 +45,7 @@ class CADEnvironment(BaseModel):
                     sys.path.append(self.lib_path)
 
                 # FreeCADのインポートを試行
-                import FreeCAD
+                import FreeCAD  # noqa: F401
 
                 logging.info("FreeCAD環境のセットアップに成功しました")
                 return True

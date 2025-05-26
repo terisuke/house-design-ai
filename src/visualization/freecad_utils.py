@@ -2,13 +2,11 @@
 FreeCADを使用して間取り図をCAD風に描画するためのユーティリティ関数
 """
 import os
-import sys
 import tempfile
 import numpy as np
 import cv2
 from PIL import Image
 import logging
-import io
 
 # FreeCADの環境設定をインポート
 from src.utils.setup_freecad import setup_freecad_environment
@@ -21,7 +19,7 @@ try:
     import FreeCAD
     import Part
     import Draft
-    import Sketcher
+    import Sketcher  # noqa: F401
     import Arch
     FREECAD_AVAILABLE = True
 except ImportError as e:
@@ -566,7 +564,7 @@ def fallback_cad_style_drawing(grid_data, positions, madori_info, cell_px, x, y,
                     font_scale, text_color, text_thickness, cv2.LINE_AA)
     
     # 廊下を処理
-    corridor_mask = (grid_data == 7)
+    # corridor_mask = (grid_data == 7)  # Not used
     for i in range(grid_data.shape[1]):
         for j in range(grid_data.shape[0]):
             if grid_data[j, i] == 7:  # 廊下コード

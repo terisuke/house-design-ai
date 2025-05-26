@@ -6,12 +6,14 @@
 import logging
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
 import Arch
 import Draft
 import FreeCAD as App
-import Part
+
+if TYPE_CHECKING:
+    from src.visualization.freecad_utils import CADDocument
 
 
 @dataclass
@@ -152,9 +154,11 @@ class WallGenerator:
 
             # 接続点の座標を計算
             if wall1.end_point == wall2.start_point:
-                connection_point = wall1.end_point
+                # connection_point = wall1.end_point
+                pass
             elif wall1.start_point == wall2.end_point:
-                connection_point = wall1.start_point
+                # connection_point = wall1.start_point
+                pass
             else:
                 raise ValueError("壁が接続できません")
 

@@ -5,9 +5,8 @@ House Design AI プロジェクトのコマンドラインインターフェー�
 """
 import argparse
 import logging
-import os
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional
 
 # ロギング設定
 logging.basicConfig(
@@ -409,7 +408,7 @@ def main(args: Optional[List[str]] = None) -> int:
             logger.info(f"Vertex AIジョブに渡される引数: {args_str}")
 
             # ジョブを実行
-            job = run_vertex_job(
+            run_vertex_job(
                 project_id=parsed_args.project_id,
                 region=parsed_args.region,
                 job_name=parsed_args.job_name,
@@ -423,12 +422,13 @@ def main(args: Optional[List[str]] = None) -> int:
             )
 
             print(f"Vertex AI ジョブ '{parsed_args.job_name}' が開始されました。")
-            print(f"ジョブの進行状況は Google Cloud Console で確認できます。")
+            print("ジョブの進行状況は Google Cloud Console で確認できます。")
             return 0
 
         # Streamlitアプリ起動コマンド
         elif parsed_args.command == "app":
             # モデルパスを環境変数に設定（Streamlitアプリで使用）
+            import os
             if parsed_args.model_path:
                 os.environ["YOLO_MODEL_PATH"] = parsed_args.model_path
 

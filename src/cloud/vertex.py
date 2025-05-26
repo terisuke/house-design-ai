@@ -2,12 +2,10 @@
 Google Cloud Vertex AI との連携モジュール。
 カスタムトレーニングジョブの設定と実行を担当します。
 """
-from typing import List, Dict, Any, Optional
-import datetime
+from typing import List, Optional
 import logging
 import argparse
 from google.cloud import aiplatform
-from pathlib import Path
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -64,7 +62,7 @@ def create_custom_training_job(
     
     if accelerator_type:
         machine_spec["accelerator_type"] = accelerator_type
-        machine_spec["accelerator_count"] = accelerator_count
+        machine_spec["accelerator_count"] = str(accelerator_count)
 
     job = aiplatform.CustomJob(
         display_name=display_name,
@@ -84,7 +82,7 @@ def create_custom_training_job(
     
     logger.info(f"Created custom training job: {display_name}")
     logger.info(f"Container image: {container_image_uri}")
-    logger.info(f"Container command: python3 -m src.cli")
+    logger.info("Container command: python3 -m src.cli")
     logger.info(f"Container args: {args}")
     logger.info(f"Machine type: {machine_type}, Accelerator: {accelerator_type} x {accelerator_count if accelerator_type else 0}")
     return job

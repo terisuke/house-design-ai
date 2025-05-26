@@ -1,15 +1,14 @@
 """
 YOLOアノテーションをベクターデータおよびグラフ構造のJSONに変換するモジュール
 """
-from typing import List, Dict, Tuple, Optional, Union, Any
+from typing import List, Dict, Optional, Any
 import numpy as np
-import json
 import cv2
 import logging
 import networkx as nx
-from shapely.geometry import Polygon, LineString, Point as ShapelyPoint
-from shapely.ops import unary_union, polygonize
-from pydantic import BaseModel, Field
+from shapely.geometry import Polygon, LineString
+from shapely.ops import unary_union
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

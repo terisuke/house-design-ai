@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 
 import numpy as np
-import pandas as pd
 from scipy import ndimage
 
 

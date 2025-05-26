@@ -2,13 +2,9 @@ import argparse
 import logging
 import os
 import shutil  # 追加
-import subprocess
-import tempfile
-from pathlib import Path
 from typing import List
 
 import yaml
-from google.cloud import storage
 
 # ロギング設定
 logger = logging.getLogger(__name__)
@@ -136,7 +132,7 @@ def train_model(args: argparse.Namespace) -> int:
             logger.info(f"認証情報ファイルが存在します: {cred_path}")
         else:
             logger.warning(
-                f"認証情報ファイルが存在しないか、環境変数が設定されていません"
+                "認証情報ファイルが存在しないか、環境変数が設定されていません"
             )
 
         # GCSからデータセットをダウンロード
