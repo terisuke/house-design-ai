@@ -113,6 +113,9 @@ def update_data_yaml(yaml_path: str, train_dir: str, val_dir: str) -> bool:
         logger.error(f"data.yaml更新エラー: {e}")
         return False
 
+def normalize_path(path: str) -> str:
+    """パスを絶対パスに正規化します"""
+    return os.path.abspath(path) if not os.path.isabs(path) else path
 
 def train_model(args: argparse.Namespace) -> int:
     """
@@ -155,10 +158,7 @@ def train_model(args: argparse.Namespace) -> int:
 
             # トレーニングデータのダウンロード
             # 絶対パスに変換
-            if not os.path.isabs(args.train_dir):
-                train_dir = os.path.abspath(args.train_dir)
-            else:
-                train_dir = args.train_dir
+            train_dir = normalize_path(args.train_dir)
                 
             # train_dir が存在し、空でない場合は削除 (Vertex AI 環境を想定)
             if os.path.exists(train_dir) and os.listdir(train_dir):
@@ -175,10 +175,7 @@ def train_model(args: argparse.Namespace) -> int:
 
             # 検証データのダウンロード
             # 絶対パスに変換
-            if not os.path.isabs(args.val_dir):
-                val_dir = os.path.abspath(args.val_dir)
-            else:
-                val_dir = args.val_dir
+            val_dir = normalize_path(args.val_dir)
                 
             # val_dir が存在し、空でない場合は削除
             if os.path.exists(val_dir) and os.listdir(val_dir):
@@ -202,17 +199,9 @@ def train_model(args: argparse.Namespace) -> int:
         # パスの正規化 - コンテナ内での絶対パスを使用
         logger.info(f"Current working directory: {os.getcwd()}")
         
-        # args.train_dir と args.val_dir が既に絶対パスの場合はそのまま使用
-        # そうでない場合は絶対パスに変換
-        if not os.path.isabs(args.train_dir):
-            train_dir_abs = os.path.abspath(args.train_dir)
-        else:
-            train_dir_abs = args.train_dir
-            
-        if not os.path.isabs(args.val_dir):
-            val_dir_abs = os.path.abspath(args.val_dir)
-        else:
-            val_dir_abs = args.val_dir
+        # args.train_dir と args.val_dir を絶対パスに変換
+        train_dir_abs = normalize_path(args.train_dir)
+        val_dir_abs = normalize_path(args.val_dir)
             
         train_images_path = os.path.join(train_dir_abs, "images")
         val_images_path = os.path.join(val_dir_abs, "images")
