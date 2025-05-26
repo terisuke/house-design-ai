@@ -78,7 +78,7 @@ while true; do
         # Use a more portable date command
         if [[ "$(uname)" == "Darwin" ]]; then
             # macOS
-            TIMESTAMP=$(date -u -v-1M '+%Y-%m-%dT%H:%M:%SZ')
+            TIMESTAMP=$(date -u -v-60S '+%Y-%m-%dT%H:%M:%SZ')
         else
             # Linux
             TIMESTAMP=$(date -u -d '1 minute ago' '+%Y-%m-%dT%H:%M:%SZ')

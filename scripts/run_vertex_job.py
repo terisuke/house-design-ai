@@ -23,6 +23,10 @@ if __name__ == "__main__":
                         default=os.environ.get("SERVICE_ACCOUNT", "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"))
     parser.add_argument("--staging_bucket", type=str,
                         default=os.environ.get("STAGING_BUCKET", "gs://yolo-v11-training-staging"))
+    parser.add_argument("--bucket_name", type=str, required=True,
+                        help="GCS bucket name for training data (without gs:// prefix)")
+    parser.add_argument("--upload_bucket", type=str, required=True,
+                        help="GCS bucket name for uploading trained models (without gs:// prefix)")
     # YOLO training parameters
     parser.add_argument("--epochs", type=int, default=600)
     parser.add_argument("--batch_size", type=int, default=16)
@@ -49,14 +53,14 @@ if __name__ == "__main__":
     save_dir = f"runs/segment/train_{now_for_savedir}"
     training_args_for_container = [
         "train",
-        "--bucket_name", "yolo-v11-training",
+        "--bucket_name", script_args.bucket_name,
         "--model", script_args.model,
         "--epochs", str(script_args.epochs),
         "--batch_size", str(script_args.batch_size),
         "--imgsz", str(script_args.imgsz),
         "--optimizer", script_args.optimizer,
         "--lr0", str(script_args.lr0),
-        "--upload_bucket", "yolo-v11-training",
+        "--upload_bucket", script_args.upload_bucket,
         "--upload_dir", "trained_models",
         "--iou_threshold", str(script_args.iou_threshold),
         "--conf_threshold", str(script_args.conf_threshold),

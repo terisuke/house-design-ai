@@ -43,3 +43,14 @@ print(f"Data yaml exists: {os.path.exists(args.data_yaml)}")
 # 実際のトレーニングは行わない
 print("\nThis is a dry run test - not performing actual training")
 print("To run actual training, use the build_and_run_vertex_training.sh script")
+
+# Run initialization test with minimal epochs
+try:
+    print("\nTesting train_model initialization...")
+    # Set epochs to 0 for dry run
+    args.epochs = 0
+    train_model(args)
+    print("Initialization test completed successfully")
+except Exception as e:
+    print(f"Initialization test failed: {e}")
+    sys.exit(1)

@@ -235,8 +235,10 @@ def train_model(args: argparse.Namespace) -> int:
             try:
                 import ultralytics
                 logger.error(f"ultralytics module found at: {ultralytics.__file__}")
-            except:
-                logger.error("ultralytics module not found in sys.modules")
+            except Exception as e:
+                logger.error(f"ultralytics module not found in sys.modules: {e}")
+                import traceback
+                logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return 1
 
         # GPU availability check
