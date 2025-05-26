@@ -1,0 +1,30 @@
+# ベースイメージ
+FROM --platform=linux/amd64 python:3.10-slim-bullseye
+
+# 作業ディレクトリ
+WORKDIR /app
+
+# 基本ツール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  git \
+  wget \
+  && rm -rf /var/lib/apt/lists/*
+
+# Python deps
+COPY requirements-base.txt requirements-gcp.txt /app/
+RUN pip install --no-cache-dir --upgrade pip && \
+  pip install --no-cache-dir -r requirements-base.txt && \
+  pip install --no-cache-dir -r requirements-gcp.txt
+
+# YOLOモデルをあらかじめ取得（オプション）
+RUN mkdir -p /root/.config/ultralytics/models && \
+  wget -q https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-seg.pt -O /root/.config/ultralytics/models/yolo11l-seg.pt || true
+
+# アプリコード
+COPY src /app/src
+COPY config/data.yaml /app/config/data.yaml
+
+ENV PYTHONPATH=/app
+
+# エントリポイント: CLI モジュール
+ENTRYPOINT ["python3", "-m", "src.cli"] 

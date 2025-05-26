@@ -5,6 +5,7 @@ Google Cloud Vertex AI との連携モジュール。
 from typing import List, Dict, Any, Optional
 import datetime
 import logging
+import argparse
 from google.cloud import aiplatform
 from pathlib import Path
 
@@ -73,8 +74,9 @@ def create_custom_training_job(
                 "replica_count": replica_count,
                 "container_spec": {
                     "image_uri": container_image_uri,
-                    "command": ["python3", "-m", "src.cli"],
-                    "args": args,
+                    "command": [],
+                    "args": ["train"] + args,
+                    "env": [{"name": "AIP_DISABLE_HEALTH_CHECK", "value": "true"}],
                 },
             }
         ],
@@ -121,10 +123,6 @@ def run_vertex_job(
     # Vertex AI の初期化
     init_vertex_ai(project_id, region, staging_bucket)
     
-    # trainサブコマンドが含まれていない場合のみ先頭に追加
-    if len(args) == 0 or args[0] != "train":
-        args = ["train"] + args
-    
     # 実行コマンドのデバッグログ出力
     command_str = "python3 -m src.cli " + " ".join(args)
     logger.info(f"実行されるコマンド: {command_str}")
@@ -147,44 +145,25 @@ def run_vertex_job(
 
 # スクリプトとして実行された場合の処理
 if __name__ == "__main__":
-    # デフォルト設定
-    PROJECT_ID = "yolov8environment"
-    REGION = "asia-northeast1"
-    JOB_NAME = "yolo11-custom-training-job"
-    CONTAINER_IMAGE_URI = "asia-northeast1-docker.pkg.dev/yolov8environment/yolov8-repository/yolov11-training-image:v1"
-    SERVICE_ACCOUNT = "yolo-v8-enviroment@yolov8environment.iam.gserviceaccount.com"
-    STAGING_BUCKET = "gs://yolo-v11-training-staging"
-    
-    # Dockerコンテナで実行されるコマンド引数リスト
-    # 最初に'train'サブコマンドを追加してCLIモードを有効化
-    args = [
-        "--bucket_name", "yolo-v11-training",
-        "--model", "yolo11l-seg.pt",
-        "--epochs", "600",             # エポック数を増加
-        "--batch_size", "16",
-        "--imgsz", "640",
-        "--optimizer", "SGD",          # AdamからSGDに変更
-        "--lr0", "0.005",              # 初期学習率を調整
-        "--upload_bucket", "yolo-v11-training",
-        "--upload_dir", "trained_models",
-        "--iou_threshold", "0.65",     # 少し緩和
-        "--conf_threshold", "0.2",     # 少し緩和
-        "--rect",                      # 矩形トレーニング
-        "--cos_lr",                    # コサイン学習率スケジューラ
-        "--mosaic", "1.0",             # モザイク拡張
-        "--degrees", "10.0",           # 回転拡張を増加
-        "--scale", "0.6",              # スケール拡張を少し増加
-    ]
-    
-    # ジョブの実行
+    parser = argparse.ArgumentParser(description="Vertex AI Custom Job Launcher")
+    parser.add_argument("--project_id", required=True, help="GCP Project ID")
+    parser.add_argument("--region", default="asia-northeast1", help="GCP Region")
+    parser.add_argument("--job_name", required=True, help="Display name of the CustomJob")
+    parser.add_argument("--container_image_uri", required=True, help="Training container image URI")
+    parser.add_argument("--service_account", required=True, help="Service account email for the job")
+    parser.add_argument("--staging_bucket", required=True, help="GCS staging bucket (gs://bucket)")
+    # 以降のパラメータはトレーニング用としてそのまま Docker に渡す
+    known_args, remaining_args = parser.parse_known_args()
+
+    # ジョブ実行
     job = run_vertex_job(
-        project_id=PROJECT_ID,
-        region=REGION,
-        job_name=JOB_NAME,
-        container_image_uri=CONTAINER_IMAGE_URI,
-        service_account=SERVICE_ACCOUNT,
-        staging_bucket=STAGING_BUCKET,
-        args=args
+        project_id=known_args.project_id,
+        region=known_args.region,
+        job_name=known_args.job_name,
+        container_image_uri=known_args.container_image_uri,
+        service_account=known_args.service_account,
+        staging_bucket=known_args.staging_bucket,
+        args=remaining_args
     )
-    
-    print(f"CustomJob '{JOB_NAME}' started successfully. Check the Vertex AI Console for progress.")
+
+    print(f"CustomJob '{known_args.job_name}' started successfully. Check the Vertex AI Console for progress.")
